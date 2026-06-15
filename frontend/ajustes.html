@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ajustes — Turnify</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#F1EFE5;--card:#fff;--ink:#17150F;--ink2:#5E594B;--teal:#0E8074;--teal-ink:#0A5B52;--teal-soft:#E3EFE9;--mango:#EFA12F;--line:#E1DCCD;--r:18px;
+--display:"Bricolage Grotesque",sans-serif;--body:"Instrument Sans",sans-serif;--mono:"Spline Sans Mono",monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--body);color:var(--ink);background:var(--paper)}
+a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+.demobar{position:sticky;top:0;z-index:90;background:var(--ink);color:#CFC9B6;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:8px 14px;display:flex;gap:14px;overflow-x:auto;white-space:nowrap}
+.demobar a{color:#CFC9B6}.demobar a.on{color:#9FE8D5}
+.shell{max-width:1100px;margin:0 auto;padding:20px 18px 80px}
+.head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:18px}
+.head h1{font-family:var(--display);font-weight:800;font-size:clamp(22px,3.6vw,28px);letter-spacing:-.02em}
+.head a{font-size:13px;font-weight:700;color:var(--teal-ink)}
+.layout{display:grid;grid-template-columns:215px 1fr;gap:18px}
+@media(max-width:860px){.layout{grid-template-columns:1fr}}
+.snav{display:flex;flex-direction:column;gap:3px;position:sticky;top:50px;align-self:start}
+@media(max-width:860px){.snav{position:static;flex-direction:row;overflow-x:auto;padding-bottom:6px;scrollbar-width:none}.snav::-webkit-scrollbar{display:none}}
+.snav button{text-align:left;white-space:nowrap;font-size:13.5px;font-weight:600;color:var(--ink2);padding:11px 13px;border-radius:12px;display:flex;gap:9px;align-items:center}
+.snav button.on{background:var(--ink);color:#FFF8EC}
+.pane{display:none;animation:fade .22s ease}
+.pane.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:20px;margin-bottom:14px}
+.card h2{font-family:var(--display);font-size:17px;font-weight:800;margin-bottom:4px}
+.card .sub{font-size:12.5px;color:var(--ink2);margin-bottom:16px;line-height:1.5}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:640px){.row2{grid-template-columns:1fr}}
+.field{margin-bottom:12px}
+.field label{display:block;font-size:11.5px;font-weight:700;color:var(--ink2);margin-bottom:6px;letter-spacing:.02em}
+.field input,.field textarea,.field select{width:100%;font:inherit;font-size:14px;padding:12px 13px;border-radius:12px;border:1.5px solid var(--line);background:#FDFCF8;color:var(--ink)}
+.field input:focus,.field textarea:focus{outline:none;border-color:var(--teal)}
+.btn{display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:13.5px;padding:12px 18px;border-radius:12px}
+.btn-dark{background:var(--ink);color:#FFF8EC}.btn-teal{background:var(--teal);color:#fff}
+.btn-ghost{background:var(--card);border:1.5px solid var(--line)}
+.btn-danger{background:#FBE3DC;color:#A33A24}
+.badge{display:inline-block;font-size:10.5px;font-weight:700;padding:4px 9px;border-radius:99px;background:var(--teal-soft);color:var(--teal-ink)}
+.badge.gold{background:#FBEFD8;color:#8a5a13}.badge.gray{background:#EDEAE0;color:var(--ink2)}
+/* swatches */
+.swatches{display:flex;gap:8px;flex-wrap:wrap}
+.sw{width:34px;height:34px;border-radius:11px;border:2.5px solid transparent;cursor:pointer}
+.sw.on{border-color:var(--ink)}
+/* toggle */
+.tg{position:relative;width:44px;height:26px;border-radius:99px;background:#D8D3C2;flex:none;transition:background .15s}
+.tg::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:99px;background:#fff;transition:left .15s}
+.tg.on{background:var(--teal)}.tg.on::after{left:21px}
+/* pagos */
+.pay{display:flex;align-items:center;gap:13px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pay:last-child{border:0;padding-bottom:0}
+.pm{font-family:var(--mono);font-weight:700;font-size:10.5px;padding:8px 11px;border-radius:10px;flex:none;letter-spacing:.02em}
+.pm-ath{background:#FF7A1A;color:#fff}.pm-st{background:#635BFF;color:#fff}.pm-pp{background:#003087;color:#fff}.pm-kl{background:#FFB3C7;color:#17120F}
+.pay .grow{flex:1;min-width:0}
+.pay h4{font-size:14.5px;font-weight:700}
+.pay p{font-size:12px;color:var(--ink2);margin-top:2px;line-height:1.45}
+.pay .st{font-size:11px;font-weight:700}
+.st.ok{color:var(--teal-ink)}.st.off{color:var(--ink2)}
+.transp-note{background:var(--teal-soft);border-radius:13px;padding:13px 15px;font-size:12.5px;color:var(--teal-ink);line-height:1.6;margin-top:14px}
+/* tienda tiers */
+.tiers{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:8px 0 4px}
+@media(max-width:640px){.tiers{grid-template-columns:1fr}}
+.tier{border:2px solid var(--line);border-radius:15px;padding:15px;cursor:pointer;position:relative}
+.tier.on{border-color:var(--teal);background:var(--teal-soft)}
+.tier b{font-family:var(--mono);font-size:20px}
+.tier small{display:block;font-size:12px;color:var(--ink2);margin-top:4px;line-height:1.5}
+.tier .cur{position:absolute;top:-10px;right:12px;background:var(--teal);color:#fff;font-size:9.5px;font-weight:800;letter-spacing:.08em;padding:4px 10px;border-radius:99px}
+.usage{margin-top:12px}
+.usage .bar{height:9px;border-radius:99px;background:#EDEAE0;overflow:hidden;margin-top:6px}
+.usage .bar i{display:block;height:100%;width:70%;background:var(--teal);border-radius:99px}
+.usage small{font-family:var(--mono);font-size:11px;color:var(--ink2)}
+/* code blocks */
+.codebox{position:relative;background:#14130E;color:#D8F4E9;border-radius:13px;padding:14px 15px;font-family:var(--mono);font-size:11.5px;line-height:1.6;overflow-x:auto;margin-top:8px}
+.codebox .cp{position:absolute;top:9px;right:9px;background:#FFF8EC;color:#14130E;font-size:10px;font-weight:800;padding:5px 9px;border-radius:8px}
+.codebox .c{color:#7BA294}
+/* api keys / webhooks rows */
+.krow{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px dashed var(--line);font-size:13px}
+.krow:last-child{border:0}
+.krow code{font-family:var(--mono);font-size:12px;background:#F3F0E6;border:1px solid var(--line);padding:5px 9px;border-radius:8px}
+.krow .grow{flex:1;min-width:0}
+.krow small{display:block;color:var(--ink2);font-size:11px;margin-top:2px}
+.scope{font-size:9.5px;font-weight:700;background:#EDEAE0;color:var(--ink2);padding:3px 7px;border-radius:6px;margin-right:4px}
+/* embed opts */
+.embopts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0 6px}
+@media(max-width:640px){.embopts{grid-template-columns:1fr}}
+.emb{border:2px solid var(--line);border-radius:13px;padding:12px;text-align:center;font-size:12.5px;font-weight:600;cursor:pointer}
+.emb.on{border-color:var(--teal);background:var(--teal-soft)}
+.emb span{display:block;font-size:20px;margin-bottom:5px}
+.preview{margin-top:12px;border:1.5px dashed var(--line);border-radius:14px;padding:16px;background:repeating-linear-gradient(45deg,#FAF8F0 0 12px,#F4F1E6 12px 24px);display:flex;justify-content:flex-end;align-items:flex-end;min-height:110px}
+.fab{background:var(--teal);color:#fff;font-weight:700;font-size:13px;padding:13px 18px;border-radius:99px;box-shadow:0 10px 22px -8px rgba(14,128,116,.55)}
+/* seguridad */
+.sec{display:flex;align-items:center;gap:13px;padding:13px 0;border-bottom:1px dashed var(--line)}
+.sec:last-child{border:0}
+.sec .ic{width:38px;height:38px;border-radius:12px;background:var(--teal-soft);display:grid;place-items:center;font-size:16px;flex:none}
+.sec .grow{flex:1}.sec h4{font-size:14px;font-weight:700}.sec p{font-size:12px;color:var(--ink2);margin-top:2px;line-height:1.45}
+.dev{font-size:12.5px;display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px dashed var(--line)}
+.dev:last-child{border:0}
+.dev small{display:block;color:var(--ink2);font-size:11px;font-family:var(--mono)}
+.dev .out{color:#A33A24;font-weight:700;font-size:11.5px}
+/* facturación */
+.bill-now{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.bill-now b{font-family:var(--mono);font-size:34px;letter-spacing:-.02em}
+.bill-now s{color:var(--ink2);font-family:var(--mono);font-size:16px}
+.desg{margin-top:12px;border-top:1px dashed var(--line)}
+.desg .r{display:flex;justify-content:space-between;font-size:13px;padding:9px 0;border-bottom:1px dashed var(--line)}
+.desg .r:last-child{border:0;font-weight:800}
+.desg .r span{color:var(--ink2)}.desg .r b{font-family:var(--mono)}
+.inv{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:10px 0;border-bottom:1px dashed var(--line)}
+.inv:last-child{border:0}
+.inv b{font-family:var(--mono)}.inv a{color:var(--teal-ink);font-weight:700;font-size:12px}
+.zero{font-size:12px;color:var(--ink2);margin-top:12px;line-height:1.6}
+.zero b{color:var(--teal-ink)}
+
+.ic-svg{flex:none}button .ic-svg,a.btn .ic-svg,.field .ic-svg,.pm .ic-svg{margin-right:.4em}.field .ic-svg{margin-right:.55em}
+/* ==== fidelización ==== */
+.badge.teal{background:var(--teal-soft);color:var(--teal-ink)}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin:12px 0 14px}
+.toggle-row b{font-size:14.5px}
+.toggle-row .muted{font-size:12.5px;color:var(--ink2);margin-top:2px}
+.swt{width:46px;height:27px;border-radius:20px;background:#D8D2C4;position:relative;transition:.15s;flex:none;cursor:pointer}
+.swt::after{content:"";position:absolute;top:3px;left:3px;width:21px;height:21px;border-radius:50%;background:#fff;transition:.15s}
+.swt.on{background:var(--teal)}.swt.on::after{left:22px}
+.loyalty-prev{display:flex;align-items:center;gap:9px;background:var(--teal-soft);color:var(--teal-ink);border-radius:12px;padding:11px 13px;font-size:13px;margin-top:12px;line-height:1.4}
+.loyalty-prev b{font-weight:700}
+.gc-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0}
+.gcs{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:13px;text-align:center}
+.gcn{font-family:var(--mono);font-weight:700;font-size:21px;color:var(--teal-ink)}
+.gcl{font-size:11.5px;color:var(--ink2);margin-top:3px}
+</style>
+</head>
+<body>
+<div class="demobar">VISTA DEMO →
+<a href="index.html">Landing</a><a href="buscar.html">Buscador</a><a href="negocio.html">Negocio público</a><a href="panel.html">Panel</a><a href="espera.html">Lista de espera</a><a href="productos.html">Productos</a><a class="on" href="ajustes.html">Ajustes</a><a href="acceso.html">Acceso</a>
+</div>
+
+<div class="shell">
+  <div class="head">
+    <h1><svg class="ic-svg" viewBox="0 0 24 24" width="1.05em" height="1.05em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.18em;display:inline-block;flex:none"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M21.5 12h-3M5.5 12h-3M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1M18.4 18.4l-2.1-2.1M7.7 7.7 5.6 5.6"/></svg> Ajustes</h1>
+    <a href="panel.html">← Volver al panel</a>
+  </div>
+
+  <div class="layout">
+    <nav class="snav">
+      <button class="on" data-p="perfil"><svg class="ic-svg" viewBox="0 0 24 24" width="1.05em" height="1.05em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.18em;display:inline-block;flex:none"><path d="M4 8.5 5 4h14l1 4.5M4 8.5h16M4 8.5v11a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-11M9 12.5a3 3 0 0 0 6 0"/></svg> Perfil del negocio</button>
+      <button data-p="pagos"><svg class="ic-svg" viewBox="0 0 24 24" width="1.05em" height="1.05em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.18em;display:inline-block;flex:none"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3 10h18M7 14.5h4"/></svg> Pagos</button>
+      <button data-p="tienda"><svg class="ic-svg" viewBox="0 0 24 24" width="1.05em" height="1.05em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.18em;display:inline-block;flex:none"><path d="M4 8.5 5 4h14l1 4.5M4 8.5h16M4 8.5v11a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-11M9 12.5a3 3 0 0 0 6 0"/></svg> Tienda (add-on)</button>
+      <button data-p="fideliza"><svg class="ic-svg" viewBox="0 0 24 24" width="1.05em" height="1.05em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.18em;display:inline-block;flex:none"><path d="M12 21s-7-4.5-9.5-9A5.5 5.5 0 0 1 12 7a5.5 5.5 0 0 1 9.5 5c-2.5 4.5-9.5 9-9.5 9Z"/></svg> Fidelización</button>
+      <button data-p="integra"><svg class="ic-svg" viewBox="0 0 24 24" width="1.05em" height="1.05em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.18em;display:inline-block;flex:none"><path d="M9 2.5v5M15 2.5v5M6.5 7.5h11v3a5.5 5.5 0 0 1-11 0zM12 16v5.5"/></svg> Integraciones</button>
+      <button data-p="seguridad"><svg class="ic-svg" viewBox="0 0 24 24" width="1.05em" height="1.05em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.18em;display:inline-block;flex:none"><path d="M12 2.5 5 5.5v5.5c0 4.5 3 8 7 10 4-2 7-5.5 7-10V5.5z"/></svg> Seguridad</button>
+      <button data-p="plan"><svg class="ic-svg" viewBox="0 0 24 24" width="1.05em" height="1.05em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.18em;display:inline-block;flex:none"><path d="M6 2.5h8l4 4v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1Z"/><path d="M13.5 2.5V7H18"/></svg> Plan y facturación</button>
+    </nav>
+
+    <div>
+      <!-- ============ PERFIL ============ -->
+      <section class="pane on" id="perfil">
+        <div class="card">
+          <h2>Identidad</h2>
+          <p class="sub">Todo lo que ve tu cliente es 100% editable — tu página, tu marca.</p>
+          <div class="row2">
+            <div class="field"><label>NOMBRE DEL NEGOCIO</label><input value="La Marquesina Barber Studio"></div>
+            <div class="field"><label>URL PÚBLICA</label><input value="turnifypr.com/lamarquesina"></div>
+          </div>
+          <div class="field"><label>BIO</label><textarea rows="2">Fades, diseños y barba desde el 2015. La marquesina más famosa de Caguas.</textarea></div>
+          <div class="row2">
+            <div class="field"><label>MUNICIPIO</label><select><option>Caguas</option><option>San Juan</option><option>Gurabo</option></select></div>
+            <div class="field"><label>WHATSAPP DEL NEGOCIO</label><input value="787 · 555 · 0123"></div>
+          </div>
+          <div class="field"><label>COLOR DE TU MARCA (tema de la página y el widget)</label>
+            <div class="swatches">
+              <span class="sw on" style="background:#0E8074"></span><span class="sw" style="background:#17150F"></span>
+              <span class="sw" style="background:#B0413E"></span><span class="sw" style="background:#3E5CB0"></span>
+              <span class="sw" style="background:#8a5a13"></span><span class="sw" style="background:#6D28D9"></span>
+            </div>
+          </div>
+          <button class="btn btn-dark">Guardar cambios</button>
+        </div>
+        <div class="card">
+          <h2>Políticas de reserva</h2>
+          <p class="sub">Estas reglas se muestran al cliente ANTES de pagar — cero sorpresas para ellos también.</p>
+          <div class="row2">
+            <div class="field"><label>DEPÓSITO POR DEFECTO</label><input value="$5.00"></div>
+            <div class="field"><label>CANCELACIÓN GRATIS HASTA</label><select><option>24 horas antes</option><option>12 horas antes</option><option>48 horas antes</option></select></div>
+            <div class="field"><label>ANTELACIÓN MÍNIMA</label><select><option>1 hora</option><option>30 min</option><option>3 horas</option></select></div>
+            <div class="field"><label>RESERVAS HASTA</label><select><option>30 días adelante</option><option>14 días</option><option>60 días</option></select></div>
+          </div>
+          <button class="btn btn-dark">Guardar políticas</button>
+        </div>
+      </section>
+
+      <!-- ============ PAGOS ============ -->
+      <section class="pane" id="pagos">
+        <div class="card">
+          <h2>Procesadores de pago</h2>
+          <p class="sub">Conecta TU cuenta. Los depósitos y ventas van directo a ti — Turnify nunca toca tu dinero ni añade comisión.</p>
+          <div class="pay">
+            <span class="pm pm-ath">ATH·Móvil</span>
+            <div class="grow"><h4>ATH Móvil Business</h4><p>pATH: /LaMarquesina · El cliente envía y tú confirmas con un tap</p><span class="st ok">● Conectado</span></div>
+            <span class="tg on"></span>
+          </div>
+          <div class="pay">
+            <span class="pm pm-st">stripe</span>
+            <div class="grow"><h4>Stripe</h4><p>Tarjetas crédito/débito, Apple Pay y Google Pay · fee del procesador 2.9% + 30¢</p><span class="st ok">● Conectado vía Stripe Connect</span></div>
+            <span class="tg on"></span>
+          </div>
+          <div class="pay">
+            <span class="pm pm-pp">PayPal</span>
+            <div class="grow"><h4>PayPal</h4><p>Ideal para ventas de productos · fee del procesador aplica</p><span class="st off">○ Sin conectar</span></div>
+            <button class="btn btn-ghost" style="padding:9px 14px;font-size:12px">Conectar</button>
+          </div>
+          <div class="pay">
+            <span class="pm pm-kl">Klarna</span>
+            <div class="grow"><h4>Klarna — paga en 4</h4><p>Tus clientes dividen compras grandes en 4 pagos · tú cobras completo al instante</p><span class="st off">○ Sin conectar</span></div>
+            <button class="btn btn-ghost" style="padding:9px 14px;font-size:12px">Conectar</button>
+          </div>
+          <div class="transp-note"><svg class="ic-svg" viewBox="0 0 24 24" width="1.05em" height="1.05em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.18em;display:inline-block;flex:none"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg> <b>Transparencia:</b> los únicos fees que existen son los del procesador que TÚ elijas (Stripe, PayPal, Klarna publican los suyos). ATH Móvil entre cuentas personales/negocio: $0. Turnify: $0 de comisión, siempre.</div>
+        </div>
+      </section>
+
+      <!-- ============ TIENDA ============ -->
+      <section class="pane" id="tienda">
+        <div class="card">
+          <h2>Tienda de productos <span class="badge gold">Add-on activo</span></h2>
+          <p class="sub">Vende productos directo en tu página. Actívalo o cancélalo cuando quieras — sin permanencia, prorrateado al día.</p>
+          <div class="tiers">
+            <div class="tier on"><span class="cur">TU PLAN</span><b>$4.99<span style="font-size:12px">/mes</span></b><small><b>Hasta 10 productos</b><br>Fotos, precio, inventario y variantes (tamaño/color)</small></div>
+            <div class="tier"><b>$9.99<span style="font-size:12px">/mes</span></b><small><b>Hasta 25 productos</b><br>Todo lo anterior + productos destacados en tu página</small></div>
+          </div>
+          <div class="usage">
+            <small>USO ACTUAL: 7 DE 10 PRODUCTOS</small>
+            <div class="bar"><i></i></div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
+            <button class="btn btn-teal">Subir a 25 productos</button>
+            <button class="btn btn-ghost">Administrar productos</button>
+            <button class="btn btn-danger">Desactivar add-on</button>
+          </div>
+          <div class="transp-note">Las ventas se cobran por tus procesadores conectados (ATH, Stripe, PayPal, Klarna). <b>Turnify no cobra % de tus ventas</b> — solo la renta fija del add-on que ves aquí.</div>
+        </div>
+      </section>
+
+      <!-- ============ FIDELIZACIÓN ============ -->
+      <section class="pane" id="fideliza">
+        <div class="card">
+          <h2><svg class="ic-svg" viewBox="0 0 24 24" width="1.05em" height="1.05em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.18em;display:inline-block;flex:none"><path d="M12 21s-7-4.5-9.5-9A5.5 5.5 0 0 1 12 7a5.5 5.5 0 0 1 9.5 5c-2.5 4.5-9.5 9-9.5 9Z"/></svg> Programa de lealtad <span class="badge teal">Studio+</span></h2>
+          <p class="sub">Premia a tus clientes fieles automáticamente. Tú decides cuántas visitas dan premio y cuál es el premio — Turnify lleva la cuenta. <b>El premio lo das tú; nosotros solo contamos.</b></p>
+          <div class="toggle-row">
+            <div><b>Activar lealtad</b><div class="muted">Cada cliente acumula visitas hacia su premio</div></div>
+            <div class="swt on" onclick="this.classList.toggle('on')"></div>
+          </div>
+          <div class="row2">
+            <div class="field"><label>Visitas para premio</label><input type="number" value="10" min="2" max="50"></div>
+            <div class="field"><label>El premio es</label><input type="text" value="Corte gratis"></div>
+          </div>
+          <div class="loyalty-prev">
+            <svg class="ic-svg" viewBox="0 0 24 24" width="1.1em" height="1.1em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m9 12 2 2 4-4"/></svg>
+            <span>Tus clientes verán: <b>"Llevas 7 de 10 visitas — ¡vas por tu corte gratis!"</b></span>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2><svg class="ic-svg" viewBox="0 0 24 24" width="1.05em" height="1.05em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.18em;display:inline-block;flex:none"><rect x="2.5" y="6.5" width="19" height="13" rx="2.5"/><path d="M2.5 11h19M7 16h4"/><path d="M16 3.5c1.5 0 2.5 1 2.5 2.5M16 3.5c-1.2 0-2 .8-2 2 0 .7.5 1 1 1h1"/></svg> Gift cards <span class="badge gold">Add-on · $3.99/mes</span></h2>
+          <p class="sub">Deja que tus clientes regalen tu servicio. Compran una tarjeta, tú recibes el dinero por tus métodos de pago, y Turnify lleva el saldo. Perfecto para Día de las Madres y Navidad.</p>
+          <div class="transp-note"><svg class="ic-svg" viewBox="0 0 24 24" width="1.05em" height="1.05em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.18em;display:inline-block;flex:none"><path d="M12 2.5 5 5.5v5.5c0 4.5 3 8 7 10 4-2 7-5.5 7-10V5.5z"/></svg> <b>Tú custodias el dinero</b>, no Turnify. El cliente paga por tus procesadores y nosotros solo llevamos el registro del saldo. Sin comisión sobre las gift cards.</div>
+          <div class="gc-stats">
+            <div class="gcs"><div class="gcn">$340</div><div class="gcl">Saldo pendiente</div></div>
+            <div class="gcs"><div class="gcn">$520</div><div class="gcl">Vendidas este mes</div></div>
+            <div class="gcs"><div class="gcn">7</div><div class="gcl">Tarjetas activas</div></div>
+          </div>
+          <button class="btn btn-ghost" style="width:100%;margin-top:4px">Ver todas las gift cards</button>
+        </div>
+
+        <div class="card">
+          <h2><svg class="ic-svg" viewBox="0 0 24 24" width="1.05em" height="1.05em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.18em;display:inline-block;flex:none"><path d="M3 13a9 9 0 1 0 9-9"/><path d="M3 4v5h5M12 7v5l3 2"/></svg> Recordatorio "te toca" <span class="badge teal">Pro+</span></h2>
+          <p class="sub">Turnify aprende cada cuánto viene tu cliente y le manda un WhatsApp cuando va siendo hora de volver. <b>Genera citas que no hubieran pasado.</b></p>
+          <div class="toggle-row">
+            <div><b>Activar recordatorio</b><div class="muted">Avísale al cliente cuando va siendo hora</div></div>
+            <div class="swt on" onclick="this.classList.toggle('on')"></div>
+          </div>
+          <div class="field"><label>Recordar después de</label><select><option>21 días (recomendado para barbería)</option><option>14 días</option><option>30 días</option><option>45 días</option></select></div>
+          <div class="loyalty-prev">
+            <svg class="ic-svg" viewBox="0 0 24 24" width="1.1em" height="1.1em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 4h9l3 4v9a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2V8z"/><path d="M9 13h6"/></svg>
+            <span>Mensaje: <b>"¿Listo para tu próxima visita? Ya va siendo hora. Reserva aquí 💈"</b></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ INTEGRACIONES ============ -->
+      <section class="pane" id="integra">
+        <div class="card">
+          <h2>Widget para tu página web</h2>
+          <p class="sub">¿Tienes web propia? Pega una línea y tus clientes reservan sin salir de tu sitio — con tu color de marca.</p>
+          <div class="embopts">
+            <div class="emb"><span><svg class="ic-svg" viewBox="0 0 24 24" width="1.05em" height="1.05em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.18em;display:inline-block;flex:none"><path d="M6 2.5h8l4 4v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1Z"/><path d="M13.5 2.5V7H18"/></svg></span>Inline<br><small style="font-weight:400;color:var(--ink2)">Dentro de tu página</small></div>
+            <div class="emb"><span><svg class="ic-svg" viewBox="0 0 24 24" width="1.05em" height="1.05em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.18em;display:inline-block;flex:none"><rect x="3" y="4.5" width="18" height="15" rx="2"/><path d="M3 9h18M6.5 6.8v0"/></svg></span>Popup<br><small style="font-weight:400;color:var(--ink2)">Botón que abre modal</small></div>
+            <div class="emb on"><span><svg class="ic-svg" viewBox="0 0 24 24" width="1.05em" height="1.05em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.18em;display:inline-block;flex:none"><path d="M4 5.5h16a1 1 0 0 1 1 1V16a1 1 0 0 1-1 1H9l-5 4V6.5a1 1 0 0 1 1-1Z"/></svg></span>Burbuja flotante<br><small style="font-weight:400;color:var(--ink2)">Esquina inferior</small></div>
+          </div>
+          <div class="row2">
+            <div class="field"><label>TEXTO DEL BOTÓN</label><input value="<svg class="ic-svg" viewBox="0 0 24 24" width="1.05em" height="1.05em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.18em;display:inline-block;flex:none"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg> Reserva tu cita"></div>
+            <div class="field"><label>IDIOMA</label><select><option>Español</option><option>English</option><option>Auto (según visitante)</option></select></div>
+          </div>
+          <div class="codebox"><button class="cp">COPIAR</button><span class="c">&lt;!-- Pega antes de &lt;/body&gt; --&gt;</span><br>&lt;script src="https://turnifypr.com/embed.js"<br>&nbsp;&nbsp;data-turnify="lamarquesina"<br>&nbsp;&nbsp;data-mode="bubble" data-lang="es"&gt;&lt;/script&gt;</div>
+          <div class="preview"><span style="font-family:var(--mono);font-size:10px;color:var(--ink2);position:absolute;margin-right:160px">VISTA PREVIA EN TU WEB →</span><button class="fab"><svg class="ic-svg" viewBox="0 0 24 24" width="1.05em" height="1.05em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.18em;display:inline-block;flex:none"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg> Reserva tu cita</button></div>
+        </div>
+
+        <div class="card">
+          <h2>API Keys</h2>
+          <p class="sub">Para developers: nuestra API REST <b>sí permite crear citas</b> (Calendly no). Keys con permisos limitados, hasheadas — nunca almacenamos la llave completa.</p>
+          <div class="krow">
+            <code>bk_live_a4f2••••••••9d21</code>
+            <div class="grow"><small>Web de la barbería · creada 2 jun · último uso hace 3 h</small>
+              <span class="scope">leer disponibilidad</span><span class="scope">crear citas</span></div>
+            <button class="btn btn-danger" style="padding:8px 12px;font-size:11.5px">Revocar</button>
+          </div>
+          <div class="krow">
+            <code>bk_test_77c1••••••••03ab</code>
+            <div class="grow"><small>Sandbox de pruebas · creada 28 may</small>
+              <span class="scope">leer disponibilidad</span></div>
+            <button class="btn btn-danger" style="padding:8px 12px;font-size:11.5px">Revocar</button>
+          </div>
+          <button class="btn btn-dark" style="margin-top:12px">+ Generar nueva key</button>
+        </div>
+
+        <div class="card">
+          <h2>Webhooks</h2>
+          <p class="sub">Recibe eventos en tu sistema, n8n o Zapier al instante. Cada envío va firmado con HMAC-SHA256 (header <code style="font-family:var(--mono);font-size:11px">X-Turnify-Signature</code>).</p>
+          <div class="krow">
+            <div class="grow"><code>https://miweb.com/hooks/turnify</code>
+              <small>✓ Activo · 142 entregas · 0 fallos</small>
+              <span class="scope">cita.creada</span><span class="scope">cita.cancelada</span><span class="scope">pago.recibido</span></div>
+            <span class="tg on"></span>
+          </div>
+          <button class="btn btn-ghost" style="margin-top:12px">+ Añadir endpoint</button>
+        </div>
+      </section>
+
+      <!-- ============ SEGURIDAD ============ -->
+      <section class="pane" id="seguridad">
+        <div class="card">
+          <h2>Seguridad de tu cuenta</h2>
+          <p class="sub">Tu negocio vive aquí — lo protegemos como tal.</p>
+          <div class="sec">
+            <span class="ic"><svg class="ic-svg" viewBox="0 0 24 24" width="1.05em" height="1.05em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.18em;display:inline-block;flex:none"><rect x="4.5" y="10.5" width="15" height="10" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5M12 14.5v2.5"/></svg></span>
+            <div class="grow"><h4>Verificación en dos pasos (2FA)</h4><p>Código por WhatsApp o app de autenticación al entrar</p></div>
+            <span class="tg on"></span>
+          </div>
+          <div class="sec">
+            <span class="ic"><svg class="ic-svg" viewBox="0 0 24 24" width="1.05em" height="1.05em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.18em;display:inline-block;flex:none"><circle cx="8" cy="8" r="4.2"/><path d="m11 11 7.5 7.5M16 13l2 2M14 15l1.5 1.5"/></svg></span>
+            <div class="grow"><h4>Contraseña</h4><p>Cambiada hace 12 días · mínimo 8 caracteres, guardada con hash bcrypt</p></div>
+            <button class="btn btn-ghost" style="padding:9px 14px;font-size:12px">Cambiar</button>
+          </div>
+          <div class="sec">
+            <span class="ic"><svg class="ic-svg" viewBox="0 0 24 24" width="1.05em" height="1.05em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.18em;display:inline-block;flex:none"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10.5 18.5h3M12 6v5M9.5 8.5 12 6l2.5 2.5"/></svg></span>
+            <div class="grow"><h4>Avisos de inicio de sesión</h4><p>Te notificamos por WhatsApp si alguien entra desde un dispositivo nuevo</p></div>
+            <span class="tg on"></span>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Sesiones activas</h2>
+          <p class="sub">Las sesiones expiran solas a los 30 días. Cierra cualquiera con un tap.</p>
+          <div class="dev"><div><svg class="ic-svg" viewBox="0 0 24 24" width="1.05em" height="1.05em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.18em;display:inline-block;flex:none"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10.5 18.5h3"/></svg> iPhone de Jesús — Caguas, PR <small>Esta sesión · ahora</small></div><span class="badge">Actual</span></div>
+          <div class="dev"><div><svg class="ic-svg" viewBox="0 0 24 24" width="1.05em" height="1.05em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.18em;display:inline-block;flex:none"><rect x="4" y="5" width="16" height="11" rx="1.5"/><path d="M2.5 19.5h19"/></svg> Chrome · Windows — Caguas, PR <small>Última actividad: hace 2 h</small></div><button class="out">Cerrar sesión</button></div>
+          <div class="dev"><div><svg class="ic-svg" viewBox="0 0 24 24" width="1.05em" height="1.05em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.18em;display:inline-block;flex:none"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10.5 18.5h3"/></svg> Android · Samsung — San Juan, PR <small>Última actividad: hace 6 días</small></div><button class="out">Cerrar sesión</button></div>
+        </div>
+        <div class="card">
+          <h2>Actividad reciente</h2>
+          <p class="sub">Registro de auditoría de tu cuenta — todo queda documentado.</p>
+          <div class="dev"><div>Precio de "Corte + barba" cambiado $28 → $30 <small>hoy 8:14 AM · iPhone</small></div></div>
+          <div class="dev"><div>API key generada (Web de la barbería) <small>2 jun · Chrome Windows</small></div></div>
+          <div class="dev"><div>Depósito ATH ref. 781002 confirmado <small>1 jun · iPhone</small></div></div>
+        </div>
+      </section>
+
+      <!-- ============ PLAN Y FACTURACIÓN ============ -->
+      <section class="pane" id="plan">
+        <div class="card">
+          <h2>Tu factura de este mes — sin letra chiquita</h2>
+          <div class="bill-now"><b>$14.98</b><s>$24.98</s><span class="badge">Studio + Tienda − referidos</span></div>
+          <div class="desg">
+            <div class="r"><span>Plan Studio (5 staff, ilimitado)</span><b>$19.99</b></div>
+            <div class="r"><span>Add-on Tienda · 10 productos</span><b>$4.99</b></div>
+            <div class="r"><span>Descuento referidos (2 activos × $5)</span><b style="color:var(--teal-ink)">− $10.00</b></div>
+            <div class="r"><span>WhatsApp (11,402 mensajes este año)</span><b style="color:var(--teal-ink)">$0.00</b></div>
+            <div class="r"><span>Comisión por tus 212 clientes</span><b style="color:var(--teal-ink)">$0.00</b></div>
+            <div class="r"><span><b>Total el 1 de julio</b></span><b>$14.98</b></div>
+          </div>
+          <p class="zero"><svg class="ic-svg" viewBox="0 0 24 24" width="1.05em" height="1.05em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.18em;display:inline-block;flex:none"><path d="M12 20s-7-4.3-9.2-9C1.5 8 3 4.5 6.3 4.5c2 0 3.3 1.2 4.2 2.7l1.5 2 1.5-2c.9-1.5 2.2-2.7 4.2-2.7C21 4.5 22.5 8 21.2 11c-2.2 4.7-9.2 9-9.2 9Z" fill="currentColor" stroke="none"/></svg> Llevas <b>$127.40 ahorrados</b> este año solo en mensajería vs plataformas que cobran SMS. Y si refieres 1 negocio más, tu Studio queda en $4.99.</p>
+        </div>
+        <div class="card">
+          <h2>Historial de facturas</h2>
+          <div class="inv"><span>Junio 2026 · Studio + Tienda</span><b>$14.98</b><a href="#">PDF ↓</a></div>
+          <div class="inv"><span>Mayo 2026 · Studio + Tienda</span><b>$14.98</b><a href="#">PDF ↓</a></div>
+          <div class="inv"><span>Abril 2026 · Studio</span><b>$14.99</b><a href="#">PDF ↓</a></div>
+        </div>
+        <div class="card">
+          <h2>Cancelar o cambiar de plan</h2>
+          <p class="sub">Sin permanencia, sin penalidad, sin llamadas de retención. Dos taps y listo — mantienes acceso hasta el fin del período pagado y tus datos se pueden exportar siempre.</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-ghost">Cambiar de plan</button>
+            <button class="btn btn-ghost">Exportar mis datos (CSV)</button>
+            <button class="btn btn-danger">Cancelar suscripción</button>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+document.querySelectorAll('.snav button').forEach(b=>{
+  b.onclick=()=>{
+    document.querySelectorAll('.snav button').forEach(x=>x.classList.toggle('on',x===b));
+    document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.id===b.dataset.p));
+    window.scrollTo({top:0});
+  };
+});
+document.querySelectorAll('.tg').forEach(t=>t.onclick=()=>t.classList.toggle('on'));
+document.querySelectorAll('.sw').forEach(s=>s.onclick=()=>{
+  document.querySelectorAll('.sw').forEach(x=>x.classList.remove('on'));s.classList.add('on');
+});
+document.querySelectorAll('.tier').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tier').forEach(x=>x.classList.remove('on'));t.classList.add('on');
+});
+document.querySelectorAll('.emb').forEach(e=>e.onclick=()=>{
+  document.querySelectorAll('.emb').forEach(x=>x.classList.remove('on'));e.classList.add('on');
+});
+</script>
+</body>
+</html>
