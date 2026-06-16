@@ -256,7 +256,17 @@ app.post('/api/businesses', authRequired, asyncH(async (req, res) => {
        genReferralCode(b.name), referrer]);
     const biz = rows[0];
 
-    await client.query(`INSERT INTO subscriptions (business_id, plan_code) VALUES ($1,'free')`, [biz.id]);
+    // Suscripción inicial:
+    //  · Con referido válido → 15 días de prueba del plan Pro (trialing)
+    //  · Sin referido        → plan free normal
+    if (referrer) {
+      await client.query(
+        `INSERT INTO subscriptions (business_id, plan_code, status, trial_ends_at)
+         VALUES ($1, 'pro', 'trialing', now() + interval '15 days')`, [biz.id]);
+    } else {
+      await client.query(
+        `INSERT INTO subscriptions (business_id, plan_code) VALUES ($1, 'free')`, [biz.id]);
+    }
 
     if (referrer)
       await client.query(

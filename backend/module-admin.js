@@ -174,6 +174,72 @@ function mount(app, { db, authRequired, h }) {
       morosos: morosos.rows,
     });
   }));
+  // ── GET /api/admin/referrals ──────────────────────────────────────────────
+  // Lista de referidos: pendientes (registrados, aún no pagan) y activos.
+  app.get('/api/admin/referrals', authRequired, adminRequired, asyncH(async (_req, res) => {
+    const { rows } = await db.query(`
+      SELECT r.id, r.status, r.code_used, r.created_at, r.activated_at,
+             rb.name  AS referido_nombre,
+             rb.id    AS referido_id,
+             ru.email AS referido_email,
+             pb.name  AS refiere_nombre,
+             pb.id    AS refiere_id,
+             pu.email AS refiere_email,
+             rs.status AS referido_sub_status,
+             rs.plan_code AS referido_plan
+      FROM referrals r
+      JOIN businesses rb ON rb.id = r.referred_business_id
+      JOIN users ru ON ru.id = rb.owner_user_id
+      JOIN businesses pb ON pb.id = r.referrer_business_id
+      JOIN users pu ON pu.id = pb.owner_user_id
+      LEFT JOIN subscriptions rs ON rs.business_id = rb.id
+      ORDER BY
+        CASE r.status WHEN 'pending' THEN 0 WHEN 'active' THEN 1 ELSE 2 END,
+        r.created_at DESC
+    `);
+
+    // Resumen de descuentos vigentes por negocio que refiere
+    const descuentos = await db.query(`
+      SELECT pb.name AS negocio, vd.active_referrals, vd.discount_cents
+      FROM v_referral_discounts vd
+      JOIN businesses pb ON pb.id = vd.business_id
+      ORDER BY vd.discount_cents DESC
+    `);
+
+    res.json({
+      referrals: rows,
+      descuentos_vigentes: descuentos.rows,
+    });
+  }));
+
+  // ── POST /api/admin/referrals/:id/activate ────────────────────────────────
+  // Marca un referido como ACTIVO (cuando el referido pagó su primer mes).
+  // Esto activa el crédito de $5/mes del que refirió (vía v_referral_discounts).
+  // Hoy se usa manualmente al cobrar; en el futuro Stripe lo llamará solo.
+  app.post('/api/admin/referrals/:id/activate', authRequired, adminRequired, asyncH(async (req, res) => {
+    const { rows } = await db.query(
+      `UPDATE referrals
+          SET status = 'active', activated_at = now()
+        WHERE id = $1 AND status = 'pending'
+        RETURNING id, referrer_business_id, referred_business_id`,
+      [req.params.id]);
+    if (!rows[0]) return bad(res, 'Referido no encontrado o ya estaba activo', 404);
+    res.json({ ok: true, referral: rows[0] });
+  }));
+
+  // ── POST /api/admin/referrals/:id/deactivate ──────────────────────────────
+  // Desactiva un referido (si el referido canceló o bajó a free).
+  // Esto remueve el crédito del que refirió.
+  app.post('/api/admin/referrals/:id/deactivate', authRequired, adminRequired, asyncH(async (req, res) => {
+    const { rows } = await db.query(
+      `UPDATE referrals
+          SET status = 'inactive', deactivated_at = now()
+        WHERE id = $1 AND status = 'active'
+        RETURNING id`,
+      [req.params.id]);
+    if (!rows[0]) return bad(res, 'Referido no encontrado o no estaba activo', 404);
+    res.json({ ok: true });
+  }));
 }
 
 module.exports = { mount };

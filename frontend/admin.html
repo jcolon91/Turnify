@@ -64,6 +64,9 @@ tr:last-child td{border-bottom:0}
 .days{font-family:var(--mono);font-weight:700}
 .days.soon{color:#A1281C}
 .wa{font-family:var(--mono);font-size:12px;color:var(--teal-ink)}
+.actbtn{font-size:12px;font-weight:700;padding:7px 12px;border-radius:9px;background:var(--teal);color:#fff;white-space:nowrap}
+.actbtn.off{background:#EDE9DB;color:var(--ink2)}
+.actbtn:disabled{opacity:.6}
 
 /* responsive: scroll horizontal en tablas en móvil */
 .scrollx{overflow-x:auto;-webkit-overflow-scrolling:touch}
@@ -135,6 +138,19 @@ tr:last-child td{border-bottom:0}
       </div>
     </div>
 
+    <!-- REFERIDOS -->
+    <div class="section">
+      <div class="seclabel">Referidos</div>
+      <div class="tablecard">
+        <div class="scrollx">
+          <table id="refTable"><thead><tr>
+            <th>Negocio referido</th><th>Lo refirió</th><th>Estado del referido</th><th>Referral</th><th>Acción</th>
+          </tr></thead><tbody></tbody></table>
+        </div>
+        <div class="empty" id="refEmpty" style="display:none">Aún no hay referidos.</div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -169,6 +185,65 @@ function fdatetime(iso){
 }
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
+// ── Referidos ──────────────────────────────────────────────────────────────
+async function loadReferrals(){
+  try{
+    const r = await fetch(API + '/admin/referrals', { headers:{ 'Authorization':'Bearer '+token } });
+    if(!r.ok) return;
+    const data = await r.json();
+    renderReferrals(data.referrals || []);
+  }catch(e){}
+}
+
+function renderReferrals(refs){
+  const tb = document.querySelector('#refTable tbody');
+  if(refs.length === 0){
+    document.getElementById('refTable').style.display = 'none';
+    document.getElementById('refEmpty').style.display = 'block';
+    return;
+  }
+  tb.innerHTML = refs.map(r=>{
+    const subStatus = r.referido_sub_status || '—';
+    let accion = '';
+    if(r.status === 'pending'){
+      accion = `<button class="actbtn" data-id="${esc(r.id)}" data-act="activate">Marcar pagado ✓</button>`;
+    } else if(r.status === 'active'){
+      accion = `<button class="actbtn off" data-id="${esc(r.id)}" data-act="deactivate">Desactivar</button>`;
+    } else {
+      accion = '<span class="muted">Inactivo</span>';
+    }
+    const estadoRef = r.status==='pending' ? '<span class="pill trialing">pendiente de pago</span>'
+                    : r.status==='active'  ? '<span class="pill active">activo · $5/mes</span>'
+                    : '<span class="pill cancelled">inactivo</span>';
+    return `<tr>
+      <td class="biz">${esc(r.referido_nombre)}<div class="muted">${esc(r.referido_email)} · plan ${esc(r.referido_plan||'free')} (${esc(subStatus)})</div></td>
+      <td>${esc(r.refiere_nombre)}<div class="muted">${esc(r.refiere_email)}</div></td>
+      <td>${estadoRef}</td>
+      <td><span class="plan">${esc(r.code_used)}</span></td>
+      <td>${accion}</td>
+    </tr>`;
+  }).join('');
+
+  // Conectar botones de acción
+  document.querySelectorAll('.actbtn').forEach(btn=>{
+    btn.onclick = async ()=>{
+      const id = btn.dataset.id, act = btn.dataset.act;
+      const msg = act==='activate'
+        ? '¿Confirmar que este negocio pagó su primer mes? Esto activa el crédito de $5/mes para quien lo refirió.'
+        : '¿Desactivar este referido? Se removerá el crédito de quien lo refirió.';
+      if(!confirm(msg)) return;
+      btn.disabled = true; btn.textContent = '…';
+      try{
+        const r = await fetch(API + '/admin/referrals/'+id+'/'+act, {
+          method:'POST', headers:{ 'Authorization':'Bearer '+token }
+        });
+        if(r.ok){ loadReferrals(); }
+        else { alert('No se pudo completar. Intenta de nuevo.'); btn.disabled=false; }
+      }catch(e){ alert('Error de conexión.'); btn.disabled=false; }
+    };
+  });
+}
+
 async function load(){
   try{
     const r = await fetch(API + '/admin/overview', {
@@ -182,6 +257,7 @@ async function load(){
     if(!r.ok){ showError('No se pudo cargar el tablero. Intenta recargar.'); return; }
     const data = await r.json();
     render(data);
+    loadReferrals();
   }catch(err){
     showError('Error de conexión. Verifica tu internet e intenta de nuevo.');
   }
