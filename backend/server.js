@@ -956,8 +956,8 @@ app.patch('/api/appointments/:id', authRequired, businessScope, asyncH(async (re
 
   if (status) {
     if (!['completed','no_show','cancelled_business','confirmed'].includes(status)) return bad(res, 'Estado inválido');
-    await db.query(`UPDATE appointments SET status = $1,
-        cancelled_at = CASE WHEN $1 = 'cancelled_business' THEN now() ELSE cancelled_at END
+    await db.query(`UPDATE appointments SET status = $1::appointment_status,
+        cancelled_at = CASE WHEN $1::appointment_status = 'cancelled_business' THEN now() ELSE cancelled_at END
       WHERE id = $2`, [status, appt.id]);
     if (status === 'completed')
       await db.query(`UPDATE clients SET total_visits = total_visits + 1,

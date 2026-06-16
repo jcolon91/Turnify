@@ -60,6 +60,22 @@ main{padding:22px 20px 90px;max-width:760px}
 .apt .grow{flex:1;min-width:0}
 .apt h4{font-size:14px;font-weight:700}
 .apt p{font-size:11.5px;color:var(--ink2);margin-top:2px}
+.apt.apt-completed{border-left-color:#15803D;opacity:.75}
+.apt.apt-no_show{border-left-color:#C8472E;opacity:.7}
+.apt.apt-cancelled_business,.apt.apt-cancelled_client{border-left-color:#9A958A;opacity:.6}
+.stbadge{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;margin-left:6px;vertical-align:middle}
+.stbadge.done{background:#E5F6EC;color:#15803D}
+.stbadge.noshow{background:#FBE3DC;color:#A33A24}
+.stbadge.canc{background:#EDE9DB;color:var(--ink2)}
+.stbadge.pend{background:#FBEFD8;color:#8a5a13}
+.aptactions{display:flex;gap:6px;margin-top:9px;flex-wrap:wrap}
+.aptbtn{font-size:11.5px;font-weight:700;padding:6px 11px;border-radius:9px;cursor:pointer;border:1.5px solid var(--line);background:var(--card)}
+.aptbtn.done{border-color:#9BD6B0;color:#15803D}
+.aptbtn.done:hover{background:#E5F6EC}
+.aptbtn.noshow{border-color:#E8B5A8;color:#A33A24}
+.aptbtn.canc{color:var(--ink2)}
+.aptbtn:disabled{opacity:.5}
+.aptwa{font-size:11px;font-weight:700;color:#15803D;flex:none;align-self:flex-start}
 .empty{text-align:center;color:var(--ink2);font-size:13.5px;padding:30px 16px;background:var(--card);border:1px dashed var(--line);border-radius:14px;line-height:1.6}
 .svc{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px 15px;display:flex;align-items:center;gap:12px;margin-bottom:8px}
 .svc .grow{flex:1;min-width:0}
@@ -111,6 +127,7 @@ main{padding:22px 20px 90px;max-width:760px}
       <section class="view on" id="view-agenda">
         <div class="tophead">
           <div><h1 id="bizGreeting">Tu agenda</h1><p id="bizSubtitle"></p></div>
+          <button class="btn btn-teal btn-sm" id="addApptBtn">+ Cita manual</button>
         </div>
         <div class="kpis" id="kpis"></div>
         <div class="seclabel">Citas de hoy</div>
@@ -185,6 +202,26 @@ main{padding:22px 20px 90px;max-width:760px}
   </div>
 </div>
 
+<div class="modal" id="apptModal">
+  <div class="box">
+    <h3>Cita manual</h3>
+    <div class="alert" id="apptAlert"></div>
+    <div class="field"><label>Nombre del cliente *</label><input id="apName" placeholder="Juan Pérez"></div>
+    <div class="field"><label>WhatsApp del cliente *</label><input id="apPhone" type="tel" placeholder="787-555-1234"></div>
+    <div class="field"><label>Servicio *</label><select id="apService"><option value="">Selecciona…</option></select></div>
+    <div class="field"><label>Profesional *</label><select id="apStaff"><option value="">Selecciona…</option></select></div>
+    <div class="row2">
+      <div class="field"><label>Fecha *</label><input id="apDate" type="date"></div>
+      <div class="field"><label>Hora *</label><input id="apTime" type="time" value="10:00"></div>
+    </div>
+    <label style="display:flex;gap:8px;font-size:13px;color:var(--ink2);margin-bottom:14px;cursor:pointer"><input type="checkbox" id="apWalkin"> Es walk-in (llegó sin reservar)</label>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-ghost btn-sm" id="apCancel" style="flex:1">Cancelar</button>
+      <button class="btn btn-teal btn-sm" id="apSave" style="flex:1">Crear cita</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal" id="svcModal">
   <div class="box">
     <h3>Nuevo servicio</h3>
@@ -229,6 +266,59 @@ document.getElementById('logout').onclick = doLogout;
 document.getElementById('logout2').onclick = doLogout;
 
 let BIZ = null;
+
+// ── Cita manual / walk-in ──────────────────────────────────────────────────
+const apptModal = document.getElementById('apptModal');
+document.getElementById('addApptBtn').onclick = async function(){
+  clearAlert('apptAlert');
+  // cargar servicios y staff en los selectores
+  const [svc, stf] = await Promise.all([ api('GET','/services'), api('GET','/staff') ]);
+  const svcSel = document.getElementById('apService');
+  svcSel.innerHTML = '<option value="">Selecciona…</option>';
+  ((svc.ok&&svc.data.services)||[]).forEach(function(s){
+    svcSel.innerHTML += '<option value="'+esc(s.id)+'" data-dur="'+s.duration_min+'">'+esc(s.name)+' ('+s.duration_min+' min)</option>';
+  });
+  const stfSel = document.getElementById('apStaff');
+  stfSel.innerHTML = '<option value="">Selecciona…</option>';
+  const staffList = (stf.ok&&stf.data.staff)||[];
+  staffList.forEach(function(s){
+    stfSel.innerHTML += '<option value="'+esc(s.id)+'">'+esc(s.display_name)+'</option>';
+  });
+  // si solo hay un profesional, seleccionarlo
+  if(staffList.length===1) stfSel.value = staffList[0].id;
+  // fecha de hoy por defecto
+  document.getElementById('apDate').value = new Date().toLocaleDateString('en-CA',{timeZone:'America/Puerto_Rico'});
+  apptModal.classList.add('on');
+};
+document.getElementById('apCancel').onclick = function(){ apptModal.classList.remove('on'); };
+document.getElementById('apSave').onclick = async function(){
+  clearAlert('apptAlert');
+  const name = document.getElementById('apName').value.trim();
+  const phone = document.getElementById('apPhone').value.trim();
+  const serviceId = document.getElementById('apService').value;
+  const staffId = document.getElementById('apStaff').value;
+  const date = document.getElementById('apDate').value;
+  const time = document.getElementById('apTime').value;
+  const walkin = document.getElementById('apWalkin').checked;
+  if(!name){ showAlert('apptAlert','Escribe el nombre del cliente.',false); return; }
+  if(phone.replace(/\D/g,'').length<10){ showAlert('apptAlert','WhatsApp válido (10 dígitos).',false); return; }
+  if(!serviceId){ showAlert('apptAlert','Elige un servicio.',false); return; }
+  if(!staffId){ showAlert('apptAlert','Elige un profesional.',false); return; }
+  if(!date||!time){ showAlert('apptAlert','Elige fecha y hora.',false); return; }
+  const startIso = date+'T'+time+':00';
+  const btn = document.getElementById('apSave'); btn.disabled=true; btn.textContent='…';
+  const body = { service_id:serviceId, staff_id:staffId, start_iso:startIso, full_name:name, phone:phone };
+  if(walkin) body.source='walk_in';
+  const r = await api('POST','/appointments', body);
+  btn.disabled=false; btn.textContent='Crear cita';
+  if(r.ok){
+    apptModal.classList.remove('on');
+    document.getElementById('apName').value=''; document.getElementById('apPhone').value='';
+    loadDashboard();
+  }else{
+    showAlert('apptAlert', r.data.error||'No se pudo crear la cita.', false);
+  }
+};
 
 async function boot(){
   const r = await api('GET','/businesses/me');
@@ -311,8 +401,38 @@ async function loadDashboard(){
   }else{
     list.innerHTML = items.map(function(a){
       const t = new Date(a.starts_at).toLocaleTimeString('es-PR',{hour:'numeric',minute:'2-digit'});
-      return '<div class="apt"><time>'+t+'</time><div class="grow"><h4>'+esc(a.client_name||a.service_name||'Cita')+'</h4><p>'+esc(a.service_name||'')+(a.staff_name?(' · '+esc(a.staff_name)):'')+'</p></div></div>';
+      const st = a.status||'confirmed';
+      // etiqueta de estado
+      let badge = '';
+      if(st==='completed') badge = '<span class="stbadge done">Completada</span>';
+      else if(st==='no_show') badge = '<span class="stbadge noshow">No llegó</span>';
+      else if(st && st.indexOf('cancelled')>=0) badge = '<span class="stbadge canc">Cancelada</span>';
+      else if(st==='pending_deposit') badge = '<span class="stbadge pend">Falta depósito</span>';
+      // acciones solo si la cita está activa (confirmed o pending)
+      let actions = '';
+      const active = (st==='confirmed' || st==='pending_deposit');
+      if(active){
+        actions = '<div class="aptactions">'+
+          '<button class="aptbtn done" data-id="'+esc(a.id)+'" data-act="completed">✓ Completada</button>'+
+          '<button class="aptbtn noshow" data-id="'+esc(a.id)+'" data-act="no_show">No llegó</button>'+
+          '<button class="aptbtn canc" data-id="'+esc(a.id)+'" data-act="cancelled_business">Cancelar</button>'+
+          '</div>';
+      }
+      const phone = a.client_phone ? '<a class="aptwa" href="https://wa.me/'+esc(String(a.client_phone).replace(/\D/g,''))+'" target="_blank">WhatsApp</a>' : '';
+      return '<div class="apt apt-'+st+'"><time>'+t+'</time><div class="grow"><h4>'+esc(a.client_name||a.service_name||'Cita')+' '+badge+'</h4><p>'+esc(a.service_name||'')+(a.staff_name?(' · '+esc(a.staff_name)):'')+(a.price_cents?(' · '+money(a.price_cents)):'')+'</p>'+actions+'</div>'+phone+'</div>';
     }).join('');
+    // conectar botones de acción
+    list.querySelectorAll('.aptbtn').forEach(function(btn){
+      btn.onclick = async function(){
+        const act = btn.dataset.act;
+        const labels = {completed:'marcar como COMPLETADA',no_show:'marcar que NO LLEGÓ',cancelled_business:'CANCELAR esta cita'};
+        if(!confirm('¿Confirmas '+labels[act]+'?')) return;
+        btn.disabled=true;
+        const r = await api('PATCH','/appointments/'+btn.dataset.id,{ status:act });
+        if(r.ok){ loadDashboard(); }
+        else { alert(r.data.error||'No se pudo actualizar.'); btn.disabled=false; }
+      };
+    });
   }
 }
 
