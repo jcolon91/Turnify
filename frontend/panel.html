@@ -76,6 +76,21 @@ main{padding:22px 20px 90px;max-width:760px}
 .aptbtn.canc{color:var(--ink2)}
 .aptbtn:disabled{opacity:.5}
 .aptwa{font-size:11px;font-weight:700;color:#15803D;flex:none;align-self:flex-start}
+.bell{position:relative;width:40px;height:40px;border-radius:12px;background:var(--card);border:1.5px solid var(--line);display:grid;place-items:center;font-size:17px;cursor:pointer}
+.bell #bellCount{position:absolute;top:-5px;right:-5px;background:#C8472E;color:#fff;font-size:10px;font-weight:800;min-width:18px;height:18px;padding:0 4px;border-radius:99px;display:grid;place-items:center}
+#notifPanel{background:var(--card);border:1.5px solid var(--line);border-radius:16px;padding:8px;margin-bottom:16px;max-height:340px;overflow-y:auto}
+.notif{padding:11px 13px;border-radius:11px;display:flex;gap:10px;align-items:flex-start}
+.notif:hover{background:#F7F4EA}
+.notif.unread{background:var(--teal-soft)}
+.notif .nico{font-size:18px;flex:none}
+.notif .ngrow{flex:1;min-width:0}
+.notif h5{font-size:13.5px;font-weight:700}
+.notif p{font-size:12px;color:var(--ink2);margin-top:2px;line-height:1.4}
+.notif time{font-size:10px;color:var(--ink2);font-family:var(--mono)}
+.notif-head{display:flex;justify-content:space-between;align-items:center;padding:6px 8px 10px}
+.notif-head b{font-size:13px;font-weight:700}
+.notif-head button{font-size:11.5px;color:var(--teal-ink);font-weight:600}
+.notif-empty{text-align:center;color:var(--ink2);font-size:13px;padding:24px}
 .empty{text-align:center;color:var(--ink2);font-size:13.5px;padding:30px 16px;background:var(--card);border:1px dashed var(--line);border-radius:14px;line-height:1.6}
 .svc{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px 15px;display:flex;align-items:center;gap:12px;margin-bottom:8px}
 .svc .grow{flex:1;min-width:0}
@@ -113,6 +128,7 @@ main{padding:22px 20px 90px;max-width:760px}
       <div class="logo">Turn<i>i</i>fy</div>
       <a data-v="agenda" class="navlink on">Agenda</a>
       <a data-v="servicios" class="navlink">Servicios</a>
+      <a data-v="equipo" class="navlink">Equipo</a>
       <a data-v="horario" class="navlink">Horario</a>
       <a data-v="negocio" class="navlink">Mi negocio</a>
       <div class="planbox">
@@ -127,8 +143,12 @@ main{padding:22px 20px 90px;max-width:760px}
       <section class="view on" id="view-agenda">
         <div class="tophead">
           <div><h1 id="bizGreeting">Tu agenda</h1><p id="bizSubtitle"></p></div>
-          <button class="btn btn-teal btn-sm" id="addApptBtn">+ Cita manual</button>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="bell" id="bellBtn" title="Notificaciones">🔔<span id="bellCount" style="display:none"></span></button>
+            <button class="btn btn-teal btn-sm" id="addApptBtn">+ Cita manual</button>
+          </div>
         </div>
+        <div id="notifPanel" style="display:none"></div>
         <div class="kpis" id="kpis"></div>
         <div class="seclabel">Citas de hoy</div>
         <div id="agendaList"></div>
@@ -140,6 +160,14 @@ main{padding:22px 20px 90px;max-width:760px}
           <button class="btn btn-teal btn-sm" id="addSvcBtn">+ Nuevo</button>
         </div>
         <div id="svcList"></div>
+      </section>
+
+      <section class="view" id="view-equipo">
+        <div class="tophead">
+          <div><h1>Equipo</h1><p>Los profesionales de tu negocio.</p></div>
+          <button class="btn btn-teal btn-sm" id="addStaffBtn">+ Añadir</button>
+        </div>
+        <div id="staffList"></div>
       </section>
 
       <section class="view" id="view-horario">
@@ -161,6 +189,16 @@ main{padding:22px 20px 90px;max-width:760px}
           <div class="field"><label>Dirección</label><input id="bizAddr" placeholder="Calle, pueblo"></div>
           <div class="field"><label>ATH Móvil (para depósitos)</label><input id="bizAth" placeholder="787-555-1234"></div>
           <button class="btn btn-teal" id="saveBizBtn">Guardar cambios</button>
+        </div>
+        <div class="card">
+          <div class="seclabel">Visibilidad</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <div style="flex:1">
+              <div style="font-weight:700;font-size:14.5px">Aparecer en el buscador</div>
+              <p style="font-size:12.5px;color:var(--ink2);margin-top:3px">Cuando está activo, los clientes pueden encontrarte en Turnify.</p>
+            </div>
+            <label class="switch"><input type="checkbox" id="bizPublished"><span class="slider"></span></label>
+          </div>
         </div>
         <div class="card">
           <div class="seclabel">Tu enlace público</div>
@@ -199,6 +237,19 @@ main{padding:22px 20px 90px;max-width:760px}
       </div>
       <div style="text-align:center;margin-top:14px"><a id="logout2" style="font-size:12.5px;color:var(--ink2);cursor:pointer">Cerrar sesión</a></div>
     </main>
+  </div>
+</div>
+
+<div class="modal" id="staffModal">
+  <div class="box">
+    <h3 id="staffModalTitle">Añadir profesional</h3>
+    <div class="alert" id="staffAlert"></div>
+    <div class="field"><label>Nombre *</label><input id="stName" placeholder="Nombre del barbero"></div>
+    <div class="field"><label>Especialidad (opcional)</label><input id="stBio" placeholder="Cortes clásicos, barba"></div>
+    <div style="display:flex;gap:10px;margin-top:6px">
+      <button class="btn btn-ghost btn-sm" id="stCancel" style="flex:1">Cancelar</button>
+      <button class="btn btn-teal btn-sm" id="stSave" style="flex:1">Guardar</button>
+    </div>
   </div>
 </div>
 
@@ -267,6 +318,42 @@ document.getElementById('logout2').onclick = doLogout;
 
 let BIZ = null;
 
+// ── Equipo / Staff ─────────────────────────────────────────────────────────
+async function loadStaff(){
+  const r = await api('GET','/staff');
+  const list = document.getElementById('staffList');
+  const staff = (r.ok && r.data.staff) ? r.data.staff : [];
+  if(staff.length === 0){
+    list.innerHTML = '<div class="empty">Aún no tienes profesionales.<br>Toca "+ Añadir" para crear el primero.</div>';
+    return;
+  }
+  list.innerHTML = staff.map(function(s){
+    return '<div class="svc"><div class="grow"><h4>'+esc(s.display_name)+'</h4><p>'+(s.bio?esc(s.bio):'Profesional')+'</p></div><button class="del" data-id="'+esc(s.id)+'">Quitar</button></div>';
+  }).join('');
+  list.querySelectorAll('.del').forEach(function(b){
+    b.onclick = async function(){
+      if(!confirm('¿Quitar este profesional?')) return;
+      const r = await api('DELETE','/staff/'+b.dataset.id);
+      if(r.ok) loadStaff();
+      else alert(r.data.error||'No se pudo quitar.');
+    };
+  });
+}
+const staffModal = document.getElementById('staffModal');
+document.getElementById('addStaffBtn').onclick = function(){ clearAlert('staffAlert'); document.getElementById('stName').value=''; document.getElementById('stBio').value=''; staffModal.classList.add('on'); };
+document.getElementById('stCancel').onclick = function(){ staffModal.classList.remove('on'); };
+document.getElementById('stSave').onclick = async function(){
+  clearAlert('staffAlert');
+  const name = document.getElementById('stName').value.trim();
+  const bio = document.getElementById('stBio').value.trim();
+  if(!name){ showAlert('staffAlert','Escribe el nombre.',false); return; }
+  const btn = document.getElementById('stSave'); btn.disabled=true; btn.textContent='…';
+  const r = await api('POST','/staff',{ display_name:name, bio:bio||undefined });
+  btn.disabled=false; btn.textContent='Guardar';
+  if(r.ok){ staffModal.classList.remove('on'); loadStaff(); }
+  else showAlert('staffAlert', r.data.error||'No se pudo guardar.', false);
+};
+
 // ── Cita manual / walk-in ──────────────────────────────────────────────────
 const apptModal = document.getElementById('apptModal');
 document.getElementById('addApptBtn').onclick = async function(){
@@ -320,6 +407,43 @@ document.getElementById('apSave').onclick = async function(){
   }
 };
 
+// ── Notificaciones (campanita) ─────────────────────────────────────────────
+let notifOpen = false;
+async function loadNotifCount(){
+  const r = await api('GET','/notifications');
+  if(!r.ok) return;
+  const unread = r.data.unread||0;
+  const badge = document.getElementById('bellCount');
+  if(unread>0){ badge.style.display='grid'; badge.textContent = unread>9?'9+':unread; }
+  else { badge.style.display='none'; }
+  window._notifs = r.data.notifications||[];
+}
+function notifIcon(type){
+  if(type==='new_appointment') return '📅';
+  if(type==='cancellation') return '❌';
+  if(type==='payment') return '💵';
+  return '🔔';
+}
+document.getElementById('bellBtn').onclick = async function(){
+  const panel = document.getElementById('notifPanel');
+  notifOpen = !notifOpen;
+  if(!notifOpen){ panel.style.display='none'; return; }
+  await loadNotifCount();
+  const notifs = window._notifs||[];
+  let html = '<div class="notif-head"><b>Notificaciones</b>'+(notifs.some(n=>!n.read_at)?'<button id="markAllRead">Marcar leídas</button>':'')+'</div>';
+  if(notifs.length===0){ html += '<div class="notif-empty">No tienes notificaciones.</div>'; }
+  else {
+    html += notifs.map(function(n){
+      const t = new Date(n.created_at).toLocaleString('es-PR',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'});
+      return '<div class="notif'+(n.read_at?'':' unread')+'"><div class="nico">'+notifIcon(n.type)+'</div><div class="ngrow"><h5>'+esc(n.title||'')+'</h5><p>'+esc(n.body||'')+'</p><time>'+t+'</time></div></div>';
+    }).join('');
+  }
+  panel.innerHTML = html;
+  panel.style.display='block';
+  const mark = document.getElementById('markAllRead');
+  if(mark){ mark.onclick = async function(){ await api('PATCH','/notifications/read-all'); loadNotifCount(); document.getElementById('bellBtn').click(); document.getElementById('bellBtn').click(); }; }
+};
+
 async function boot(){
   const r = await api('GET','/businesses/me');
   if(r.status === 404){
@@ -335,6 +459,7 @@ async function boot(){
   fillBusiness(r.data);
   buildMobnav();
   loadDashboard();
+  loadNotifCount();
 }
 
 async function loadOnboardingOptions(){
@@ -378,6 +503,13 @@ function fillBusiness(data){
   document.getElementById('bizAddr').value = b.address_line || '';
   document.getElementById('bizAth').value = b.ath_phone || '';
   document.getElementById('publicLink').textContent = 'turnifypr.com/'+b.slug;
+  var pub = document.getElementById('bizPublished');
+  if(pub){ pub.checked = !!b.is_published;
+    pub.onchange = async function(){
+      const r = await api('PATCH','/businesses/me',{ is_published: pub.checked });
+      if(!r.ok){ pub.checked = !pub.checked; alert(r.data.error||'No se pudo cambiar.'); }
+    };
+  }
   renderHours(data.hours || []);
 }
 
@@ -531,12 +663,13 @@ function switchView(v){
   document.querySelectorAll('.navlink').forEach(function(a){ a.classList.toggle('on', a.dataset.v===v); });
   document.querySelectorAll('#mobnav a').forEach(function(a){ a.classList.toggle('on', a.dataset.v===v); });
   if(v==='servicios') loadServices();
+  if(v==='equipo') loadStaff();
 }
 document.querySelectorAll('.navlink').forEach(function(a){ a.onclick=function(){ switchView(a.dataset.v); }; });
 
 function buildMobnav(){
   const nav = document.getElementById('mobnav');
-  const items = [['agenda','Agenda'],['servicios','Servicios'],['horario','Horario'],['negocio','Negocio']];
+  const items = [['agenda','Agenda'],['servicios','Servicios'],['equipo','Equipo'],['horario','Horario'],['negocio','Negocio']];
   nav.innerHTML = items.map(function(it,i){ return '<a data-v="'+it[0]+'" class="'+(i===0?'on':'')+'">'+it[1]+'</a>'; }).join('');
   nav.querySelectorAll('a').forEach(function(a){ a.onclick=function(){ switchView(a.dataset.v); }; });
 }

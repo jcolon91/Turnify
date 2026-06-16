@@ -2,277 +2,142 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Productos — Turnify</title>
+<title>Tienda — Turnify</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
-:root{--paper:#F1EFE5;--card:#fff;--ink:#17150F;--ink2:#5E594B;--teal:#0E8074;--teal-ink:#0A5B52;--teal-soft:#E3EFE9;--mango:#EFA12F;--line:#E1DCCD;--r:18px;
+:root{--paper:#F1EFE5;--card:#fff;--ink:#17150F;--ink2:#5E594B;--teal:#0E8074;--teal-ink:#0A5B52;--teal-soft:#E3EFE9;--mango:#EFA12F;--line:#E1DCCD;
 --display:"Bricolage Grotesque",sans-serif;--body:"Instrument Sans",sans-serif;--mono:"Spline Sans Mono",monospace}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:var(--body);color:var(--ink);background:var(--paper)}
+body{font-family:var(--body);color:var(--ink);background:var(--paper);-webkit-font-smoothing:antialiased}
 a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
-.demobar{position:sticky;top:0;z-index:90;background:var(--ink);color:#CFC9B6;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:8px 14px;display:flex;gap:14px;overflow-x:auto;white-space:nowrap}
-.demobar a{color:#CFC9B6}.demobar a.on{color:#9FE8D5}
-.shell{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:230px 1fr;min-height:calc(100vh - 33px)}
-@media(max-width:860px){.shell{grid-template-columns:1fr}.side{display:none}.mobnav{display:flex !important}}
-.ic-svg{vertical-align:-0.18em;display:inline-block;flex:none}
-
-.side{border-right:1px solid var(--line);padding:20px 16px;display:flex;flex-direction:column;gap:4px;background:#F7F4EA}
-.side .logo{font-family:var(--display);font-weight:800;font-size:21px;padding:4px 10px 18px}.side .logo i{font-style:normal;color:var(--teal)}
-.side a{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;font-weight:600;font-size:14px;color:var(--ink2)}
-.side a.on{background:var(--ink);color:#fff}
-.side a:not(.on):hover{background:var(--teal-soft);color:var(--teal-ink)}
-.chip{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600}
-.chip.gold{background:#FBEFD3;color:#8a5a13}.chip.teal{background:var(--teal-soft);color:var(--teal-ink)}
-
-.main{padding:26px 28px 90px}
-@media(max-width:860px){.main{padding:18px 16px 90px}}
-.head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:6px}
-h1{font-family:var(--display);font-size:26px;font-weight:800;letter-spacing:-.02em}
-.sub{color:var(--ink2);font-size:13.5px;margin-top:3px}
-.btn{display:inline-flex;align-items:center;gap:7px;padding:11px 16px;border-radius:12px;font-weight:700;font-size:14px}
-.btn-teal{background:var(--teal);color:#fff}.btn-ink{background:var(--ink);color:#fff}
-.btn-ghost{border:1.5px solid var(--line);background:var(--card)}
-.btn-sm{padding:8px 12px;font-size:13px;border-radius:10px}
-
-.addon-bar{display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,#11221E,#0A5B52);color:#F4FBF8;border-radius:14px;padding:14px 18px;margin:16px 0 20px}
-.addon-bar .ab-t{flex:1;font-size:13.5px;line-height:1.5}
-.addon-bar b{color:#fff}
-.usage{font-family:var(--mono);font-size:12px;background:rgba(255,255,255,.15);padding:5px 11px;border-radius:20px;white-space:nowrap}
-
-.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
-.pcard{background:var(--card);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;display:flex;flex-direction:column}
-.pcard .ph{aspect-ratio:4/3;background:#EEEAE0 center/cover;position:relative}
-.pcard .ph .nfoto{position:absolute;bottom:8px;right:8px;background:rgba(20,18,12,.7);color:#fff;font-family:var(--mono);font-size:10px;padding:3px 8px;border-radius:20px}
-.pcard .pb{padding:13px 14px;display:flex;flex-direction:column;gap:6px;flex:1}
-.pcard .pn{font-weight:700;font-size:15px}
-.pcard .pp{font-family:var(--mono);font-weight:700;color:var(--teal-ink);font-size:16px}
-.pcard .pstock{font-size:12px;color:var(--ink2)}
-.pcard .pactions{display:flex;gap:6px;padding:0 14px 14px;margin-top:auto}
-.pcard .pactions button{flex:1;border:1.5px solid var(--line);border-radius:9px;padding:7px;font-size:12.5px;font-weight:600}
-.pcard .pactions button:hover{background:var(--teal-soft);border-color:var(--teal);color:var(--teal-ink)}
-.badge-feat{position:absolute;top:8px;left:8px;background:var(--mango);color:#3a2607;font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px}
-
-/* card "agregar" */
-.addcard{border:2px dashed var(--line);border-radius:var(--r);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--ink2);min-height:240px;cursor:pointer;transition:.12s}
-.addcard:hover{border-color:var(--teal);color:var(--teal-ink);background:var(--teal-soft)}
-
-/* modal */
-.scrim{position:fixed;inset:0;background:rgba(20,18,12,.55);display:none;align-items:flex-end;justify-content:center;z-index:120}
-.scrim.show{display:flex}
-@media(min-width:560px){.scrim{align-items:center;padding:20px}}
-.sheet{background:var(--paper);width:100%;max-width:520px;border-radius:22px 22px 0 0;padding:22px 20px calc(22px + env(safe-area-inset-bottom));max-height:92vh;overflow:auto}
-@media(min-width:560px){.sheet{border-radius:22px}}
-.sheet h3{font-family:var(--display);font-size:20px;font-weight:800;margin-bottom:14px}
-.field{margin-bottom:13px}
-.field label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:5px;text-transform:uppercase;letter-spacing:.03em}
-.field input,.field select,.field textarea{width:100%;padding:12px;border:1.5px solid var(--line);border-radius:11px;font:inherit;background:var(--card)}
-.field textarea{resize:vertical;min-height:64px}
-.field input:focus,.field select:focus,.field textarea:focus{outline:0;border-color:var(--teal)}
-.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-
-/* fotos: máx 4 */
-.photos{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-.photo{aspect-ratio:1;border-radius:11px;border:1.5px solid var(--line);background:#EEEAE0 center/cover;position:relative;overflow:hidden}
-.photo .rm{position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;background:rgba(20,18,12,.7);color:#fff;display:grid;place-items:center;font-size:14px}
-.photo.add{border:1.5px dashed var(--line);background:var(--card);display:flex;align-items:center;justify-content:center;color:var(--ink2);cursor:pointer}
-.photo.add:hover{border-color:var(--teal);color:var(--teal-ink);background:var(--teal-soft)}
-.photo.add.disabled{opacity:.4;pointer-events:none}
-.photohint{font-size:11.5px;color:var(--ink2);margin-top:6px}
-.photohint.full{color:var(--mango);font-weight:600}
-
-.toggle{display:flex;align-items:center;gap:10px;padding:11px;border:1.5px solid var(--line);border-radius:11px;background:var(--card);margin-bottom:13px}
-.toggle .tl{flex:1}.toggle .tl b{font-size:14px}.toggle .tl .d{font-size:12px;color:var(--ink2)}
-.sw{width:42px;height:25px;border-radius:20px;background:#D8D2C4;position:relative;transition:.15s;flex:none}
-.sw::after{content:"";position:absolute;top:3px;left:3px;width:19px;height:19px;border-radius:50%;background:#fff;transition:.15s}
-.sw.on{background:var(--teal)}.sw.on::after{left:20px}
-
-.mobnav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--line);justify-content:space-around;padding:10px 6px calc(10px + env(safe-area-inset-bottom));z-index:80}
-.mobnav a{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;font-weight:600;color:var(--ink2)}
-.mobnav a.on{color:var(--teal-ink)}
+input,textarea{font:inherit}
+.bootload{min-height:100vh;display:grid;place-items:center;color:var(--ink2);font-size:14px}
+.nav{background:var(--card);border-bottom:1px solid var(--line);padding:14px 18px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:50}
+.nav a.back{font-size:18px}.nav .logo{font-family:var(--display);font-weight:800;font-size:19px}.nav .logo i{font-style:normal;color:var(--teal)}
+.wrap{max-width:600px;margin:0 auto;padding:24px 16px 60px}
+.tophead{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px}
+h1{font-family:var(--display);font-weight:800;font-size:26px;letter-spacing:-.02em}
+.sub{font-size:13px;color:var(--ink2);margin-top:3px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:700;font-size:14px;padding:10px 16px;border-radius:12px;cursor:pointer;background:var(--teal);color:#fff}
+.btn:disabled{opacity:.55}
+.prod{background:var(--card);border:1.5px solid var(--line);border-radius:16px;padding:14px;display:flex;gap:13px;align-items:center;margin-bottom:10px}
+.prod .ph{width:60px;height:60px;border-radius:12px;background:var(--teal-soft);flex:none;display:grid;place-items:center;font-size:24px;overflow:hidden}
+.prod .ph img{width:100%;height:100%;object-fit:cover}
+.prod .grow{flex:1;min-width:0}
+.prod h4{font-size:15px;font-weight:700}
+.prod p{font-size:12.5px;color:var(--ink2);margin-top:2px}
+.prod .price{font-family:var(--mono);font-weight:700;font-size:15px;color:var(--teal-ink)}
+.prod .del{color:#A1281C;font-size:12px;font-weight:600}
+.empty{text-align:center;color:var(--ink2);font-size:14px;padding:40px 20px;line-height:1.6;background:var(--card);border:1px dashed var(--line);border-radius:16px}
+.locked{text-align:center;padding:36px 24px;background:linear-gradient(135deg,#11221E,#0A5B52);color:#FFF8EC;border-radius:20px}
+.locked .ic{font-size:40px;margin-bottom:12px}
+.locked h2{font-family:var(--display);font-weight:800;font-size:22px;margin-bottom:8px}
+.locked p{font-size:14px;opacity:.9;line-height:1.55;margin-bottom:18px}
+.locked a{display:inline-block;background:#FFF8EC;color:var(--teal-ink);font-weight:700;font-size:14px;padding:12px 22px;border-radius:12px}
+.modal{display:none;position:fixed;inset:0;background:rgba(20,18,12,.5);z-index:100;align-items:center;justify-content:center;padding:18px}
+.modal.on{display:flex}
+.modal .box{background:var(--card);border-radius:18px;padding:22px;max-width:420px;width:100%}
+.modal h3{font-family:var(--display);font-weight:800;font-size:19px;margin-bottom:16px}
+.field{margin-bottom:14px}
+.field label{display:block;font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);margin-bottom:6px}
+.field input,.field textarea{width:100%;padding:12px;border:1.5px solid var(--line);border-radius:11px;background:#FCFBF7}
+.field input:focus,.field textarea:focus{outline:none;border-color:var(--teal)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.btn-ghost{background:var(--card);border:1.5px solid var(--line);color:var(--ink)}
+.alert{display:none;font-size:13px;font-weight:600;padding:11px 13px;border-radius:11px;margin-bottom:12px}
+.alert.err{display:block;background:#FCE8E6;color:#A1281C;border:1px solid #F3C0BA}
+.foot{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);padding:20px 0 40px}
 </style>
 </head>
 <body>
-<div class="demobar">VISTA DEMO →
-<a href="index.html">Landing</a><a href="buscar.html">Buscador</a><a href="negocio.html">Negocio público</a><a href="panel.html">Panel</a><a href="espera.html">Lista de espera</a><a class="on" href="productos.html">Productos</a><a href="ajustes.html">Ajustes</a><a href="acceso.html">Acceso</a>
+<div id="boot" class="bootload">Cargando…</div>
+<div id="app" style="display:none">
+<nav class="nav"><a href="panel.html" class="back">←</a><span class="logo">Turn<i>i</i>fy</span></nav>
+<div class="wrap">
+  <div class="tophead">
+    <div><h1>Tienda</h1><p class="sub" id="sub">Vende productos a tus clientes.</p></div>
+    <button class="btn" id="addBtn" style="display:none">+ Producto</button>
+  </div>
+  <div id="content"></div>
 </div>
-
-<div class="shell">
-  <aside class="side">
-    <div class="logo">Turn<i>i</i>fy</div>
-    <a href="panel.html"><svg class="ic-svg" viewBox="0 0 24 24" width="1.05em" height="1.05em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg> Agenda</a>
-    <a href="#"><svg class="ic-svg" viewBox="0 0 24 24" width="1.05em" height="1.05em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20c0-3.3 2.5-5.5 5.5-5.5s5.5 2.2 5.5 5.5M16 5.2a3.2 3.2 0 0 1 0 5.6M17 14.8c2 .7 3.5 2.6 3.5 5.2"/></svg> Clientes</a>
-    <a href="espera.html"><svg class="ic-svg" viewBox="0 0 24 24" width="1.05em" height="1.05em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> Lista de espera <span class="chip teal" style="margin-left:auto">4</span></a>
-    <a class="on" href="productos.html"><svg class="ic-svg" viewBox="0 0 24 24" width="1.05em" height="1.05em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5 5 4h14l1 4.5M4 8.5h16M4 8.5v11a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-11M9 12.5a3 3 0 0 0 6 0"/></svg> Productos <span class="chip gold" style="margin-left:auto">7/10</span></a>
-    <a href="#"><svg class="ic-svg" viewBox="0 0 24 24" width="1.05em" height="1.05em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5l3 .5 1.5 5h2l-1-5L19 18V6L9.5 9H6a2 2 0 0 0-2 .5ZM19 9a3 3 0 0 1 0 6"/></svg> Campañas</a>
-    <a href="ajustes.html"><svg class="ic-svg" viewBox="0 0 24 24" width="1.05em" height="1.05em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M21.5 12h-3M5.5 12h-3M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1M18.4 18.4l-2.1-2.1M7.7 7.7 5.6 5.6"/></svg> Ajustes</a>
-  </aside>
-
-  <main class="main">
-    <div class="head">
-      <div>
-        <h1>Productos</h1>
-        <div class="sub">Vende pomadas, ceras, aceites y más en tu página</div>
-      </div>
-      <button class="btn btn-ink" onclick="openSheet()"><svg class="ic-svg" viewBox="0 0 24 24" width="1.05em" height="1.05em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Nuevo producto</button>
-    </div>
-
-    <div class="addon-bar">
-      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#9FE8D5" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5 5 4h14l1 4.5M4 8.5h16M4 8.5v11a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-11M9 12.5a3 3 0 0 0 6 0"/></svg>
-      <div class="ab-t">Add-on <b>Tienda · 10 productos</b> activo. El cliente paga por tus métodos conectados — <b>0% de comisión de Turnify</b>. ¿Necesitas más? Sube a 25 productos.</div>
-      <span class="usage">7 / 10 usados</span>
-    </div>
-
-    <div class="pgrid">
-      <!-- producto destacado -->
-      <div class="pcard">
-        <div class="ph" style="background-image:url('https://images.unsplash.com/photo-1621607512214-68297480165e?w=400')">
-          <span class="badge-feat">Destacado</span>
-          <span class="nfoto">3 fotos</span>
-        </div>
-        <div class="pb">
-          <div class="pn">Pomada Mate Premium</div>
-          <div class="pp">$14.00</div>
-          <div class="pstock">18 en inventario · Tamaño: 2oz, 4oz</div>
-        </div>
-        <div class="pactions"><button onclick="openSheet()">Editar</button><button>Ocultar</button></div>
-      </div>
-
-      <div class="pcard">
-        <div class="ph" style="background-image:url('https://images.unsplash.com/photo-1583241800698-9c2e0c8a0d3d?w=400')">
-          <span class="nfoto">2 fotos</span>
-        </div>
-        <div class="pb">
-          <div class="pn">Aceite para barba</div>
-          <div class="pp">$12.00</div>
-          <div class="pstock">24 en inventario</div>
-        </div>
-        <div class="pactions"><button onclick="openSheet()">Editar</button><button>Ocultar</button></div>
-      </div>
-
-      <div class="pcard">
-        <div class="ph" style="background-image:url('https://images.unsplash.com/photo-1626766632648-c7a9a3c69c4f?w=400')">
-          <span class="nfoto">4 fotos</span>
-        </div>
-        <div class="pb">
-          <div class="pn">Cera moldeadora</div>
-          <div class="pp">$16.00</div>
-          <div class="pstock">9 en inventario</div>
-        </div>
-        <div class="pactions"><button onclick="openSheet()">Editar</button><button>Ocultar</button></div>
-      </div>
-
-      <div class="pcard">
-        <div class="ph" style="background-image:url('https://images.unsplash.com/photo-1599751449628-8e7c1a1c0a0a?w=400')">
-          <span class="nfoto">1 foto</span>
-        </div>
-        <div class="pb">
-          <div class="pn">Shampoo anticaspa</div>
-          <div class="pp">$18.00</div>
-          <div class="pstock">Sin control de inventario</div>
-        </div>
-        <div class="pactions"><button onclick="openSheet()">Editar</button><button>Ocultar</button></div>
-      </div>
-
-      <!-- card agregar -->
-      <div class="addcard" onclick="openSheet()">
-        <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
-        <div style="font-weight:600;font-size:14px">Agregar producto</div>
-        <div style="font-size:12px">Te quedan 3 espacios</div>
-      </div>
-    </div>
-  </main>
 </div>
+<div class="foot">Hecho con Turnify · turnifypr.com</div>
 
-<!-- ============ MODAL: CREAR/EDITAR PRODUCTO ============ -->
-<div class="scrim" id="scrim">
-  <div class="sheet">
+<div class="modal" id="modal">
+  <div class="box">
     <h3>Nuevo producto</h3>
-
-    <div class="field"><label>Nombre del producto</label><input placeholder="Ej. Pomada Mate Premium" value="Pomada Mate Premium"></div>
-    <div class="field"><label>Descripción</label><textarea placeholder="Cuéntale al cliente qué hace especial este producto…">Acabado mate de fijación fuerte. Sin brillo, todo el día.</textarea></div>
-
+    <div class="alert" id="mAlert"></div>
+    <div class="field"><label>Nombre *</label><input id="pName" placeholder="Pomada para cabello"></div>
     <div class="row2">
-      <div class="field"><label>Precio</label><input type="text" inputmode="decimal" value="$14.00"></div>
-      <div class="field"><label>Inventario (opcional)</label><input type="number" placeholder="Ej. 20" value="18"></div>
+      <div class="field"><label>Precio ($) *</label><input id="pPrice" type="number" value="10" min="0" step="0.01"></div>
+      <div class="field"><label>Inventario</label><input id="pStock" type="number" value="0" min="0"></div>
     </div>
-
-    <!-- FOTOS: máx 4 -->
-    <div class="field">
-      <label>Fotos del producto</label>
-      <div class="photos" id="photos">
-        <div class="photo" style="background-image:url('https://images.unsplash.com/photo-1621607512214-68297480165e?w=200')"><button class="rm" onclick="rmPhoto(this)">×</button></div>
-        <div class="photo" style="background-image:url('https://images.unsplash.com/photo-1583241800698-9c2e0c8a0d3d?w=200')"><button class="rm" onclick="rmPhoto(this)">×</button></div>
-        <div class="photo" style="background-image:url('https://images.unsplash.com/photo-1626766632648-c7a9a3c69c4f?w=200')"><button class="rm" onclick="rmPhoto(this)">×</button></div>
-        <div class="photo add" id="addPhoto" onclick="addPhoto()">
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-        </div>
-      </div>
-      <div class="photohint" id="photohint">3 de 4 fotos · puedes añadir 1 más</div>
-    </div>
-
-    <!-- variantes -->
-    <div class="field"><label>Variantes (opcional)</label><input placeholder="Ej. Tamaño: 2oz, 4oz" value="Tamaño: 2oz, 4oz"></div>
-
-    <div class="toggle">
-      <div class="tl"><b>Destacar en mi página</b><div class="d">Aparece primero en tu tienda</div></div>
-      <div class="sw on" onclick="this.classList.toggle('on')"></div>
-    </div>
-
-    <div style="display:flex;gap:10px;margin-top:6px">
-      <button class="btn btn-ghost" style="flex:1" onclick="closeSheet()">Cancelar</button>
-      <button class="btn btn-teal" style="flex:1.4" onclick="closeSheet()">Guardar producto</button>
-    </div>
+    <div class="field"><label>Descripción (opcional)</label><textarea id="pDesc" rows="2"></textarea></div>
+    <div style="display:flex;gap:10px"><button class="btn btn-ghost" id="mCancel" style="flex:1">Cancelar</button><button class="btn" id="mSave" style="flex:1">Guardar</button></div>
   </div>
 </div>
 
-<nav class="mobnav">
-  <a href="panel.html"><svg class="ic-svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg>Agenda</a>
-  <a href="espera.html"><svg class="ic-svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Espera</a>
-  <a class="on" href="productos.html"><svg class="ic-svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5 5 4h14l1 4.5M4 8.5h16M4 8.5v11a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-11M9 12.5a3 3 0 0 0 6 0"/></svg>Productos</a>
-  <a href="ajustes.html"><svg class="ic-svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M21.5 12h-3M5.5 12h-3"/></svg>Ajustes</a>
-</nav>
-
 <script>
-const scrim = document.getElementById('scrim');
-function openSheet(){ scrim.classList.add('show'); }
-function closeSheet(){ scrim.classList.remove('show'); }
-scrim.addEventListener('click', e => { if(e.target===scrim) closeSheet(); });
+const API='/api';
+const token=localStorage.getItem('turnify_token');
+if(!token){ location.href='acceso.html'; }
+function esc(s){return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function money(c){return '$'+((c||0)/100).toFixed(2);}
+async function api(method,path,body){
+  const opts={method,headers:{'Authorization':'Bearer '+token}};
+  if(body){opts.headers['Content-Type']='application/json';opts.body=JSON.stringify(body);}
+  const r=await fetch(API+path,opts);
+  if(r.status===401){localStorage.clear();location.href='acceso.html';throw new Error('s');}
+  let data={};try{data=await r.json();}catch(e){}
+  return {status:r.status,ok:r.ok,data};
+}
 
-// gestión de fotos con LÍMITE DE 4
-function countPhotos(){ return document.querySelectorAll('#photos .photo:not(.add)').length; }
-function refreshPhotoUI(){
-  const n = countPhotos();
-  const add = document.getElementById('addPhoto');
-  const hint = document.getElementById('photohint');
-  if(n >= 4){
-    add.classList.add('disabled');
-    add.style.display = 'none';
-    hint.textContent = 'Máximo 4 fotos alcanzado';
-    hint.classList.add('full');
-  } else {
-    add.classList.remove('disabled');
-    add.style.display = 'flex';
-    hint.textContent = `${n} de 4 fotos · puedes añadir ${4-n} más`;
-    hint.classList.remove('full');
+async function load(){
+  const r=await api('GET','/products');
+  document.getElementById('boot').style.display='none';
+  document.getElementById('app').style.display='block';
+  const content=document.getElementById('content');
+  // si el plan no tiene tienda, limit será 0
+  if(r.ok && r.data.limit===0){
+    content.innerHTML='<div class="locked"><div class="ic">🛍️</div><h2>Activa tu tienda</h2><p>Vende productos directo a tus clientes. Disponible con el add-on de Tienda.</p><a href="panel.html">Ver planes</a></div>';
+    return;
   }
+  document.getElementById('addBtn').style.display='inline-flex';
+  const prods=(r.ok&&r.data.products)?r.data.products:[];
+  if(r.data.limit) document.getElementById('sub').textContent='Vende productos a tus clientes. ('+(r.data.used||0)+'/'+r.data.limit+')';
+  if(prods.length===0){
+    content.innerHTML='<div class="empty">Aún no tienes productos.<br>Toca "+ Producto" para añadir el primero.</div>';
+    return;
+  }
+  content.innerHTML=prods.map(function(p){
+    const photo=(p.photos&&p.photos[0])?'<img src="'+esc(p.photos[0].url)+'">':'📦';
+    return '<div class="prod"><div class="ph">'+photo+'</div><div class="grow"><h4>'+esc(p.name)+'</h4><p>'+(p.stock!=null?p.stock+' en inventario':'')+(p.description?(' · '+esc(p.description)):'')+'</p></div><div style="text-align:right"><div class="price">'+money(p.price_cents)+'</div><button class="del" data-id="'+esc(p.id)+'">Borrar</button></div></div>';
+  }).join('');
+  content.querySelectorAll('.del').forEach(function(b){
+    b.onclick=async function(){ if(!confirm('¿Borrar este producto?'))return; const r=await api('DELETE','/products/'+b.dataset.id); if(r.ok)load(); };
+  });
 }
-function rmPhoto(btn){
-  btn.closest('.photo').remove();
-  refreshPhotoUI();
-}
-function addPhoto(){
-  if(countPhotos() >= 4) return;  // tope duro, también validado en backend
-  const add = document.getElementById('addPhoto');
-  const ph = document.createElement('div');
-  ph.className = 'photo';
-  const stock = ['1621607512214-68297480165e','1583241800698-9c2e0c8a0d3d','1626766632648-c7a9a3c69c4f','1599751449628-8e7c1a1c0a0a'];
-  ph.style.backgroundImage = `url('https://images.unsplash.com/photo-${stock[countPhotos()%4]}?w=200')`;
-  ph.innerHTML = '<button class="rm" onclick="rmPhoto(this)">×</button>';
-  add.parentNode.insertBefore(ph, add);
-  refreshPhotoUI();
-}
-refreshPhotoUI();
+
+const modal=document.getElementById('modal');
+document.getElementById('addBtn').onclick=function(){ document.getElementById('mAlert').className='alert'; modal.classList.add('on'); };
+document.getElementById('mCancel').onclick=function(){ modal.classList.remove('on'); };
+document.getElementById('mSave').onclick=async function(){
+  const name=document.getElementById('pName').value.trim();
+  const price=Math.round(parseFloat(document.getElementById('pPrice').value)*100);
+  const stock=parseInt(document.getElementById('pStock').value,10)||0;
+  const desc=document.getElementById('pDesc').value.trim();
+  const a=document.getElementById('mAlert');
+  if(!name){a.textContent='Escribe el nombre.';a.className='alert err';return;}
+  if(!(price>=0)){a.textContent='Precio inválido.';a.className='alert err';return;}
+  const btn=this;btn.disabled=true;btn.textContent='…';
+  const r=await api('POST','/products',{name,price_cents:price,stock,description:desc||undefined});
+  btn.disabled=false;btn.textContent='Guardar';
+  if(r.ok){modal.classList.remove('on');document.getElementById('pName').value='';document.getElementById('pDesc').value='';load();}
+  else{a.textContent=r.data.error||'No se pudo guardar.';a.className='alert err';}
+};
+
+load();
 </script>
 </body>
 </html>
