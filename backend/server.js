@@ -357,6 +357,56 @@ app.put('/api/businesses/me/hours', authRequired, businessScope, asyncH(async (r
   res.json({ ok: true });
 }));
 
+// ── Días libres / bloqueos de tiempo ────────────────────────────────────────
+// Listar bloqueos futuros del negocio
+app.get('/api/blocks', authRequired, businessScope, asyncH(async (req, res) => {
+  const { rows } = await db.query(
+    `SELECT tb.id, tb.staff_id, tb.starts_at, tb.ends_at, tb.reason,
+            st.display_name AS staff_name
+       FROM time_blocks tb
+       LEFT JOIN staff st ON st.id = tb.staff_id
+      WHERE tb.business_id = $1 AND tb.ends_at >= now()
+        AND COALESCE(tb.reason,'') <> '__OPEN_SLOT__'
+      ORDER BY tb.starts_at`, [req.business.id]);
+  res.json({ blocks: rows });
+}));
+
+// Crear un bloqueo (día libre completo o rango de horas)
+app.post('/api/blocks', authRequired, businessScope, asyncH(async (req, res) => {
+  const { date, all_day, start_time, end_time, staff_id, reason } = req.body || {};
+  if (!isDate(date)) return bad(res, 'Fecha requerida');
+  if (staff_id && !isUuid(staff_id)) return bad(res, 'Profesional inválido');
+
+  let startsAt, endsAt;
+  if (all_day) {
+    // día completo: de 00:00 a 23:59:59 del día (hora de PR)
+    startsAt = new Date(`${date}T00:00:00${TZ_OFFSET}`);
+    endsAt   = new Date(`${date}T23:59:59${TZ_OFFSET}`);
+  } else {
+    if (!isTime(start_time) || !isTime(end_time)) return bad(res, 'Horas inválidas');
+    if (end_time <= start_time) return bad(res, 'La hora de fin debe ser después del inicio');
+    startsAt = new Date(`${date}T${start_time}:00${TZ_OFFSET}`);
+    endsAt   = new Date(`${date}T${end_time}:00${TZ_OFFSET}`);
+  }
+
+  const { rows } = await db.query(
+    `INSERT INTO time_blocks (business_id, staff_id, starts_at, ends_at, reason)
+     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+    [req.business.id, staff_id || null, startsAt, endsAt, (reason || '').slice(0, 120) || null]);
+  await audit(req, 'block.create', 'time_block', rows[0].id);
+  res.status(201).json({ block: rows[0] });
+}));
+
+// Borrar un bloqueo
+app.delete('/api/blocks/:id', authRequired, businessScope, asyncH(async (req, res) => {
+  if (!isUuid(req.params.id)) return bad(res, 'ID inválido');
+  const { rows } = await db.query(
+    `DELETE FROM time_blocks WHERE id = $1 AND business_id = $2 RETURNING id`,
+    [req.params.id, req.business.id]);
+  if (!rows[0]) return bad(res, 'Bloqueo no encontrado', 404);
+  res.json({ ok: true });
+}));
+
 // ============================================================================
 //  RUTAS — STAFF (límite por plan) Y SERVICIOS
 // ============================================================================

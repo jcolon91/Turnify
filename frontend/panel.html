@@ -175,6 +175,11 @@ main{padding:22px 20px 90px;max-width:760px}
         <div class="alert" id="hoursAlert"></div>
         <div class="card" id="hoursCard"></div>
         <button class="btn btn-teal" id="saveHoursBtn">Guardar horario</button>
+
+        <div class="seclabel" style="margin-top:28px">Días libres y bloqueos</div>
+        <p style="font-size:13px;color:var(--ink2);margin-bottom:12px">Marca días que no trabajas o bloquea horas específicas. Tus clientes no podrán reservar en esos momentos.</p>
+        <button class="btn btn-ghost btn-sm" id="addBlockBtn" style="margin-bottom:14px">+ Añadir día libre o bloqueo</button>
+        <div id="blocksList"></div>
       </section>
 
       <section class="view" id="view-negocio">
@@ -237,6 +242,26 @@ main{padding:22px 20px 90px;max-width:760px}
       </div>
       <div style="text-align:center;margin-top:14px"><a id="logout2" style="font-size:12.5px;color:var(--ink2);cursor:pointer">Cerrar sesión</a></div>
     </main>
+  </div>
+</div>
+
+<div class="modal" id="blockModal">
+  <div class="box">
+    <h3>Día libre o bloqueo</h3>
+    <div class="alert" id="blockAlert"></div>
+    <div class="field"><label>Fecha *</label><input id="blkDate" type="date"></div>
+    <label style="display:flex;gap:8px;font-size:14px;font-weight:600;margin-bottom:14px;cursor:pointer"><input type="checkbox" id="blkAllDay" checked> Todo el día (no trabajo)</label>
+    <div id="blkHours" style="display:none">
+      <div class="row2">
+        <div class="field"><label>Desde</label><input id="blkStart" type="time" value="12:00"></div>
+        <div class="field"><label>Hasta</label><input id="blkEnd" type="time" value="14:00"></div>
+      </div>
+    </div>
+    <div class="field"><label>Motivo (opcional)</label><input id="blkReason" placeholder="Cita médica, vacaciones…"></div>
+    <div style="display:flex;gap:10px;margin-top:6px">
+      <button class="btn btn-ghost btn-sm" id="blkCancel" style="flex:1">Cancelar</button>
+      <button class="btn btn-teal btn-sm" id="blkSave" style="flex:1">Guardar</button>
+    </div>
   </div>
 </div>
 
@@ -317,6 +342,67 @@ document.getElementById('logout').onclick = doLogout;
 document.getElementById('logout2').onclick = doLogout;
 
 let BIZ = null;
+
+// ── Días libres / bloqueos ─────────────────────────────────────────────────
+async function loadBlocks(){
+  const r = await api('GET','/blocks');
+  const list = document.getElementById('blocksList');
+  const blocks = (r.ok && r.data.blocks) ? r.data.blocks : [];
+  if(blocks.length === 0){
+    list.innerHTML = '<div class="empty">No tienes días libres marcados.</div>';
+    return;
+  }
+  list.innerHTML = blocks.map(function(b){
+    const start = new Date(b.starts_at);
+    const end = new Date(b.ends_at);
+    // detectar si es todo el día (00:00 a 23:59)
+    const isAllDay = start.getHours()===0 && start.getMinutes()===0 && end.getHours()===23;
+    const fecha = start.toLocaleDateString('es-PR',{weekday:'short',day:'numeric',month:'short'});
+    let desc;
+    if(isAllDay){ desc = 'Todo el día'; }
+    else { desc = start.toLocaleTimeString('es-PR',{hour:'numeric',minute:'2-digit'})+' – '+end.toLocaleTimeString('es-PR',{hour:'numeric',minute:'2-digit'}); }
+    const motivo = b.reason ? (' · '+esc(b.reason)) : '';
+    return '<div class="svc"><div class="grow"><h4>'+fecha+'</h4><p>'+desc+motivo+'</p></div><button class="del" data-id="'+esc(b.id)+'">Quitar</button></div>';
+  }).join('');
+  list.querySelectorAll('.del').forEach(function(btn){
+    btn.onclick = async function(){
+      if(!confirm('¿Quitar este bloqueo?')) return;
+      const r = await api('DELETE','/blocks/'+btn.dataset.id);
+      if(r.ok) loadBlocks();
+    };
+  });
+}
+const blockModal = document.getElementById('blockModal');
+document.getElementById('addBlockBtn').onclick = function(){
+  clearAlert('blockAlert');
+  document.getElementById('blkDate').value = new Date().toLocaleDateString('en-CA',{timeZone:'America/Puerto_Rico'});
+  document.getElementById('blkAllDay').checked = true;
+  document.getElementById('blkHours').style.display = 'none';
+  document.getElementById('blkReason').value = '';
+  blockModal.classList.add('on');
+};
+document.getElementById('blkAllDay').onchange = function(){
+  document.getElementById('blkHours').style.display = this.checked ? 'none' : 'block';
+};
+document.getElementById('blkCancel').onclick = function(){ blockModal.classList.remove('on'); };
+document.getElementById('blkSave').onclick = async function(){
+  clearAlert('blockAlert');
+  const date = document.getElementById('blkDate').value;
+  const allDay = document.getElementById('blkAllDay').checked;
+  const reason = document.getElementById('blkReason').value.trim();
+  if(!date){ showAlert('blockAlert','Elige una fecha.',false); return; }
+  const body = { date:date, all_day:allDay, reason:reason||undefined };
+  if(!allDay){
+    body.start_time = document.getElementById('blkStart').value;
+    body.end_time = document.getElementById('blkEnd').value;
+    if(body.end_time <= body.start_time){ showAlert('blockAlert','La hora de fin debe ser después del inicio.',false); return; }
+  }
+  const btn = document.getElementById('blkSave'); btn.disabled=true; btn.textContent='…';
+  const r = await api('POST','/blocks', body);
+  btn.disabled=false; btn.textContent='Guardar';
+  if(r.ok){ blockModal.classList.remove('on'); loadBlocks(); }
+  else showAlert('blockAlert', r.data.error||'No se pudo guardar.', false);
+};
 
 // ── Equipo / Staff ─────────────────────────────────────────────────────────
 async function loadStaff(){
@@ -664,6 +750,7 @@ function switchView(v){
   document.querySelectorAll('#mobnav a').forEach(function(a){ a.classList.toggle('on', a.dataset.v===v); });
   if(v==='servicios') loadServices();
   if(v==='equipo') loadStaff();
+  if(v==='horario') loadBlocks();
 }
 document.querySelectorAll('.navlink').forEach(function(a){ a.onclick=function(){ switchView(a.dataset.v); }; });
 
