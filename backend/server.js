@@ -356,8 +356,13 @@ app.patch('/api/businesses/me', authRequired, businessScope, asyncH(async (req, 
   res.json({ business: rows[0] });
 }));
 
-// Subir / reemplazar el logo del negocio
+// Subir / reemplazar el logo del negocio (solo planes de pago)
 app.post('/api/businesses/me/logo', authRequired, businessScope,
+  (req, res, next) => {
+    if (req.business.plan_code === 'free')
+      return bad(res, 'El logo personalizado está disponible desde el plan Pro. Sube de plan para personalizar tu página.', 403);
+    next();
+  },
   (req, res, next) => uploadLogo.single('logo')(req, res, (err) => {
     if (err) return bad(res, err.message || 'Error al subir el logo');
     next();

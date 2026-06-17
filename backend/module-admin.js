@@ -9,7 +9,7 @@
 // ============================================================================
 
 function mount(app, { db, authRequired, h }) {
-  const { asyncH, bad } = h;
+  const { asyncH, bad, audit } = h;
 
   // ── Middleware: exige que el usuario sea admin de plataforma ──────────────
   const adminRequired = asyncH(async (req, res, next) => {
@@ -239,6 +239,51 @@ function mount(app, { db, authRequired, h }) {
       [req.params.id]);
     if (!rows[0]) return bad(res, 'Referido no encontrado o no estaba activo', 404);
     res.json({ ok: true });
+  }));
+
+  // ── POST /api/admin/businesses/:id/plan ───────────────────────────────────
+  // Cambia el plan de un negocio MANUALMENTE (antes de tener Stripe).
+  // Útil para: activar Pro/Studio a quien paga por ATH, dar upgrade de prueba,
+  // o corregir un plan. Body: { plan_code, months? }
+  //   plan_code: 'free' | 'pro' | 'studio' | 'team' | 'grande' | 'ilimitado'
+  //   months: cuántos meses dura (default 1). Si es 'free', se ignora.
+  const VALID_PLANS = ['free', 'pro', 'studio', 'team', 'grande', 'ilimitado'];
+  app.post('/api/admin/businesses/:id/plan', authRequired, adminRequired, asyncH(async (req, res) => {
+    const planCode = String(req.body?.plan_code || '').trim().toLowerCase();
+    const months = Number.isInteger(req.body?.months) ? req.body.months : 1;
+    if (!VALID_PLANS.includes(planCode)) return bad(res, 'Plan inválido. Usa: ' + VALID_PLANS.join(', '));
+    if (months < 1 || months > 24) return bad(res, 'Meses debe estar entre 1 y 24');
+
+    // Verificar que el negocio existe
+    const biz = await db.query('SELECT id, name FROM businesses WHERE id = $1 AND deleted_at IS NULL', [req.params.id]);
+    if (!biz.rows[0]) return bad(res, 'Negocio no encontrado', 404);
+
+    let rows;
+    if (planCode === 'free') {
+      // Bajar a free: sin fecha de vencimiento, status active
+      ({ rows } = await db.query(
+        `UPDATE subscriptions
+            SET plan_code = 'free', status = 'active',
+                current_period_start = now(), current_period_end = NULL,
+                cancel_at_period_end = false, trial_ends_at = NULL
+          WHERE business_id = $1
+          RETURNING plan_code, status, current_period_end`,
+        [req.params.id]));
+    } else {
+      // Subir a plan premium: vence en N meses
+      ({ rows } = await db.query(
+        `UPDATE subscriptions
+            SET plan_code = $2::plan_code, status = 'active',
+                current_period_start = now(),
+                current_period_end = now() + ($3 || ' months')::interval,
+                cancel_at_period_end = false, trial_ends_at = NULL
+          WHERE business_id = $1
+          RETURNING plan_code, status, current_period_end`,
+        [req.params.id, planCode, String(months)]));
+    }
+    if (!rows[0]) return bad(res, 'El negocio no tiene suscripción registrada', 404);
+    await audit(req, 'admin.plan.change', 'business', req.params.id, { plan_code: planCode, months });
+    res.json({ ok: true, business: biz.rows[0].name, subscription: rows[0] });
   }));
 }
 

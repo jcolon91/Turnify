@@ -195,7 +195,7 @@ main{padding:22px 20px 90px;max-width:760px}
               <input type="file" id="logoFile" accept="image/jpeg,image/png,image/webp" style="display:none">
               <button class="btn btn-teal" id="logoUploadBtn" style="padding:10px 16px;font-size:13px">Subir logo</button>
               <button class="btn btn-ghost" id="logoRemoveBtn" style="padding:10px 16px;font-size:13px;display:none;margin-left:8px">Quitar</button>
-              <p style="font-size:12px;color:var(--ink2);margin-top:8px">JPG, PNG o WEBP · Se recorta cuadrado · Máx 5MB</p>
+              <p style="font-size:12px;color:var(--ink2);margin-top:8px">JPG, PNG o WEBP · Se recorta cuadrado · Máx 5MB · <b>Desde plan Pro</b></p>
             </div>
           </div>
         </div>
@@ -606,17 +606,17 @@ function fillBusiness(data){
   document.getElementById('bizWa').value = b.whatsapp || '';
   document.getElementById('bizAddr').value = b.address_line || '';
   document.getElementById('bizAth').value = b.ath_phone || '';
-  // ── Logo del negocio ──
+  // ── Logo del negocio (premium: Pro+) ──
   (function(){
+    var isFree = (b.plan_code || 'free') === 'free';
     function renderLogo(url){
       var prev = document.getElementById('logoPreview');
-      var ph = document.getElementById('logoPlaceholder');
       var rm = document.getElementById('logoRemoveBtn');
       if(url){
         prev.innerHTML = '<img src="'+url+'" alt="logo" style="width:100%;height:100%;object-fit:cover">';
-        if(rm) rm.style.display = 'inline-flex';
+        if(rm) rm.style.display = isFree ? 'none' : 'inline-flex';
       } else {
-        prev.innerHTML = '<span id="logoPlaceholder" style="font-size:11px;color:var(--ink2);text-align:center;padding:6px">Sin logo</span>';
+        prev.innerHTML = '<span style="font-size:11px;color:var(--ink2);text-align:center;padding:6px">Sin logo</span>';
         if(rm) rm.style.display = 'none';
       }
     }
@@ -624,6 +624,18 @@ function fillBusiness(data){
     var fileInput = document.getElementById('logoFile');
     var uploadBtn = document.getElementById('logoUploadBtn');
     var removeBtn = document.getElementById('logoRemoveBtn');
+
+    if(isFree){
+      // Plan gratis: bloquear, invitar a upgrade
+      if(uploadBtn){
+        uploadBtn.textContent = '🔒 Subir logo (Pro)';
+        uploadBtn.onclick = function(){
+          showAlert('bizAlert','El logo personalizado está disponible desde el plan Pro. Sube de plan para personalizar tu página.', false);
+        };
+      }
+      return;
+    }
+
     if(uploadBtn) uploadBtn.onclick = function(){ fileInput.click(); };
     if(fileInput) fileInput.onchange = async function(){
       var file = fileInput.files[0];
@@ -637,7 +649,7 @@ function fillBusiness(data){
         });
         var data = await r.json().catch(function(){ return {}; });
         if(r.ok && data.logo_url){
-          renderLogo(data.logo_url + '?t=' + Date.now());  // cache-bust
+          renderLogo(data.logo_url + '?t=' + Date.now());
           showAlert('bizAlert','Logo actualizado ✓', true);
         } else {
           showAlert('bizAlert', data.error || 'No se pudo subir el logo', false);

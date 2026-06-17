@@ -41,6 +41,8 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer;border:0
 /* Mini-desglose de estados */
 .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
 .chip{font-size:11.5px;font-weight:600;padding:5px 11px;border-radius:99px;background:#EDE9DB;color:var(--ink2)}
+.planbtn{font-size:12px;font-weight:700;padding:6px 12px;border-radius:9px;background:var(--ink);color:#FFF8EC;white-space:nowrap}
+.planbtn:hover{opacity:.88}
 .chip b{font-family:var(--mono)}
 .chip.green{background:var(--teal-soft);color:var(--teal-ink)}
 .chip.amber{background:#FBEFD8;color:#92590E}
@@ -118,7 +120,7 @@ tr:last-child td{border-bottom:0}
       <div class="tablecard">
         <div class="scrollx">
           <table id="bizTable"><thead><tr>
-            <th>Negocio</th><th>Dueño</th><th>Plan</th><th>Estado</th><th>Registrado</th>
+            <th>Negocio</th><th>Dueño</th><th>Plan</th><th>Estado</th><th>Registrado</th><th>Acción</th>
           </tr></thead><tbody></tbody></table>
         </div>
         <div class="empty" id="bizEmpty" style="display:none">Aún no hay negocios registrados.</div>
@@ -155,6 +157,30 @@ tr:last-child td{border-bottom:0}
 </div>
 
 <div class="foot">Turnify · Panel de administrador</div>
+
+<div id="planModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#fff;border-radius:18px;max-width:380px;width:100%;padding:22px">
+    <h3 style="font-family:var(--display,sans-serif);font-size:19px;margin-bottom:4px">Cambiar plan</h3>
+    <p id="pmBiz" style="font-size:13px;color:var(--ink2,#666);margin-bottom:16px"></p>
+    <label style="font-size:12px;font-weight:700;display:block;margin-bottom:6px">Plan</label>
+    <select id="pmPlan" style="width:100%;padding:11px;border:1.5px solid #ddd;border-radius:10px;font-size:14px;margin-bottom:14px">
+      <option value="free">Free (gratis)</option>
+      <option value="pro">Pro — $14.99</option>
+      <option value="studio">Studio — $19.99</option>
+      <option value="team">Team — $29.99</option>
+      <option value="grande">Grande — $44.99</option>
+      <option value="ilimitado">Ilimitado — $59.99</option>
+    </select>
+    <label style="font-size:12px;font-weight:700;display:block;margin-bottom:6px">Duración (meses)</label>
+    <input id="pmMonths" type="number" value="1" min="1" max="24" style="width:100%;padding:11px;border:1.5px solid #ddd;border-radius:10px;font-size:14px;margin-bottom:8px">
+    <p style="font-size:11.5px;color:var(--ink2,#666);margin-bottom:16px">Para planes de pago, define cuántos meses dura antes de vencer. Para Free no aplica.</p>
+    <div id="pmAlert" style="display:none;font-size:13px;padding:9px;border-radius:8px;margin-bottom:12px"></div>
+    <div style="display:flex;gap:8px">
+      <button id="pmCancel" style="flex:1;padding:11px;border-radius:10px;background:#EDE9DB;color:#333;font-weight:700">Cancelar</button>
+      <button id="pmSave" style="flex:1;padding:11px;border-radius:10px;background:#0E8074;color:#fff;font-weight:700">Aplicar</button>
+    </div>
+  </div>
+</div>
 
 <script>
 const API = '/api';
@@ -343,8 +369,13 @@ function render(data){
         <td><span class="plan">${esc(b.plan_code||'free')}</span></td>
         <td><span class="pill ${esc(st)}">${esc(st)}</span></td>
         <td class="muted">${fdate(b.created_at)}</td>
+        <td><button class="planbtn" data-id="${esc(b.id)}" data-name="${esc(b.name)}" data-plan="${esc(b.plan_code||'free')}">Cambiar plan</button></td>
       </tr>`;
     }).join('');
+    // Enganchar botones de cambiar plan
+    document.querySelectorAll('.planbtn').forEach(function(btn){
+      btn.onclick = function(){ openPlanChange(btn.dataset.id, btn.dataset.name, btn.dataset.plan); };
+    });
   }
 
   // Tabla: citas recientes
@@ -362,6 +393,48 @@ function render(data){
     </tr>`).join('');
   }
 }
+
+// ── Cambiar plan de un negocio (admin manual) ──
+let pmCurrentId = null;
+function openPlanChange(id, name, currentPlan){
+  pmCurrentId = id;
+  document.getElementById('pmBiz').textContent = name + ' · plan actual: ' + (currentPlan||'free').toUpperCase();
+  document.getElementById('pmPlan').value = currentPlan || 'free';
+  document.getElementById('pmMonths').value = 1;
+  var al = document.getElementById('pmAlert'); al.style.display = 'none';
+  document.getElementById('planModal').style.display = 'flex';
+}
+document.getElementById('pmCancel').onclick = function(){
+  document.getElementById('planModal').style.display = 'none';
+};
+document.getElementById('pmSave').onclick = async function(){
+  if(!pmCurrentId) return;
+  var plan = document.getElementById('pmPlan').value;
+  var months = parseInt(document.getElementById('pmMonths').value,10) || 1;
+  var al = document.getElementById('pmAlert');
+  var saveBtn = document.getElementById('pmSave');
+  saveBtn.disabled = true; saveBtn.textContent = 'Aplicando…';
+  try {
+    var r = await fetch(API + '/admin/businesses/' + pmCurrentId + '/plan', {
+      method:'POST',
+      headers:{ 'Authorization':'Bearer '+token, 'Content-Type':'application/json' },
+      body: JSON.stringify({ plan_code: plan, months: months })
+    });
+    var data = await r.json().catch(function(){ return {}; });
+    if(r.ok){
+      al.style.display='block'; al.style.background='#E3EFE9'; al.style.color='#0A5B52';
+      al.textContent = 'Plan actualizado ✓';
+      setTimeout(function(){ document.getElementById('planModal').style.display='none'; load(); }, 900);
+    } else {
+      al.style.display='block'; al.style.background='#FBE4E4'; al.style.color='#A33';
+      al.textContent = data.error || 'No se pudo cambiar el plan';
+    }
+  } catch(e){
+    al.style.display='block'; al.style.background='#FBE4E4'; al.style.color='#A33';
+    al.textContent = 'Error de conexión';
+  }
+  saveBtn.disabled = false; saveBtn.textContent = 'Aplicar';
+};
 
 load();
 </script>
