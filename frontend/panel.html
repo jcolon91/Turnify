@@ -203,11 +203,20 @@ main{padding:22px 20px 90px;max-width:760px}
         </div>
 
         <!-- Tarjetas resumen -->
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px" id="acctCards">
-          <div class="acct-card"><span class="acct-lbl">Facturado</span><b class="acct-val" id="acctFacturado">$0.00</b><small id="acctFactN" style="color:var(--ink2)"></small></div>
-          <div class="acct-card"><span class="acct-lbl">Cobrado</span><b class="acct-val" id="acctCobrado">$0.00</b><small id="acctCobN" style="color:var(--ink2)"></small></div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px" id="acctCards">
+          <div class="acct-card"><span class="acct-lbl">Ganancia realizada</span><b class="acct-val" id="acctFacturado">$0.00</b><small id="acctFactN" style="color:var(--ink2)"></small></div>
+          <div class="acct-card" id="cardNoReal" style="display:none"><span class="acct-lbl">No realizada</span><b class="acct-val" id="acctNoReal" style="color:#B8860B">$0.00</b><small id="acctNoRealN" style="color:var(--ink2)"></small></div>
+          <div class="acct-card" id="cardDepos" style="display:none"><span class="acct-lbl">Depósitos cobrados</span><b class="acct-val" id="acctDepos">$0.00</b><small id="acctDeposN" style="color:var(--ink2)"></small></div>
           <div class="acct-card"><span class="acct-lbl">Gastos</span><b class="acct-val" id="acctGastos">$0.00</b><small id="acctGastN" style="color:var(--ink2)"></small></div>
-          <div class="acct-card" style="background:var(--teal);color:#fff"><span class="acct-lbl" style="color:#cfeee8">Ganancia neta</span><b class="acct-val" id="acctNeto">$0.00</b><small style="color:#cfeee8">Cobrado − Gastos</small></div>
+          <div class="acct-card" style="background:var(--teal);color:#fff"><span class="acct-lbl" style="color:#cfeee8">Ganancia neta</span><b class="acct-val" id="acctNeto">$0.00</b><small style="color:#cfeee8" id="acctNetoHint">Realizada − Gastos</small></div>
+        </div>
+
+        <!-- Depósitos retenidos (canceladas / no-show) -->
+        <div id="acctRetenidos" style="display:none;margin-bottom:20px">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px">
+            <div class="acct-card" style="border-color:#E0B0B0"><span class="acct-lbl">Canceladas (depósito retenido)</span><b class="acct-val" id="acctCancel" style="font-size:18px">$0.00</b><small id="acctCancelN" style="color:var(--ink2)"></small></div>
+            <div class="acct-card" style="border-color:#E0B0B0"><span class="acct-lbl">No-show (depósito retenido)</span><b class="acct-val" id="acctNoShow" style="font-size:18px">$0.00</b><small id="acctNoShowN" style="color:var(--ink2)"></small></div>
+          </div>
         </div>
 
         <!-- Aviso de upgrade (free) -->
@@ -984,14 +993,31 @@ async function loadAccounting(){
   const d = r.data;
   acctIsPaid = !d.plan_limitado;
 
-  // Tarjetas
+  // Tarjetas base
   document.getElementById('acctFacturado').textContent = money(d.ingresos.facturado_cents);
   document.getElementById('acctFactN').textContent = d.ingresos.citas_completadas + ' citas completadas';
-  document.getElementById('acctCobrado').textContent = money(d.ingresos.cobrado_cents);
-  document.getElementById('acctCobN').textContent = d.ingresos.pagos_registrados + ' pagos';
   document.getElementById('acctGastos').textContent = money(d.gastos.total_cents);
   document.getElementById('acctGastN').textContent = (d.gastos.app_cents>0 ? 'incl. app '+money(d.gastos.app_cents) : '');
   document.getElementById('acctNeto').textContent = money(d.neto_cents);
+
+  // Tarjetas avanzadas (Pro)
+  var hasDetalle = acctIsPaid && d.detalle;
+  document.getElementById('cardNoReal').style.display = hasDetalle ? 'flex' : 'none';
+  document.getElementById('cardDepos').style.display = hasDetalle ? 'flex' : 'none';
+  document.getElementById('acctRetenidos').style.display = hasDetalle ? 'block' : 'none';
+  document.getElementById('acctNetoHint').textContent = hasDetalle ? 'Realizada + depósitos retenidos − Gastos' : 'Cobrado − Gastos';
+
+  if(hasDetalle){
+    var x = d.detalle;
+    document.getElementById('acctNoReal').textContent = money(x.no_realizado_cents);
+    document.getElementById('acctNoRealN').textContent = x.no_realizado_n + ' citas confirmadas';
+    document.getElementById('acctDepos').textContent = money(x.depositos_cents);
+    document.getElementById('acctDeposN').textContent = x.depositos_n + ' depósitos';
+    document.getElementById('acctCancel').textContent = money(x.canceladas_cents);
+    document.getElementById('acctCancelN').textContent = x.canceladas_n + ' citas';
+    document.getElementById('acctNoShow').textContent = money(x.no_show_cents);
+    document.getElementById('acctNoShowN').textContent = x.no_show_n + ' citas';
+  }
 
   // Mostrar/ocultar según plan
   document.getElementById('acctUpgrade').style.display = d.plan_limitado ? 'block' : 'none';

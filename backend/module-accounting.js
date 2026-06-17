@@ -51,7 +51,7 @@ module.exports.mount = function (app, ctx) {
     const { from, to } = resolveRange(period, req.query.from, req.query.to);
     const bid = req.business.id;
 
-    // INGRESOS FACTURADOS: citas completadas en el rango (por starts_at)
+    // ── INGRESOS REALIZADOS: citas completadas (por starts_at) ──
     const facturado = await db.query(
       `SELECT COALESCE(SUM(price_cents),0)::bigint AS total, COUNT(*)::int AS n
          FROM appointments
@@ -59,7 +59,7 @@ module.exports.mount = function (app, ctx) {
           AND starts_at >= $2::date AND starts_at < $3::date`,
       [bid, from, to]);
 
-    // INGRESOS COBRADOS: pagos completados en el rango (por paid_at)
+    // ── INGRESOS COBRADOS: pagos recibidos (por paid_at) ──
     const cobrado = await db.query(
       `SELECT COALESCE(SUM(amount_cents),0)::bigint AS total, COUNT(*)::int AS n
          FROM payments
@@ -67,15 +67,14 @@ module.exports.mount = function (app, ctx) {
           AND paid_at >= $2::date AND paid_at < $3::date`,
       [bid, from, to]);
 
-    // GASTOS anotados en el rango
+    // ── GASTOS anotados ──
     const gastos = await db.query(
       `SELECT COALESCE(SUM(amount_cents),0)::bigint AS total, COUNT(*)::int AS n
          FROM expenses
-        WHERE business_id = $1
-          AND spent_on >= $2::date AND spent_on < $3::date`,
+        WHERE business_id = $1 AND spent_on >= $2::date AND spent_on < $3::date`,
       [bid, from, to]);
 
-    // GASTO DE LA APP (mensualidad pagada a Turnify) en el rango
+    // ── GASTO DE LA APP (mensualidad a Turnify) ──
     const appCost = await db.query(
       `SELECT COALESCE(SUM(amount_cents - discount_cents),0)::bigint AS total
          FROM platform_payments
@@ -92,8 +91,8 @@ module.exports.mount = function (app, ctx) {
     const out = {
       period, from, to,
       ingresos: {
-        facturado_cents: facturadoTotal,   // lo que se trabajó (citas completadas)
-        cobrado_cents:   cobradoTotal,     // lo que entró de verdad (pagos)
+        facturado_cents: facturadoTotal,   // ganancia realizada (citas completadas)
+        cobrado_cents:   cobradoTotal,     // todo lo que entró (pagos)
         citas_completadas: facturado.rows[0].n,
         pagos_registrados: cobrado.rows[0].n,
       },
@@ -103,10 +102,67 @@ module.exports.mount = function (app, ctx) {
         app_cents:     gastoApp,
         cantidad:      gastos.rows[0].n,
       },
-      // Ganancia neta = cobrado - gastos (lo más realista contablemente)
-      neto_cents: cobradoTotal - gastosTotal,
-      plan_limitado: !paid,   // el frontend muestra el aviso de upgrade
+      plan_limitado: !paid,
     };
+
+    if (paid) {
+      // ── NO REALIZADAS: citas confirmadas que aún no han pasado ──
+      const noRealizado = await db.query(
+        `SELECT COALESCE(SUM(price_cents),0)::bigint AS total, COUNT(*)::int AS n
+           FROM appointments
+          WHERE business_id = $1 AND status = 'confirmed'
+            AND starts_at >= $2::date AND starts_at < $3::date`,
+        [bid, from, to]);
+
+      // ── DEPÓSITOS COBRADOS: pagos kind=deposit no reembolsados ──
+      const depositos = await db.query(
+        `SELECT COALESCE(SUM(amount_cents),0)::bigint AS total, COUNT(*)::int AS n
+           FROM payments
+          WHERE business_id = $1 AND kind = 'deposit' AND status = 'paid'
+            AND refunded_at IS NULL
+            AND paid_at >= $2::date AND paid_at < $3::date`,
+        [bid, from, to]);
+
+      // ── CANCELADAS con depósito retenido ──
+      const canceladas = await db.query(
+        `SELECT COALESCE(SUM(p.amount_cents),0)::bigint AS total, COUNT(DISTINCT a.id)::int AS n
+           FROM appointments a
+           JOIN payments p ON p.appointment_id = a.id
+          WHERE a.business_id = $1
+            AND a.status IN ('cancelled_client','cancelled_business')
+            AND p.kind = 'deposit' AND p.status = 'paid' AND p.refunded_at IS NULL
+            AND a.starts_at >= $2::date AND a.starts_at < $3::date`,
+        [bid, from, to]);
+
+      // ── NO-SHOW con depósito retenido ──
+      const noShow = await db.query(
+        `SELECT COALESCE(SUM(p.amount_cents),0)::bigint AS total, COUNT(DISTINCT a.id)::int AS n
+           FROM appointments a
+           JOIN payments p ON p.appointment_id = a.id
+          WHERE a.business_id = $1 AND a.status = 'no_show'
+            AND p.kind = 'deposit' AND p.status = 'paid' AND p.refunded_at IS NULL
+            AND a.starts_at >= $2::date AND a.starts_at < $3::date`,
+        [bid, from, to]);
+
+      const depositosRetenidos = Number(canceladas.rows[0].total) + Number(noShow.rows[0].total);
+
+      out.detalle = {
+        no_realizado_cents: Number(noRealizado.rows[0].total),
+        no_realizado_n:     noRealizado.rows[0].n,
+        depositos_cents:    Number(depositos.rows[0].total),
+        depositos_n:        depositos.rows[0].n,
+        canceladas_cents:   Number(canceladas.rows[0].total),
+        canceladas_n:       canceladas.rows[0].n,
+        no_show_cents:      Number(noShow.rows[0].total),
+        no_show_n:          noShow.rows[0].n,
+      };
+
+      // Ganancia neta = realizada + depósitos retenidos − gastos
+      out.neto_cents = facturadoTotal + depositosRetenidos - gastosTotal;
+    } else {
+      // Free: neto simple = cobrado − gastos
+      out.neto_cents = cobradoTotal - gastosTotal;
+    }
 
     // DESGLOSE POR SERVICIO (solo Pro+)
     if (paid) {
