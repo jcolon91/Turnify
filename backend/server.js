@@ -30,8 +30,8 @@ const {
   DATABASE_URL,
   JWT_SECRET,
   CORS_ORIGINS = '',
-  EVOLUTION_URL,            // http://127.0.0.1:8080  (Evolution API, opcional)
-  EVOLUTION_APIKEY,
+  EVOLUTION_API_URL,            // http://localhost:8080  (Evolution API, opcional)
+  EVOLUTION_API_KEY,
   EVOLUTION_INSTANCE = 'turnify',
   RESEND_API_KEY,           // emails (opcional)
   EMAIL_FROM = 'Turnify <citas@turnifypr.com>',
@@ -1147,11 +1147,11 @@ function buildMessage(template, ctx) {
 }
 
 async function sendWhatsApp(phone, text) {
-  if (!EVOLUTION_URL || !EVOLUTION_APIKEY) return { skipped: true };
-  const r = await fetch(`${EVOLUTION_URL}/message/sendText/${EVOLUTION_INSTANCE}`, {
+  if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) return { skipped: true };
+  const r = await fetch(`${EVOLUTION_API_URL}/message/sendText/${EVOLUTION_INSTANCE}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', apikey: EVOLUTION_APIKEY },
-    body: JSON.stringify({ number: phone.replace('+', ''), text }),
+    headers: { 'Content-Type': 'application/json', apikey: EVOLUTION_API_KEY },
+    body: JSON.stringify({ number: phone.replace('+', ''), textMessage: { text } }),
   });
   if (!r.ok) throw new Error(`Evolution ${r.status}`);
   const j = await r.json().catch(() => ({}));
