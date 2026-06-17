@@ -38,6 +38,11 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- ----------------------------------------------------------------------------
+-- Propinas: añadir columna tip_cents a payments (si no existe)
+-- ----------------------------------------------------------------------------
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS tip_cents integer NOT NULL DEFAULT 0;
+
+-- ----------------------------------------------------------------------------
 -- Índices adicionales para acelerar los reportes de INGRESOS
 -- (las citas y pagos se consultan mucho por fecha en contabilidad)
 -- ----------------------------------------------------------------------------

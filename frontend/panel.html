@@ -45,6 +45,8 @@ main{padding:22px 20px 90px;max-width:760px}
 .acct-val{font-size:22px;font-weight:800;font-family:var(--display,sans-serif)}
 .serv-row{display:flex;justify-content:space-between;align-items:center;padding:11px 13px;background:var(--card);border:1.5px solid var(--line);border-radius:11px;margin-bottom:7px}
 .exp-row{display:flex;justify-content:space-between;align-items:center;padding:11px 13px;background:var(--card);border:1.5px solid var(--line);border-radius:11px;margin-bottom:7px}
+.paymethod{padding:10px 16px;border:1.5px solid var(--line);border-radius:10px;background:var(--card);font-weight:600;font-size:14px;cursor:pointer;color:var(--ink2)}
+.paymethod.on{background:var(--ink);color:#FFF8EC;border-color:var(--ink)}
 .seclabel{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--ink2);display:flex;align-items:center;gap:10px;margin:6px 0 14px}
 .seclabel::after{content:"";flex:1;height:1px;background:var(--line)}
 .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:20px;margin-bottom:14px}
@@ -387,6 +389,31 @@ main{padding:22px 20px 90px;max-width:760px}
     <div style="display:flex;gap:10px">
       <button class="btn btn-ghost btn-sm" id="apCancel" style="flex:1">Cancelar</button>
       <button class="btn btn-teal btn-sm" id="apSave" style="flex:1">Crear cita</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="cobroModal">
+  <div class="box">
+    <h3>Cobrar cita</h3>
+    <div class="alert" id="cobroAlert"></div>
+    <p style="font-size:14px;color:var(--ink2);margin-bottom:14px" id="cobroServicio"></p>
+    <div class="field">
+      <label>Método de pago *</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button type="button" class="paymethod on" data-m="cash">Efectivo</button>
+        <button type="button" class="paymethod" data-m="ath_movil">ATH Móvil</button>
+        <button type="button" class="paymethod" data-m="card">Tarjeta</button>
+      </div>
+    </div>
+    <div class="field"><label>Propina (opcional)</label><input id="cobroTip" type="number" step="0.01" min="0" placeholder="0.00"></div>
+    <div style="background:var(--paper);border-radius:10px;padding:12px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-weight:600">Total a cobrar</span>
+      <b style="font-size:20px" id="cobroTotal">$0.00</b>
+    </div>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-ghost btn-sm" id="cobroCancel" style="flex:1">Cancelar</button>
+      <button class="btn btn-teal btn-sm" id="cobroSave" style="flex:1">Completar y cobrar</button>
     </div>
   </div>
 </div>
@@ -838,7 +865,7 @@ async function loadDashboard(){
       const active = (st==='confirmed' || st==='pending_deposit');
       if(active){
         actions = '<div class="aptactions">'+
-          '<button class="aptbtn done" data-id="'+esc(a.id)+'" data-act="completed">✓ Completada</button>'+
+          '<button class="aptbtn done" data-id="'+esc(a.id)+'" data-act="completed" data-price="'+(a.price_cents||0)+'" data-svc="'+esc(a.service_name||'')+'">✓ Completada</button>'+
           '<button class="aptbtn noshow" data-id="'+esc(a.id)+'" data-act="no_show">No llegó</button>'+
           '<button class="aptbtn canc" data-id="'+esc(a.id)+'" data-act="cancelled_business">Cancelar</button>'+
           '</div>';
@@ -850,7 +877,12 @@ async function loadDashboard(){
     list.querySelectorAll('.aptbtn').forEach(function(btn){
       btn.onclick = async function(){
         const act = btn.dataset.act;
-        const labels = {completed:'marcar como COMPLETADA',no_show:'marcar que NO LLEGÓ',cancelled_business:'CANCELAR esta cita'};
+        // Completar cita → abrir modal de cobro
+        if(act === 'completed'){
+          openCobro(btn.dataset.id, btn.dataset.svc, parseInt(btn.dataset.price,10)||0);
+          return;
+        }
+        const labels = {no_show:'marcar que NO LLEGÓ',cancelled_business:'CANCELAR esta cita'};
         if(!confirm('¿Confirmas '+labels[act]+'?')) return;
         btn.disabled=true;
         const r = await api('PATCH','/appointments/'+btn.dataset.id,{ status:act });
@@ -968,6 +1000,45 @@ function buildMobnav(){
   nav.innerHTML = items.map(function(it,i){ return '<a data-v="'+it[0]+'" class="'+(i===0?'on':'')+'">'+it[1]+'</a>'; }).join('');
   nav.querySelectorAll('a').forEach(function(a){ a.onclick=function(){ switchView(a.dataset.v); }; });
 }
+
+// ════════════════════════ COBRO AL COMPLETAR CITA ════════════════════════
+const cobroModal = document.getElementById('cobroModal');
+let cobroId = null, cobroPrice = 0, cobroMethod = 'cash';
+
+function openCobro(id, servicio, priceCents){
+  cobroId = id; cobroPrice = priceCents; cobroMethod = 'cash';
+  clearAlert('cobroAlert');
+  document.getElementById('cobroServicio').textContent = servicio + ' — ' + money(priceCents);
+  document.getElementById('cobroTip').value = '';
+  document.querySelectorAll('.paymethod').forEach(function(b){ b.classList.toggle('on', b.dataset.m==='cash'); });
+  updateCobroTotal();
+  cobroModal.classList.add('on');
+}
+function updateCobroTotal(){
+  var tip = parseFloat(document.getElementById('cobroTip').value) || 0;
+  document.getElementById('cobroTotal').textContent = money(cobroPrice + Math.round(tip*100));
+}
+document.querySelectorAll('.paymethod').forEach(function(b){
+  b.onclick = function(){
+    cobroMethod = b.dataset.m;
+    document.querySelectorAll('.paymethod').forEach(function(x){ x.classList.remove('on'); });
+    b.classList.add('on');
+  };
+});
+document.getElementById('cobroTip').oninput = updateCobroTotal;
+document.getElementById('cobroCancel').onclick = function(){ cobroModal.classList.remove('on'); };
+document.getElementById('cobroSave').onclick = async function(){
+  const btn = this; btn.disabled = true; btn.textContent = 'Guardando…';
+  const tip = parseFloat(document.getElementById('cobroTip').value) || 0;
+  const r = await api('PATCH','/appointments/'+cobroId, {
+    status: 'completed',
+    payment_method: cobroMethod,
+    tip_cents: Math.round(tip*100)
+  });
+  btn.disabled = false; btn.textContent = 'Completar y cobrar';
+  if(r.ok){ cobroModal.classList.remove('on'); loadDashboard(); }
+  else { showAlert('cobroAlert', r.data.error || 'No se pudo completar', false); }
+};
 
 // ════════════════════════ CONTABILIDAD ════════════════════════
 let acctPeriod = 'day';

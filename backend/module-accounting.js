@@ -59,9 +59,11 @@ module.exports.mount = function (app, ctx) {
           AND starts_at >= $2::date AND starts_at < $3::date`,
       [bid, from, to]);
 
-    // ── INGRESOS COBRADOS: pagos recibidos (por paid_at) ──
+    // ── INGRESOS COBRADOS: pagos recibidos + propinas (por paid_at) ──
     const cobrado = await db.query(
-      `SELECT COALESCE(SUM(amount_cents),0)::bigint AS total, COUNT(*)::int AS n
+      `SELECT COALESCE(SUM(amount_cents + COALESCE(tip_cents,0)),0)::bigint AS total,
+              COALESCE(SUM(COALESCE(tip_cents,0)),0)::bigint AS propinas,
+              COUNT(*)::int AS n
          FROM payments
         WHERE business_id = $1 AND status = 'paid'
           AND paid_at >= $2::date AND paid_at < $3::date`,
@@ -92,7 +94,8 @@ module.exports.mount = function (app, ctx) {
       period, from, to,
       ingresos: {
         facturado_cents: facturadoTotal,   // ganancia realizada (citas completadas)
-        cobrado_cents:   cobradoTotal,     // todo lo que entró (pagos)
+        cobrado_cents:   cobradoTotal,     // todo lo que entró (pagos + propinas)
+        propinas_cents:  Number(cobrado.rows[0].propinas),
         citas_completadas: facturado.rows[0].n,
         pagos_registrados: cobrado.rows[0].n,
       },
@@ -248,7 +251,7 @@ module.exports.mount = function (app, ctx) {
     if (type === 'all' || type === 'income') {
       // Ingresos cobrados (pagos)
       const pays = await db.query(
-        `SELECT p.paid_at, p.amount_cents, p.method, p.kind,
+        `SELECT p.paid_at, p.amount_cents, COALESCE(p.tip_cents,0) AS tip_cents, p.method, p.kind,
                 a.service_name, c.full_name AS cliente
            FROM payments p
            LEFT JOIN appointments a ON a.id = p.appointment_id
@@ -258,11 +261,13 @@ module.exports.mount = function (app, ctx) {
           ORDER BY p.paid_at`,
         [bid, from, to]);
       lines.push('INGRESOS (PAGOS COBRADOS)');
-      lines.push(['Fecha','Servicio','Cliente','Método','Tipo','Monto USD'].map(esc).join(','));
+      lines.push(['Fecha','Servicio','Cliente','Método','Tipo','Monto USD','Propina USD','Total USD'].map(esc).join(','));
       for (const r of pays.rows) {
+        const monto = Number(r.amount_cents), tip = Number(r.tip_cents);
         lines.push([
           r.paid_at ? new Date(r.paid_at).toISOString().slice(0,10) : '',
-          r.service_name || '', r.cliente || '', r.method || '', r.kind || '', money(r.amount_cents),
+          r.service_name || '', r.cliente || '', r.method || '', r.kind || '',
+          money(monto), money(tip), money(monto + tip),
         ].map(esc).join(','));
       }
       lines.push('');

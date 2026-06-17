@@ -1080,10 +1080,26 @@ app.patch('/api/appointments/:id', authRequired, businessScope, asyncH(async (re
     await db.query(`UPDATE appointments SET status = $1::appointment_status,
         cancelled_at = CASE WHEN $1::appointment_status = 'cancelled_business' THEN now() ELSE cancelled_at END
       WHERE id = $2`, [status, appt.id]);
-    if (status === 'completed')
+    if (status === 'completed') {
       await db.query(`UPDATE clients SET total_visits = total_visits + 1,
           total_spent_cents = total_spent_cents + $2, last_visit_at = now() WHERE id = $1`,
         [appt.client_id, appt.price_cents]);
+      // Registrar el pago de la cita (precio + propina) si se indicó método.
+      // Evita duplicar si ya existe un pago 'balance' para esta cita.
+      const method = ['cash','ath_movil','card'].includes(req.body?.payment_method) ? req.body.payment_method : null;
+      if (method) {
+        const tip = Number.isInteger(req.body?.tip_cents) && req.body.tip_cents >= 0 && req.body.tip_cents <= 100000000
+          ? req.body.tip_cents : 0;
+        const exists = await db.query(
+          `SELECT 1 FROM payments WHERE appointment_id = $1 AND kind = 'balance' LIMIT 1`, [appt.id]);
+        if (!exists.rows[0]) {
+          await db.query(
+            `INSERT INTO payments (business_id, appointment_id, client_id, kind, method, amount_cents, tip_cents, status, paid_at)
+             VALUES ($1, $2, $3, 'balance', $4::payment_method, $5, $6, 'paid', now())`,
+            [req.business.id, appt.id, appt.client_id, method, appt.price_cents, tip]);
+        }
+      }
+    }
     if (status === 'no_show')
       await db.query(`UPDATE clients SET no_show_count = no_show_count + 1 WHERE id = $1`, [appt.client_id]);
   }
