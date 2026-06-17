@@ -1307,6 +1307,7 @@ try {
   loyalty.mount(app, { db, authRequired, businessScope, h: sharedHelpers });
   loyalty.startWorkers({ db, h: sharedHelpers });
   require('./module-admin').mount(app, { db, authRequired, h: sharedHelpers });
+  require('./module-accounting').mount(app, { db, authRequired, businessScope, h: sharedHelpers });
 } catch (e) {
   console.error('⚠ Error montando módulos v1.1:', e.message);
 }

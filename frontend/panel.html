@@ -38,6 +38,13 @@ main{padding:22px 20px 90px;max-width:760px}
 .kpi small{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink2)}
 .kpi b{display:block;font-family:var(--display);font-weight:800;font-size:24px;margin-top:4px;letter-spacing:-.02em}
 .view{display:none}.view.on{display:block}
+.period-btn{background:var(--card);border:1.5px solid var(--line);color:var(--ink2);font-weight:600}
+.period-btn.on{background:var(--ink);color:#FFF8EC;border-color:var(--ink)}
+.acct-card{background:var(--card);border:1.5px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:3px}
+.acct-lbl{font-size:12px;font-weight:600;color:var(--ink2)}
+.acct-val{font-size:22px;font-weight:800;font-family:var(--display,sans-serif)}
+.serv-row{display:flex;justify-content:space-between;align-items:center;padding:11px 13px;background:var(--card);border:1.5px solid var(--line);border-radius:11px;margin-bottom:7px}
+.exp-row{display:flex;justify-content:space-between;align-items:center;padding:11px 13px;background:var(--card);border:1.5px solid var(--line);border-radius:11px;margin-bottom:7px}
 .seclabel{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--ink2);display:flex;align-items:center;gap:10px;margin:6px 0 14px}
 .seclabel::after{content:"";flex:1;height:1px;background:var(--line)}
 .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:20px;margin-bottom:14px}
@@ -130,6 +137,7 @@ main{padding:22px 20px 90px;max-width:760px}
       <a data-v="servicios" class="navlink">Servicios</a>
       <a data-v="equipo" class="navlink">Equipo</a>
       <a data-v="horario" class="navlink">Horario</a>
+      <a data-v="contabilidad" class="navlink">Contabilidad</a>
       <a data-v="negocio" class="navlink">Mi negocio</a>
       <div class="planbox">
         <small>Tu plan</small>
@@ -180,6 +188,64 @@ main{padding:22px 20px 90px;max-width:760px}
         <p style="font-size:13px;color:var(--ink2);margin-bottom:12px">Marca días que no trabajas o bloquea horas específicas. Tus clientes no podrán reservar en esos momentos.</p>
         <button class="btn btn-ghost btn-sm" id="addBlockBtn" style="margin-bottom:14px">+ Añadir día libre o bloqueo</button>
         <div id="blocksList"></div>
+      </section>
+
+      <section class="view" id="view-contabilidad">
+        <div class="tophead"><div><h1>Contabilidad</h1><p>Tus ingresos, gastos y ganancias.</p></div></div>
+        <div class="alert" id="acctAlert"></div>
+
+        <!-- Selector de período -->
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px" id="acctPeriods">
+          <button class="btn btn-sm period-btn on" data-p="day">Hoy</button>
+          <button class="btn btn-sm period-btn" data-p="week">Semana</button>
+          <button class="btn btn-sm period-btn" data-p="month" data-pro="1">Mes</button>
+          <button class="btn btn-sm period-btn" data-p="year" data-pro="1">Año</button>
+        </div>
+
+        <!-- Tarjetas resumen -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px" id="acctCards">
+          <div class="acct-card"><span class="acct-lbl">Facturado</span><b class="acct-val" id="acctFacturado">$0.00</b><small id="acctFactN" style="color:var(--ink2)"></small></div>
+          <div class="acct-card"><span class="acct-lbl">Cobrado</span><b class="acct-val" id="acctCobrado">$0.00</b><small id="acctCobN" style="color:var(--ink2)"></small></div>
+          <div class="acct-card"><span class="acct-lbl">Gastos</span><b class="acct-val" id="acctGastos">$0.00</b><small id="acctGastN" style="color:var(--ink2)"></small></div>
+          <div class="acct-card" style="background:var(--teal);color:#fff"><span class="acct-lbl" style="color:#cfeee8">Ganancia neta</span><b class="acct-val" id="acctNeto">$0.00</b><small style="color:#cfeee8">Cobrado − Gastos</small></div>
+        </div>
+
+        <!-- Aviso de upgrade (free) -->
+        <div id="acctUpgrade" style="display:none;background:#FFF4E0;border:1px solid #F0C674;border-radius:12px;padding:14px;margin-bottom:20px;font-size:13.5px">
+          📊 <b>Desbloquea la contabilidad completa con Pro:</b> reportes por mes y año, desglose por servicio, registro de gastos y exportación para tu contable.
+        </div>
+
+        <!-- Desglose por servicio (Pro) -->
+        <div id="acctServicios" style="display:none;margin-bottom:24px">
+          <div class="seclabel">Ingresos por servicio</div>
+          <div id="acctServList"></div>
+        </div>
+
+        <!-- Gastos (Pro) -->
+        <div id="acctGastosBox" style="display:none">
+          <div class="seclabel" style="margin-top:8px">Gastos del período</div>
+          <p style="font-size:13px;color:var(--ink2);margin-bottom:10px">Anota tus gastos (renta, productos, empleados…) para ver tu ganancia real.</p>
+          <button class="btn btn-ghost btn-sm" id="addExpenseBtn" style="margin-bottom:12px">+ Añadir gasto</button>
+          <div id="expenseList"></div>
+        </div>
+
+        <!-- Exportar (Pro) -->
+        <div id="acctExportBox" style="display:none;margin-top:24px;padding-top:20px;border-top:1px solid var(--line)">
+          <div class="seclabel">Exportar para tu contable</div>
+          <p style="font-size:13px;color:var(--ink2);margin-bottom:10px">Descarga un CSV con el rango de fechas que necesites.</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+            <div><label style="font-size:12px;font-weight:700;display:block;margin-bottom:4px">Desde</label><input type="date" id="expFrom" style="padding:9px;border:1.5px solid var(--line);border-radius:9px"></div>
+            <div><label style="font-size:12px;font-weight:700;display:block;margin-bottom:4px">Hasta</label><input type="date" id="expTo" style="padding:9px;border:1.5px solid var(--line);border-radius:9px"></div>
+            <div><label style="font-size:12px;font-weight:700;display:block;margin-bottom:4px">Qué exportar</label>
+              <select id="expType" style="padding:9px;border:1.5px solid var(--line);border-radius:9px">
+                <option value="all">Todo</option>
+                <option value="income">Solo ingresos</option>
+                <option value="expenses">Solo gastos</option>
+              </select>
+            </div>
+            <button class="btn btn-teal btn-sm" id="exportBtn" style="padding:10px 18px">Descargar CSV</button>
+          </div>
+        </div>
       </section>
 
       <section class="view" id="view-negocio">
@@ -312,6 +378,34 @@ main{padding:22px 20px 90px;max-width:760px}
     <div style="display:flex;gap:10px">
       <button class="btn btn-ghost btn-sm" id="apCancel" style="flex:1">Cancelar</button>
       <button class="btn btn-teal btn-sm" id="apSave" style="flex:1">Crear cita</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="expenseModal">
+  <div class="box">
+    <h3>Añadir gasto</h3>
+    <div class="alert" id="expAlert"></div>
+    <div class="field"><label>Descripción *</label><input id="expLabel" placeholder="Renta del local, productos…"></div>
+    <div class="row2">
+      <div class="field"><label>Monto (USD) *</label><input id="expAmount" type="number" step="0.01" min="0" placeholder="0.00"></div>
+      <div class="field"><label>Categoría</label>
+        <select id="expCategory">
+          <option value="renta">Renta</option>
+          <option value="productos">Productos</option>
+          <option value="empleados">Empleados</option>
+          <option value="equipo">Equipo</option>
+          <option value="servicios">Servicios (luz, agua…)</option>
+          <option value="mercadeo">Mercadeo</option>
+          <option value="transporte">Transporte</option>
+          <option value="otro" selected>Otro</option>
+        </select>
+      </div>
+    </div>
+    <div class="field"><label>Fecha</label><input id="expDate" type="date"></div>
+    <div style="display:flex;gap:10px;margin-top:6px">
+      <button class="btn btn-ghost btn-sm" id="expCancel" style="flex:1">Cancelar</button>
+      <button class="btn btn-teal btn-sm" id="expSave" style="flex:1">Guardar gasto</button>
     </div>
   </div>
 </div>
@@ -855,15 +949,146 @@ function switchView(v){
   if(v==='servicios') loadServices();
   if(v==='equipo') loadStaff();
   if(v==='horario') loadBlocks();
+  if(v==='contabilidad') loadAccounting();
 }
 document.querySelectorAll('.navlink').forEach(function(a){ a.onclick=function(){ switchView(a.dataset.v); }; });
 
 function buildMobnav(){
   const nav = document.getElementById('mobnav');
-  const items = [['agenda','Agenda'],['servicios','Servicios'],['equipo','Equipo'],['horario','Horario'],['negocio','Negocio']];
+  const items = [['agenda','Agenda'],['servicios','Servicios'],['equipo','Equipo'],['horario','Horario'],['contabilidad','$'],['negocio','Negocio']];
   nav.innerHTML = items.map(function(it,i){ return '<a data-v="'+it[0]+'" class="'+(i===0?'on':'')+'">'+it[1]+'</a>'; }).join('');
   nav.querySelectorAll('a').forEach(function(a){ a.onclick=function(){ switchView(a.dataset.v); }; });
 }
+
+// ════════════════════════ CONTABILIDAD ════════════════════════
+let acctPeriod = 'day';
+let acctIsPaid = false;
+
+document.querySelectorAll('.period-btn').forEach(function(btn){
+  btn.onclick = function(){
+    if(btn.dataset.pro && !acctIsPaid){
+      showAlert('acctAlert','Los reportes por mes y año están disponibles desde el plan Pro.', false);
+      return;
+    }
+    document.querySelectorAll('.period-btn').forEach(function(b){ b.classList.remove('on'); });
+    btn.classList.add('on');
+    acctPeriod = btn.dataset.p;
+    loadAccounting();
+  };
+});
+
+async function loadAccounting(){
+  clearAlert('acctAlert');
+  const r = await api('GET','/accounting/summary?period='+acctPeriod);
+  if(!r.ok){ showAlert('acctAlert', r.data.error || 'No se pudo cargar la contabilidad', false); return; }
+  const d = r.data;
+  acctIsPaid = !d.plan_limitado;
+
+  // Tarjetas
+  document.getElementById('acctFacturado').textContent = money(d.ingresos.facturado_cents);
+  document.getElementById('acctFactN').textContent = d.ingresos.citas_completadas + ' citas completadas';
+  document.getElementById('acctCobrado').textContent = money(d.ingresos.cobrado_cents);
+  document.getElementById('acctCobN').textContent = d.ingresos.pagos_registrados + ' pagos';
+  document.getElementById('acctGastos').textContent = money(d.gastos.total_cents);
+  document.getElementById('acctGastN').textContent = (d.gastos.app_cents>0 ? 'incl. app '+money(d.gastos.app_cents) : '');
+  document.getElementById('acctNeto').textContent = money(d.neto_cents);
+
+  // Mostrar/ocultar según plan
+  document.getElementById('acctUpgrade').style.display = d.plan_limitado ? 'block' : 'none';
+  document.getElementById('acctServicios').style.display = (acctIsPaid && d.por_servicio) ? 'block' : 'none';
+  document.getElementById('acctGastosBox').style.display = acctIsPaid ? 'block' : 'none';
+  document.getElementById('acctExportBox').style.display = acctIsPaid ? 'block' : 'none';
+
+  // Desglose por servicio
+  if(acctIsPaid && d.por_servicio){
+    const el = document.getElementById('acctServList');
+    if(d.por_servicio.length === 0){
+      el.innerHTML = '<p style="font-size:13px;color:var(--ink2)">Aún no hay citas completadas en este período.</p>';
+    } else {
+      el.innerHTML = d.por_servicio.map(function(s){
+        return '<div class="serv-row"><span><b>'+escapeHtml(s.servicio)+'</b> <small style="color:var(--ink2)">· '+s.citas+' citas</small></span><b>'+money(s.total_cents)+'</b></div>';
+      }).join('');
+    }
+  }
+
+  // Cargar gastos
+  if(acctIsPaid) loadExpenses();
+}
+
+async function loadExpenses(){
+  const r = await api('GET','/accounting/expenses?period='+acctPeriod);
+  if(!r.ok) return;
+  const el = document.getElementById('expenseList');
+  const list = r.data.expenses || [];
+  if(list.length === 0){
+    el.innerHTML = '<p style="font-size:13px;color:var(--ink2)">Sin gastos en este período.</p>';
+    return;
+  }
+  el.innerHTML = list.map(function(e){
+    return '<div class="exp-row"><span><b>'+escapeHtml(e.label)+'</b> <small style="color:var(--ink2)">· '+escapeHtml(e.category)+' · '+e.spent_on+'</small></span>'+
+      '<span style="display:flex;gap:10px;align-items:center"><b>'+money(e.amount_cents)+'</b>'+
+      '<button class="exp-del" data-id="'+e.id+'" style="color:#C44;font-weight:700;background:none;font-size:18px;line-height:1">×</button></span></div>';
+  }).join('');
+  el.querySelectorAll('.exp-del').forEach(function(b){
+    b.onclick = async function(){
+      if(!confirm('¿Borrar este gasto?')) return;
+      const rr = await api('DELETE','/accounting/expenses/'+b.dataset.id);
+      if(rr.ok){ loadAccounting(); }
+    };
+  });
+}
+
+// Modal de gastos
+const expenseModal = document.getElementById('expenseModal');
+document.getElementById('addExpenseBtn').onclick = function(){
+  clearAlert('expAlert');
+  document.getElementById('expLabel').value = '';
+  document.getElementById('expAmount').value = '';
+  document.getElementById('expCategory').value = 'otro';
+  document.getElementById('expDate').value = new Date().toISOString().slice(0,10);
+  expenseModal.classList.add('on');
+};
+document.getElementById('expCancel').onclick = function(){ expenseModal.classList.remove('on'); };
+document.getElementById('expSave').onclick = async function(){
+  clearAlert('expAlert');
+  const label = document.getElementById('expLabel').value.trim();
+  const amount = parseFloat(document.getElementById('expAmount').value);
+  const category = document.getElementById('expCategory').value;
+  const spent_on = document.getElementById('expDate').value;
+  if(!label){ showAlert('expAlert','Describe el gasto', false); return; }
+  if(!amount || amount <= 0){ showAlert('expAlert','Monto inválido', false); return; }
+  const btn = document.getElementById('expSave'); btn.disabled = true; btn.textContent = 'Guardando…';
+  const r = await api('POST','/accounting/expenses', {
+    label: label, amount_cents: Math.round(amount*100), category: category, spent_on: spent_on
+  });
+  btn.disabled = false; btn.textContent = 'Guardar gasto';
+  if(r.ok){ expenseModal.classList.remove('on'); loadAccounting(); }
+  else { showAlert('expAlert', r.data.error || 'No se pudo guardar', false); }
+};
+
+// Exportar CSV
+document.getElementById('exportBtn').onclick = async function(){
+  const from = document.getElementById('expFrom').value;
+  const to = document.getElementById('expTo').value;
+  const type = document.getElementById('expType').value;
+  if(!from || !to){ showAlert('acctAlert','Elige las fechas Desde y Hasta', false); return; }
+  const btn = this; btn.disabled = true; btn.textContent = 'Generando…';
+  try {
+    const res = await fetch(API+'/accounting/export?from='+from+'&to='+to+'&type='+type, {
+      headers:{ 'Authorization':'Bearer '+token }
+    });
+    if(!res.ok){ const e = await res.json().catch(function(){return{};}); showAlert('acctAlert', e.error || 'No se pudo exportar', false); }
+    else {
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'turnify-contabilidad-'+from+'_a_'+to+'.csv';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+    }
+  } catch(e){ showAlert('acctAlert','Error al exportar', false); }
+  btn.disabled = false; btn.textContent = 'Descargar CSV';
+};
+
+function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 
 boot();
 </script>
