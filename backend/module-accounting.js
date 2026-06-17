@@ -63,7 +63,7 @@ module.exports.mount = function (app, ctx) {
     const cobrado = await db.query(
       `SELECT COALESCE(SUM(amount_cents),0)::bigint AS total, COUNT(*)::int AS n
          FROM payments
-        WHERE business_id = $1 AND status = 'completed'
+        WHERE business_id = $1 AND status = 'paid'
           AND paid_at >= $2::date AND paid_at < $3::date`,
       [bid, from, to]);
 
@@ -79,7 +79,7 @@ module.exports.mount = function (app, ctx) {
     const appCost = await db.query(
       `SELECT COALESCE(SUM(amount_cents - discount_cents),0)::bigint AS total
          FROM platform_payments
-        WHERE business_id = $1 AND status = 'completed'
+        WHERE business_id = $1 AND status = 'paid'
           AND paid_at >= $2::date AND paid_at < $3::date`,
       [bid, from, to]);
 
@@ -197,7 +197,7 @@ module.exports.mount = function (app, ctx) {
            FROM payments p
            LEFT JOIN appointments a ON a.id = p.appointment_id
            LEFT JOIN clients c ON c.id = p.client_id
-          WHERE p.business_id = $1 AND p.status = 'completed'
+          WHERE p.business_id = $1 AND p.status = 'paid'
             AND p.paid_at >= $2::date AND p.paid_at < ($3::date + 1)
           ORDER BY p.paid_at`,
         [bid, from, to]);
@@ -230,7 +230,7 @@ module.exports.mount = function (app, ctx) {
       const appPays = await db.query(
         `SELECT paid_at, (amount_cents - discount_cents) AS net
            FROM platform_payments
-          WHERE business_id = $1 AND status = 'completed'
+          WHERE business_id = $1 AND status = 'paid'
             AND paid_at >= $2::date AND paid_at < ($3::date + 1)
           ORDER BY paid_at`,
         [bid, from, to]);
