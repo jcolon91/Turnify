@@ -27,6 +27,9 @@ nav .links{display:flex;gap:22px;font-size:14px;font-weight:600;color:var(--ink2
 @media(max-width:720px){nav .links{display:none}}
 /* hero */
 .awning{height:12px;background:repeating-linear-gradient(90deg,var(--teal) 0 26px,#0A5B52 26px 28px,#F8F5EA 28px 54px,#E7E2D1 54px 56px)}
+.clientbar{background:var(--teal);color:#fff;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;padding:10px 16px;font-size:14px;font-weight:600;text-align:center}
+.clientbar a{color:#fff;font-weight:800;text-decoration:underline;text-underline-offset:3px}
+@media(max-width:520px){.clientbar{font-size:13px;gap:8px}}
 .hero{padding:64px 0 50px;text-align:center}
 .hero h1{font-family:var(--display);font-weight:800;font-size:clamp(36px,6.5vw,62px);letter-spacing:-.03em;line-height:1.04}
 .hero h1 em{font-style:normal;color:var(--teal)}
@@ -97,6 +100,10 @@ footer a{font-weight:600}
 <div class="demobar">VISTA DEMO →
 <a class="on" href="index.html">Landing</a><a href="buscar.html">Buscador</a><a href="negocio.html">Negocio público</a><a href="panel.html">Panel</a><a href="espera.html">Lista de espera</a><a href="productos.html">Productos</a><a href="ajustes.html">Ajustes</a><a href="acceso.html">Acceso</a>
 </div>
+<div class="clientbar">
+  <span>¿Buscas una cita? No necesitas cuenta.</span>
+  <a href="buscar.html">Explorar barberías y salones →</a>
+</div>
 <div class="awning"></div>
 
 <div class="wrap">
@@ -114,6 +121,7 @@ footer a{font-weight:600}
     <a class="btn btn-teal" href="acceso.html">Empezar gratis →</a>
     <a class="btn btn-ghost" href="negocio.html">Ver una página demo</a>
   </div>
+  <p style="margin-top:18px;font-size:14px;color:var(--ink2)">¿Eres cliente y quieres reservar? <a href="buscar.html" style="color:var(--teal);font-weight:700;text-decoration:underline;text-underline-offset:2px">Busca tu barbería aquí</a></p>
   <div class="promise">SIN COMISIONES · SIN CARGOS POR STAFF · SIN SORPRESAS EN LA FACTURA</div>
 </section>
 

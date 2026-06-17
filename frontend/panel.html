@@ -186,6 +186,20 @@ main{padding:22px 20px 90px;max-width:760px}
         <div class="tophead"><div><h1>Mi negocio</h1><p>Información que ven tus clientes.</p></div></div>
         <div class="alert" id="bizAlert"></div>
         <div class="card">
+          <div class="seclabel">Logo del negocio</div>
+          <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+            <div id="logoPreview" style="width:84px;height:84px;border-radius:18px;background:var(--paper);border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0">
+              <span id="logoPlaceholder" style="font-size:11px;color:var(--ink2);text-align:center;padding:6px">Sin logo</span>
+            </div>
+            <div style="flex:1;min-width:160px">
+              <input type="file" id="logoFile" accept="image/jpeg,image/png,image/webp" style="display:none">
+              <button class="btn btn-teal" id="logoUploadBtn" style="padding:10px 16px;font-size:13px">Subir logo</button>
+              <button class="btn btn-ghost" id="logoRemoveBtn" style="padding:10px 16px;font-size:13px;display:none;margin-left:8px">Quitar</button>
+              <p style="font-size:12px;color:var(--ink2);margin-top:8px">JPG, PNG o WEBP · Se recorta cuadrado · Máx 5MB</p>
+            </div>
+          </div>
+        </div>
+        <div class="card">
           <div class="field"><label>Nombre del negocio</label><input id="bizName"></div>
           <div class="row2">
             <div class="field"><label>Teléfono</label><input id="bizPhone" placeholder="787-555-1234"></div>
@@ -208,7 +222,11 @@ main{padding:22px 20px 90px;max-width:760px}
         <div class="card">
           <div class="seclabel">Tu enlace público</div>
           <p style="font-size:13.5px;color:var(--ink2);margin-bottom:8px">Comparte este enlace para que te reserven:</p>
-          <div style="font-family:var(--mono);font-size:13px;color:var(--teal-ink);word-break:break-all" id="publicLink"></div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <div style="font-family:var(--mono);font-size:13px;color:var(--teal-ink);word-break:break-all;flex:1;min-width:180px;padding:10px 12px;background:var(--paper);border-radius:10px" id="publicLink"></div>
+            <button id="copyLinkBtn" class="btn btn-teal" style="padding:10px 16px;font-size:13px">Copiar</button>
+            <button id="shareLinkBtn" class="btn btn-ghost" style="padding:10px 16px;font-size:13px">Compartir</button>
+          </div>
         </div>
       </section>
     </main>
@@ -588,7 +606,81 @@ function fillBusiness(data){
   document.getElementById('bizWa').value = b.whatsapp || '';
   document.getElementById('bizAddr').value = b.address_line || '';
   document.getElementById('bizAth').value = b.ath_phone || '';
+  // ── Logo del negocio ──
+  (function(){
+    function renderLogo(url){
+      var prev = document.getElementById('logoPreview');
+      var ph = document.getElementById('logoPlaceholder');
+      var rm = document.getElementById('logoRemoveBtn');
+      if(url){
+        prev.innerHTML = '<img src="'+url+'" alt="logo" style="width:100%;height:100%;object-fit:cover">';
+        if(rm) rm.style.display = 'inline-flex';
+      } else {
+        prev.innerHTML = '<span id="logoPlaceholder" style="font-size:11px;color:var(--ink2);text-align:center;padding:6px">Sin logo</span>';
+        if(rm) rm.style.display = 'none';
+      }
+    }
+    renderLogo(b.logo_url || null);
+    var fileInput = document.getElementById('logoFile');
+    var uploadBtn = document.getElementById('logoUploadBtn');
+    var removeBtn = document.getElementById('logoRemoveBtn');
+    if(uploadBtn) uploadBtn.onclick = function(){ fileInput.click(); };
+    if(fileInput) fileInput.onchange = async function(){
+      var file = fileInput.files[0];
+      if(!file) return;
+      if(file.size > 5*1024*1024){ showAlert('bizAlert','La imagen es muy grande (máx 5MB)', false); fileInput.value=''; return; }
+      uploadBtn.disabled = true; uploadBtn.textContent = 'Subiendo…';
+      try {
+        var fd = new FormData(); fd.append('logo', file);
+        var r = await fetch(API+'/businesses/me/logo', {
+          method:'POST', headers:{ 'Authorization':'Bearer '+token }, body: fd
+        });
+        var data = await r.json().catch(function(){ return {}; });
+        if(r.ok && data.logo_url){
+          renderLogo(data.logo_url + '?t=' + Date.now());  // cache-bust
+          showAlert('bizAlert','Logo actualizado ✓', true);
+        } else {
+          showAlert('bizAlert', data.error || 'No se pudo subir el logo', false);
+        }
+      } catch(e){ showAlert('bizAlert','Error al subir. Intenta de nuevo.', false); }
+      uploadBtn.disabled = false; uploadBtn.textContent = 'Subir logo'; fileInput.value='';
+    };
+    if(removeBtn) removeBtn.onclick = async function(){
+      removeBtn.disabled = true;
+      var r = await api('DELETE','/businesses/me/logo');
+      if(r.ok){ renderLogo(null); showAlert('bizAlert','Logo eliminado', true); }
+      else { showAlert('bizAlert','No se pudo quitar el logo', false); }
+      removeBtn.disabled = false;
+    };
+  })();
   document.getElementById('publicLink').textContent = 'turnifypr.com/'+b.slug;
+  (function(){
+    var fullUrl = 'https://turnifypr.com/'+b.slug;
+    var copyBtn = document.getElementById('copyLinkBtn');
+    var shareBtn = document.getElementById('shareLinkBtn');
+    if(copyBtn) copyBtn.onclick = async function(){
+      try {
+        await navigator.clipboard.writeText(fullUrl);
+        var orig = copyBtn.textContent;
+        copyBtn.textContent = '¡Copiado!';
+        setTimeout(function(){ copyBtn.textContent = orig; }, 1800);
+      } catch(e) {
+        // respaldo para navegadores viejos
+        var t = document.createElement('textarea');
+        t.value = fullUrl; document.body.appendChild(t); t.select();
+        try { document.execCommand('copy'); copyBtn.textContent = '¡Copiado!'; setTimeout(function(){ copyBtn.textContent='Copiar'; },1800);} catch(_){}
+        document.body.removeChild(t);
+      }
+    };
+    if(shareBtn) shareBtn.onclick = async function(){
+      if(navigator.share){
+        try { await navigator.share({ title: b.name, text: 'Reserva tu cita en '+b.name, url: fullUrl }); } catch(e){}
+      } else {
+        // si no hay compartir nativo, copia
+        copyBtn && copyBtn.click();
+      }
+    };
+  })();
   var pub = document.getElementById('bizPublished');
   if(pub){ pub.checked = !!b.is_published;
     pub.onchange = async function(){

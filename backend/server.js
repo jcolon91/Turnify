@@ -20,6 +20,10 @@ const rateLimit = require('express-rate-limit');
 const bcrypt    = require('bcryptjs');
 const jwt       = require('jsonwebtoken');
 const crypto    = require('crypto');
+const multer    = require('multer');
+const sharp     = require('sharp');
+const path      = require('path');
+const fs        = require('fs');
 const { Pool }  = require('pg');
 
 // ----------------------------------------------------------------------------
@@ -55,8 +59,25 @@ const db = new Pool({ connectionString: DATABASE_URL, max: 10 });
 const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', 1);             // detrás de Nginx
-app.use(helmet());
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(express.json({ limit: '1mb' }));
+
+// --- Uploads (logos de negocios) ---
+const UPLOAD_DIR = path.join(__dirname, 'uploads');
+const LOGO_DIR   = path.join(UPLOAD_DIR, 'logos');
+try { fs.mkdirSync(LOGO_DIR, { recursive: true }); } catch (e) { /* ya existe */ }
+// Servir las imágenes subidas como archivos estáticos
+app.use('/uploads', express.static(UPLOAD_DIR, { maxAge: '7d', immutable: false }));
+// Multer en memoria: validamos tipo y tamaño antes de procesar con sharp
+const ALLOWED_IMG = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const uploadLogo = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },   // 5MB máx de entrada
+  fileFilter: (_req, file, cb) => {
+    if (ALLOWED_IMG.has(file.mimetype)) cb(null, true);
+    else cb(new Error('Solo se permiten imágenes JPG, PNG o WEBP'));
+  },
+});
 
 const origins = CORS_ORIGINS.split(',').map(s => s.trim()).filter(Boolean);
 app.use(cors({ origin: origins.length ? origins : true, credentials: false }));
@@ -332,6 +353,51 @@ app.patch('/api/businesses/me', authRequired, businessScope, asyncH(async (req, 
   const { rows } = await db.query(
     `UPDATE businesses SET ${sets.join(', ')} WHERE id = $${vals.length} RETURNING *`, vals);
   await audit(req, 'business.update', 'business', req.business.id, { fields: sets.length });
+  res.json({ business: rows[0] });
+}));
+
+// Subir / reemplazar el logo del negocio
+app.post('/api/businesses/me/logo', authRequired, businessScope,
+  (req, res, next) => uploadLogo.single('logo')(req, res, (err) => {
+    if (err) return bad(res, err.message || 'Error al subir el logo');
+    next();
+  }),
+  asyncH(async (req, res) => {
+    if (!req.file) return bad(res, 'No se recibió ninguna imagen');
+    // Procesar: cuadrado 400x400, WEBP optimizado
+    const filename = `${req.business.id}-${Date.now()}.webp`;
+    const filepath = path.join(LOGO_DIR, filename);
+    try {
+      await sharp(req.file.buffer)
+        .resize(400, 400, { fit: 'cover', position: 'centre' })
+        .webp({ quality: 82 })
+        .toFile(filepath);
+    } catch (e) {
+      return bad(res, 'La imagen no se pudo procesar. Prueba con otra.');
+    }
+    const logoUrl = `/uploads/logos/${filename}`;
+    // Borrar el logo anterior si era un archivo nuestro
+    const prev = req.business.logo_url;
+    if (prev && prev.startsWith('/uploads/logos/')) {
+      const prevPath = path.join(__dirname, prev.replace(/^\//, ''));
+      fs.unlink(prevPath, () => {});   // silencioso si no existe
+    }
+    const { rows } = await db.query(
+      `UPDATE businesses SET logo_url = $1 WHERE id = $2 RETURNING *`, [logoUrl, req.business.id]);
+    await audit(req, 'business.logo', 'business', req.business.id, {});
+    res.json({ business: rows[0], logo_url: logoUrl });
+  }));
+
+// Quitar el logo del negocio
+app.delete('/api/businesses/me/logo', authRequired, businessScope, asyncH(async (req, res) => {
+  const prev = req.business.logo_url;
+  if (prev && prev.startsWith('/uploads/logos/')) {
+    const prevPath = path.join(__dirname, prev.replace(/^\//, ''));
+    fs.unlink(prevPath, () => {});
+  }
+  const { rows } = await db.query(
+    `UPDATE businesses SET logo_url = NULL WHERE id = $1 RETURNING *`, [req.business.id]);
+  await audit(req, 'business.logo.delete', 'business', req.business.id, {});
   res.json({ business: rows[0] });
 }));
 
