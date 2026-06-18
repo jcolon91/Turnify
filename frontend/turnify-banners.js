@@ -73,6 +73,8 @@
     el.className = el.className.replace(/\bbnr-[a-z-]+\b/g, '').trim();
     el.classList.add('tbanner');
     el.style.backgroundImage = '';
+    // asegurar que el contenedor tenga altura visible (si no la trae por CSS)
+    if (!el.style.height && el.offsetHeight < 20) el.style.height = '150px';
     if (coverUrl) {
       el.classList.add('has-img');
       el.style.backgroundImage = "url('" + coverUrl + "')";
