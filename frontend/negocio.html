@@ -87,9 +87,10 @@ input,select,textarea{font:inherit}
 .review .reply b{font-weight:700}
 
 /* Info rows (contacto, horario, políticas) */
-.inforow{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);font-size:14px}
+.inforow{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);font-size:14px;align-items:flex-start}
 .inforow:last-child{border-bottom:0}
-.inforow .ic{width:22px;flex:none;text-align:center}
+.inforow .ic{width:20px;height:20px;flex:none;margin-top:1px}
+.inforow .ic svg{width:20px;height:20px;stroke:var(--teal-ink);stroke-width:1.8;fill:none}
 .inforow .lbl{color:var(--ink2);min-width:78px}
 .inforow .val{font-weight:600;flex:1}
 .hours-day{display:flex;justify-content:space-between;font-size:14px;padding:8px 0;border-bottom:1px solid var(--line)}
@@ -330,6 +331,16 @@ const MON = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','
 
 const state = { biz:null, services:[], staff:[], hours:[], reviews:[], service:null, staffId:null, date:null, slot:null };
 
+// Iconos SVG profesionales (líneas limpias, sin emojis)
+const ICONS = {
+  phone: '<svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  chat: '<svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  pin: '<svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="10" r="3"/></svg>',
+  clock: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  dollar: '<svg viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  doc: '<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+};
+
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function money(c){ return '$'+((c||0)/100).toFixed(2); }
 function showAlert(id,msg){ const e=document.getElementById(id); if(e){e.textContent=msg; e.className='alert err';} }
@@ -428,12 +439,12 @@ function renderProfile(){
 
   // ── Contacto ──
   var ci = [];
-  if(b.phone) ci.push('<div class="inforow"><span class="ic">📞</span><span class="lbl">Teléfono</span><span class="val"><a href="tel:'+esc(b.phone)+'" style="color:var(--teal-ink)">'+esc(b.phone)+'</a></span></div>');
-  if(b.whatsapp) ci.push('<div class="inforow"><span class="ic">💬</span><span class="lbl">WhatsApp</span><span class="val"><a href="https://wa.me/'+esc((b.whatsapp||'').replace(/\D/g,''))+'" style="color:var(--teal-ink)">'+esc(b.whatsapp)+'</a></span></div>');
+  if(b.phone) ci.push('<div class="inforow"><span class="ic">'+ICONS.phone+'</span><span class="lbl">Teléfono</span><span class="val"><a href="tel:'+esc(b.phone)+'" style="color:var(--teal-ink)">'+esc(b.phone)+'</a></span></div>');
+  if(b.whatsapp) ci.push('<div class="inforow"><span class="ic">'+ICONS.chat+'</span><span class="lbl">WhatsApp</span><span class="val"><a href="https://wa.me/'+esc((b.whatsapp||'').replace(/\D/g,''))+'" style="color:var(--teal-ink)">'+esc(b.whatsapp)+'</a></span></div>');
   if(b.address_line || b.municipality){
     var addr = [b.address_line, b.municipality].filter(Boolean).join(', ');
     var maps = 'https://maps.google.com/?q='+encodeURIComponent(addr);
-    ci.push('<div class="inforow"><span class="ic">📍</span><span class="lbl">Dirección</span><span class="val">'+esc(addr)+'<br><a class="map-link" href="'+maps+'" target="_blank">Ver en el mapa →</a></span></div>');
+    ci.push('<div class="inforow"><span class="ic">'+ICONS.pin+'</span><span class="lbl">Dirección</span><span class="val">'+esc(addr)+'<br><a class="map-link" href="'+maps+'" target="_blank">Ver en el mapa →</a></span></div>');
   }
   document.getElementById('contactList').innerHTML = ci.join('') || '<p class="bio-text">Reserva en línea para ver los detalles.</p>';
   // Botón de llamar en drawer
@@ -444,9 +455,9 @@ function renderProfile(){
 
   // ── Políticas ──
   var pol = [];
-  if(b.cancellation_hours>0) pol.push('<div class="inforow"><span class="ic">⏰</span><span class="lbl" style="min-width:0">Cancelación</span><span class="val">Cancela con al menos '+b.cancellation_hours+' hora'+(b.cancellation_hours>1?'s':'')+' de anticipación.</span></div>');
-  if(b.deposit_default_cents>0) pol.push('<div class="inforow"><span class="ic">💵</span><span class="lbl" style="min-width:0">Depósito</span><span class="val">Algunos servicios requieren un depósito al reservar.</span></div>');
-  if(b.no_show_policy) pol.push('<div class="inforow"><span class="ic">📋</span><span class="lbl" style="min-width:0">No-show</span><span class="val">'+esc(b.no_show_policy)+'</span></div>');
+  if(b.cancellation_hours>0) pol.push('<div class="inforow"><span class="ic">'+ICONS.clock+'</span><span class="lbl" style="min-width:0">Cancelación</span><span class="val">Cancela con al menos '+b.cancellation_hours+' hora'+(b.cancellation_hours>1?'s':'')+' de anticipación.</span></div>');
+  if(b.deposit_default_cents>0) pol.push('<div class="inforow"><span class="ic">'+ICONS.dollar+'</span><span class="lbl" style="min-width:0">Depósito</span><span class="val">Algunos servicios requieren un depósito al reservar.</span></div>');
+  if(b.no_show_policy) pol.push('<div class="inforow"><span class="ic">'+ICONS.doc+'</span><span class="lbl" style="min-width:0">No-show</span><span class="val">'+esc(b.no_show_policy)+'</span></div>');
   if(pol.length){
     document.getElementById('sec-policies').style.display='block';
     document.getElementById('policyList').innerHTML = pol.join('');
