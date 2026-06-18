@@ -826,7 +826,9 @@ app.get('/api/public/:slug', publicLimiter, asyncH(async (req, res) => {
 // Disponibilidad: ?service_id=&date=YYYY-MM-DD[&staff_id=]
 app.get('/api/public/:slug/availability', publicLimiter, asyncH(async (req, res) => {
   const { service_id, staff_id, date } = req.query;
-  if (!isUuid(service_id) || !isDate(date)) return bad(res, 'service_id y date requeridos');
+  // service_id puede ser uno o varios separados por coma: "uuid1,uuid2,uuid3"
+  const serviceIds = String(service_id || '').split(',').map(s => s.trim()).filter(isUuid);
+  if (!serviceIds.length || !isDate(date)) return bad(res, 'service_id y date requeridos');
 
   const b = await db.query(`SELECT * FROM businesses WHERE slug = $1 AND deleted_at IS NULL`, [req.params.slug]);
   const biz = b.rows[0];
@@ -837,17 +839,22 @@ app.get('/api/public/:slug/availability', publicLimiter, asyncH(async (req, res)
   const horizon = new Date(today.getTime() + biz.booking_horizon_days * 864e5);
   if (reqDay > horizon) return res.json({ slots: [], reason: 'fuera_de_horizonte' });
 
+  // Sumar la duración de TODOS los servicios elegidos
   const sv = await db.query(
-    `SELECT id, duration_min FROM services WHERE id = $1 AND business_id = $2 AND is_active`, [service_id, biz.id]);
-  if (!sv.rows[0]) return bad(res, 'Servicio no encontrado', 404);
-  const dur = sv.rows[0].duration_min;
+    `SELECT id, duration_min FROM services WHERE id = ANY($1) AND business_id = $2 AND is_active`,
+    [serviceIds, biz.id]);
+  if (!sv.rows.length) return bad(res, 'Servicio no encontrado', 404);
+  const dur = sv.rows.reduce((sum, s) => sum + s.duration_min, 0);
+
+  // El staff debe ofrecer TODOS los servicios elegidos. Usamos el primero como
+  // referencia para elegibilidad; el bloqueo de tiempo usa la duración total.
+  const refService = serviceIds[0];
 
   let slots;
   if (isUuid(staff_id)) {
     slots = await staffDaySlots(biz, staff_id, date, dur);
   } else {
-    // "Cualquiera disponible" = unión de todos los que ofrecen el servicio
-    const ids = await eligibleStaff(biz.id, service_id, date);
+    const ids = await eligibleStaff(biz.id, refService, date);
     const all = new Set();
     for (const id of ids) (await staffDaySlots(biz, id, date, dur)).forEach(s => all.add(s));
     slots = [...all].sort();
@@ -858,7 +865,10 @@ app.get('/api/public/:slug/availability', publicLimiter, asyncH(async (req, res)
 // CREAR CITA (público, sin cuenta)
 app.post('/api/public/:slug/appointments', publicLimiter, asyncH(async (req, res) => {
   const { service_id, staff_id, start_iso, full_name, phone, email, client_notes, payment_method } = req.body || {};
-  if (!isUuid(service_id)) return bad(res, 'Servicio requerido');
+  // service_id puede ser uno (string) o varios (array). Normalizamos a lista.
+  const serviceIds = (Array.isArray(service_id) ? service_id : String(service_id || '').split(','))
+    .map(s => String(s).trim()).filter(isUuid);
+  if (!serviceIds.length) return bad(res, 'Servicio requerido');
   if (!isStr(full_name, 120)) return bad(res, 'Tu nombre es requerido');
   if (!isPhone(phone)) return bad(res, 'Tu WhatsApp es requerido para el recordatorio');
   const starts = new Date(start_iso || '');
@@ -884,29 +894,45 @@ app.post('/api/public/:slug/appointments', publicLimiter, asyncH(async (req, res
       return bad(res, 'Este negocio alcanzó su límite de citas del mes. Intenta contactarlo directo.', 409);
   }
 
-  const sv = await db.query(
-    `SELECT * FROM services WHERE id = $1 AND business_id = $2 AND is_active AND deleted_at IS NULL`,
-    [service_id, biz.id]);
-  const service = sv.rows[0];
-  if (!service) return bad(res, 'Servicio no encontrado', 404);
+  // Cargar TODOS los servicios elegidos, preservando el orden de selección
+  const svQ = await db.query(
+    `SELECT * FROM services WHERE id = ANY($1) AND business_id = $2 AND is_active AND deleted_at IS NULL`,
+    [serviceIds, biz.id]);
+  if (!svQ.rows.length) return bad(res, 'Servicio no encontrado', 404);
+  // Ordenar según el orden en que el cliente los eligió
+  const services = serviceIds.map(id => svQ.rows.find(s => s.id === id)).filter(Boolean);
+  if (!services.length) return bad(res, 'Servicio no encontrado', 404);
+
+  // Combinar: nombre, duración total, precio total, depósito total
+  const service = {
+    id: services[0].id,
+    name: services.map(s => s.name).join(' + '),
+    duration_min: services.reduce((sum, s) => sum + s.duration_min, 0),
+    price_cents: services.reduce((sum, s) => sum + s.price_cents, 0),
+    deposit_cents: services.reduce((sum, s) => sum + (s.deposit_cents || 0), 0),
+  };
+  // Detalle para guardar en service_ids (jsonb)
+  const serviceDetail = services.map(s => ({
+    id: s.id, name: s.name, duration_min: s.duration_min, price_cents: s.price_cents,
+  }));
 
   const ends = new Date(starts.getTime() + service.duration_min * 60_000);
   const dateStr = starts.toLocaleDateString('en-CA', { timeZone: 'America/Puerto_Rico' });
 
-  // candidatos de staff
+  // candidatos de staff (deben ofrecer el primer servicio como referencia)
   let candidates;
   if (isUuid(staff_id)) {
     const ok = await db.query(
       `SELECT 1 FROM service_staff ss JOIN staff st ON st.id = ss.staff_id
-        WHERE ss.service_id = $1 AND ss.staff_id = $2 AND st.is_active`, [service_id, staff_id]);
+        WHERE ss.service_id = $1 AND ss.staff_id = $2 AND st.is_active`, [service.id, staff_id]);
     if (!ok.rows[0]) return bad(res, 'Ese profesional no ofrece este servicio', 400);
     candidates = [staff_id];
   } else {
-    candidates = await eligibleStaff(biz.id, service_id, dateStr);
+    candidates = await eligibleStaff(biz.id, service.id, dateStr);
     if (!candidates.length) return bad(res, 'No hay profesionales para este servicio', 409);
   }
 
-  // valida que el slot exista en la disponibilidad real (horario laboral)
+  // valida que el slot exista en la disponibilidad real (con la duración TOTAL)
   const validFor = [];
   for (const id of candidates)
     if ((await staffDaySlots(biz, id, dateStr, service.duration_min)).includes(starts.toISOString()))
@@ -942,11 +968,12 @@ app.post('/api/public/:slug/appointments', publicLimiter, asyncH(async (req, res
         const r = await client.query(
           `INSERT INTO appointments (business_id, client_id, staff_id, service_id, service_name,
               duration_min, price_cents, deposit_cents, starts_at, ends_at, status, source,
-              confirmation_code, client_notes)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'online',$12,$13) RETURNING *`,
+              confirmation_code, client_notes, service_ids)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'online',$12,$13,$14) RETURNING *`,
           [biz.id, cl.rows[0].id, sid, service.id, service.name, service.duration_min,
            service.price_cents, deposit, starts, ends,
-           deposit > 0 ? 'pending_deposit' : 'confirmed', code, (client_notes || '').slice(0, 300) || null]);
+           deposit > 0 ? 'pending_deposit' : 'confirmed', code, (client_notes || '').slice(0, 300) || null,
+           JSON.stringify(serviceDetail)]);
         appt = r.rows[0];
         break;
       } catch (e) {

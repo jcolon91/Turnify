@@ -272,12 +272,23 @@ input,select,textarea{font:inherit}
     </div>
 
     <section class="view on" id="step1">
-      <div class="seclabel">¿Qué servicio quieres?</div>
+      <div class="seclabel">¿Qué servicios quieres?</div>
+      <p style="text-align:center;font-size:12.5px;color:var(--ink2);margin:-6px 0 14px">Puedes elegir uno o varios</p>
       <div id="svcList"></div>
+      <div id="svcTotalBar" style="display:none;position:sticky;bottom:0;background:var(--paper);padding:14px 0 4px;margin-top:8px">
+        <div style="background:var(--card);border:1.5px solid var(--teal);border-radius:14px;padding:12px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:12px;color:var(--ink2)" id="svcTotalCount"></div>
+            <div style="font-size:12px;color:var(--ink2)" id="svcTotalTime"></div>
+          </div>
+          <b style="font-family:var(--display);font-size:20px;color:var(--teal-ink)" id="svcTotalPrice"></b>
+        </div>
+        <button class="btn btn-teal" id="svcContinue">Continuar →</button>
+      </div>
     </section>
 
     <section class="view" id="step2">
-      <span class="backbtn" id="back2">← Cambiar servicio</span>
+      <span class="backbtn" id="back2">← Cambiar servicios</span>
       <div class="seclabel">Elige profesional</div>
       <div class="staffrow" id="staffRow"></div>
       <div class="seclabel">Elige el día</div>
@@ -329,7 +340,7 @@ const DOW = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
 const DOW_FULL = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
 const MON = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 
-const state = { biz:null, services:[], staff:[], hours:[], reviews:[], service:null, staffId:null, date:null, slot:null };
+const state = { biz:null, services:[], staff:[], hours:[], reviews:[], service:null, selectedServices:[], staffId:null, date:null, slot:null };
 
 // Iconos SVG profesionales (líneas limpias, sin emojis)
 const ICONS = {
@@ -485,35 +496,77 @@ function renderServices(){
     var dep = s.deposit_cents>0 ? '<span style="color:var(--ink2)">'+money(s.deposit_cents)+' de depósito</span>' : '';
     return '<div class="svc" data-id="'+esc(s.id)+'"><div class="grow"><h4>'+esc(s.name)+'</h4><p>'+s.duration_min+' min'+(s.description?(' · '+esc(s.description)):'')+'</p></div><div class="price"><b>'+money(s.price_cents)+'</b>'+dep+'</div></div>';
   }).join('');
-  // En el perfil: tocar un servicio abre el modal y preselecciona
+  // En el perfil: tocar un servicio abre el modal y lo preselecciona
   prev.innerHTML = html;
   prev.querySelectorAll('.svc').forEach(function(el){
     el.onclick = function(){ openBook(el.dataset.id); };
   });
-  // En el modal: lista de servicios para elegir
+  // En el modal: lista de servicios con selección MÚLTIPLE (toggle)
   list.innerHTML = html;
   list.querySelectorAll('.svc').forEach(function(el){
-    el.onclick = function(){
-      state.service = state.services.find(function(x){ return x.id===el.dataset.id; });
-      renderStaff(); renderDates();
-      state.staffId=null; state.date=null; state.slot=null;
-      goStep(2);
-    };
+    el.onclick = function(){ toggleService(el.dataset.id); };
   });
+}
+
+// Marcar/desmarcar un servicio en el modal
+function toggleService(id){
+  var svc = state.services.find(function(x){ return x.id===id; });
+  if(!svc) return;
+  var idx = state.selectedServices.findIndex(function(x){ return x.id===id; });
+  if(idx>=0) state.selectedServices.splice(idx,1);
+  else state.selectedServices.push(svc);
+  // actualizar visual de las tarjetas en el modal
+  document.querySelectorAll('#svcList .svc').forEach(function(el){
+    el.classList.toggle('sel', state.selectedServices.some(function(x){ return x.id===el.dataset.id; }));
+  });
+  updateSvcTotal();
+}
+
+// Actualizar la barra de total (precio, tiempo, cantidad)
+function updateSvcTotal(){
+  var bar = document.getElementById('svcTotalBar');
+  var n = state.selectedServices.length;
+  if(n===0){ bar.style.display='none'; return; }
+  bar.style.display='block';
+  var totalPrice = state.selectedServices.reduce(function(s,x){ return s+x.price_cents; },0);
+  var totalMin = state.selectedServices.reduce(function(s,x){ return s+x.duration_min; },0);
+  document.getElementById('svcTotalCount').textContent = n+' servicio'+(n>1?'s':'')+' seleccionado'+(n>1?'s':'');
+  document.getElementById('svcTotalTime').textContent = fmtDuration(totalMin);
+  document.getElementById('svcTotalPrice').textContent = money(totalPrice);
+}
+
+// Formatear minutos a "1h 30min"
+function fmtDuration(min){
+  if(min<60) return min+' min';
+  var h = Math.floor(min/60), m = min%60;
+  return h+'h'+(m>0?(' '+m+'min'):'');
 }
 
 // ───────── Modal de reserva: abrir/cerrar ─────────
 var bookModal = document.getElementById('bookModal');
 function openBook(preselectServiceId){
+  // resetear selección
+  state.selectedServices = [];
+  state.staffId=null; state.date=null; state.slot=null;
+  document.querySelectorAll('#svcList .svc').forEach(function(el){ el.classList.remove('sel'); });
   goStep(1);
   bookModal.classList.add('on');
   document.body.style.overflow='hidden';
   if(preselectServiceId){
-    state.service = state.services.find(function(x){ return x.id===preselectServiceId; });
-    if(state.service){ renderStaff(); renderDates(); state.staffId=null; state.date=null; state.slot=null; goStep(2); }
+    toggleService(preselectServiceId);  // marca ese servicio de entrada
+  } else {
+    updateSvcTotal();
   }
 }
 function closeBook(){ bookModal.classList.remove('on'); document.body.style.overflow=''; }
+
+// Botón "Continuar" del paso 1 → pasa a elegir profesional/fecha/hora
+document.getElementById('svcContinue').onclick = function(){
+  if(state.selectedServices.length===0) return;
+  renderStaff(); renderDates();
+  state.staffId=null; state.date=null; state.slot=null;
+  goStep(2);
+};
 document.getElementById('heroBook').onclick = function(){ openBook(); };
 document.getElementById('fabBook').onclick = function(){ openBook(); };
 document.getElementById('closeBook').onclick = closeBook;
@@ -595,7 +648,8 @@ async function loadSlots(){
   var area = document.getElementById('slotsArea');
   area.innerHTML = '<div class="slots-empty">Buscando horas disponibles…</div>';
   try{
-    var url = API+'/public/'+encodeURIComponent(SLUG)+'/availability?service_id='+encodeURIComponent(state.service.id)+'&date='+state.date;
+    var ids = state.selectedServices.map(function(s){ return s.id; }).join(',');
+    var url = API+'/public/'+encodeURIComponent(SLUG)+'/availability?service_id='+encodeURIComponent(ids)+'&date='+state.date;
     if(state.staffId) url += '&staff_id='+encodeURIComponent(state.staffId);
     var r = await fetch(url);
     var data = await r.json();
@@ -617,7 +671,6 @@ async function loadSlots(){
 }
 
 function goToConfirm(){
-  var s = state.service;
   var startIso = state.slot;
   if(!startIso.includes('T')){ startIso = state.date+'T'+state.slot+':00'; }
   state.startIso = startIso;
@@ -625,13 +678,19 @@ function goToConfirm(){
   var fecha = when.toLocaleDateString('es-PR',{weekday:'long',day:'numeric',month:'long'});
   var hora = when.toLocaleTimeString('es-PR',{hour:'numeric',minute:'2-digit'});
   var staffName = state.staffId ? (state.staff.find(function(x){ return x.id===state.staffId; })||{}).display_name : 'Cualquiera disponible';
+  var totalPrice = state.selectedServices.reduce(function(s,x){ return s+x.price_cents; },0);
+  var totalMin = state.selectedServices.reduce(function(s,x){ return s+x.duration_min; },0);
+  // Lista de servicios elegidos
+  var svcRows = state.selectedServices.map(function(s){
+    return '<div class="row"><span>'+esc(s.name)+'</span><b>'+money(s.price_cents)+'</b></div>';
+  }).join('');
   document.getElementById('summary').innerHTML =
-    '<div class="row"><span>Servicio</span><b>'+esc(s.name)+'</b></div>'+
+    svcRows +
     '<div class="row"><span>Profesional</span><b>'+esc(staffName)+'</b></div>'+
     '<div class="row"><span>Fecha</span><b>'+fecha+'</b></div>'+
     '<div class="row"><span>Hora</span><b>'+hora+'</b></div>'+
-    '<div class="row"><span>Duración</span><b>'+s.duration_min+' min</b></div>'+
-    '<div class="row tot"><span>Total</span><b>'+money(s.price_cents)+'</b></div>';
+    '<div class="row"><span>Duración</span><b>'+fmtDuration(totalMin)+'</b></div>'+
+    '<div class="row tot"><span>Total</span><b>'+money(totalPrice)+'</b></div>';
   goStep(3);
 }
 
@@ -647,7 +706,8 @@ document.getElementById('confirmBtn').onclick = async function(){
   if(!full_name){ showAlert('formAlert','Escribe tu nombre.'); return; }
   if(phone.replace(/\D/g,'').length < 10){ showAlert('formAlert','Escribe un WhatsApp válido (10 dígitos).'); return; }
 
-  var body = { service_id: state.service.id, start_iso: state.startIso, full_name:full_name, phone:phone };
+  var serviceIds = state.selectedServices.map(function(s){ return s.id; });
+  var body = { service_id: serviceIds, start_iso: state.startIso, full_name:full_name, phone:phone };
   if(state.staffId) body.staff_id = state.staffId;
   if(email) body.email = email;
   if(notes) body.client_notes = notes;
@@ -667,7 +727,7 @@ document.getElementById('confirmBtn').onclick = async function(){
     var appt = data.appointment || data;
     var when = new Date(state.startIso);
     document.getElementById('okDetail').textContent =
-      state.service.name+' · '+when.toLocaleDateString('es-PR',{weekday:'long',day:'numeric',month:'long'})+' a las '+when.toLocaleTimeString('es-PR',{hour:'numeric',minute:'2-digit'});
+      state.selectedServices.map(function(s){ return s.name; }).join(' + ')+' · '+when.toLocaleDateString('es-PR',{weekday:'long',day:'numeric',month:'long'})+' a las '+when.toLocaleTimeString('es-PR',{hour:'numeric',minute:'2-digit'});
     document.getElementById('okCode').textContent = appt.confirmation_code || '—';
     document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('on'); });
     document.getElementById('stepOk').classList.add('on');
