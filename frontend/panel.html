@@ -273,8 +273,27 @@ main{padding:22px 20px 90px;max-width:760px}
               <input type="file" id="logoFile" accept="image/jpeg,image/png,image/webp" style="display:none">
               <button class="btn btn-teal" id="logoUploadBtn" style="padding:10px 16px;font-size:13px">Subir logo</button>
               <button class="btn btn-ghost" id="logoRemoveBtn" style="padding:10px 16px;font-size:13px;display:none;margin-left:8px">Quitar</button>
-              <p style="font-size:12px;color:var(--ink2);margin-top:8px">JPG, PNG o WEBP · Se recorta cuadrado · Máx 5MB · <b>Desde plan Pro</b></p>
+              <p style="font-size:12px;color:var(--ink2);margin-top:8px">JPG, PNG o WEBP · Cuadrado 800×800 · Máx 5MB · <b>Desde plan Pro</b></p>
             </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="seclabel">Banner del negocio</div>
+          <p style="font-size:12.5px;color:var(--ink2);margin-bottom:12px">Así se ve el encabezado de tu página. Medida recomendada para imagen: <b>1600×400</b> (4:1).</p>
+          <!-- Preview del banner en vivo -->
+          <div id="bannerPreview" style="width:100%;height:110px;border-radius:14px;overflow:hidden;border:1.5px solid var(--line);margin-bottom:14px"></div>
+
+          <!-- Galería de patrones (free + todos) -->
+          <div style="font-size:12px;color:var(--ink2);margin-bottom:8px;font-weight:600">Elige un diseño</div>
+          <div id="bannerGallery" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:8px;margin-bottom:16px"></div>
+
+          <!-- Imagen propia (Pro) -->
+          <div style="border-top:1.5px solid var(--line);padding-top:14px">
+            <div style="font-size:12px;color:var(--ink2);margin-bottom:8px;font-weight:600">O sube tu propia imagen <span style="color:var(--teal-ink)">· Pro</span></div>
+            <input type="file" id="coverFile" accept="image/jpeg,image/png,image/webp" style="display:none">
+            <button class="btn btn-teal" id="coverUploadBtn" style="padding:10px 16px;font-size:13px">Subir imagen</button>
+            <button class="btn btn-ghost" id="coverRemoveBtn" style="padding:10px 16px;font-size:13px;display:none;margin-left:8px">Quitar imagen</button>
           </div>
         </div>
         <div class="card">
@@ -521,6 +540,7 @@ main{padding:22px 20px 90px;max-width:760px}
   </div>
 </div>
 
+<script src="turnify-banners.js"></script>
 <script>
 const API = '/api';
 const token = localStorage.getItem('turnify_token');
@@ -852,6 +872,110 @@ function fillBusiness(data){
       removeBtn.disabled = false;
     };
   })();
+
+  // ── BANNER / COVER ──
+  (function(){
+    if(!window.TurnifyBanners) return;
+    var isFree = (b.plan_code || 'free') === 'free';
+    var preview = document.getElementById('bannerPreview');
+    var gallery = document.getElementById('bannerGallery');
+    var coverBtn = document.getElementById('coverUploadBtn');
+    var coverRemove = document.getElementById('coverRemoveBtn');
+    var coverInput = document.getElementById('coverFile');
+
+    // theme actual del negocio
+    var theme = {};
+    try { theme = (typeof b.theme==='string') ? JSON.parse(b.theme) : (b.theme||{}); } catch(e){ theme = {}; }
+    var currentBanner = theme.banner || 'teal-mesh';
+    var currentCover = b.cover_url || null;
+
+    function renderPreview(){
+      TurnifyBanners.apply(preview, JSON.stringify(theme), currentCover, b.name);
+    }
+    renderPreview();
+
+    // Galería de patrones (mini-swatches)
+    gallery.innerHTML = TurnifyBanners.PRESETS.map(function(p){
+      var sel = (!currentCover && p.id===currentBanner);
+      return '<button type="button" class="bnr-swatch" data-id="'+p.id+'" title="'+p.name+'" '+
+        'style="height:48px;border-radius:10px;cursor:pointer;padding:0;overflow:hidden;'+
+        'border:2.5px solid '+(sel?'var(--teal)':'transparent')+';box-shadow:0 0 0 1px var(--line)">'+
+        '<span class="tbanner bnr-'+p.id+'" style="display:block;width:100%;height:100%"></span></button>';
+    }).join('');
+    TurnifyBanners.injectCss();
+
+    // Elegir un patrón
+    gallery.querySelectorAll('.bnr-swatch').forEach(function(sw){
+      sw.onclick = async function(){
+        var id = sw.dataset.id;
+        theme.banner = id;
+        currentCover = null;   // elegir patrón quita la imagen
+        // guardar theme
+        var r = await api('PATCH','/businesses/me',{ theme: theme, cover_url: null });
+        if(r.ok){
+          currentBanner = id;
+          // marcar seleccionado
+          gallery.querySelectorAll('.bnr-swatch').forEach(function(x){ x.style.borderColor='transparent'; });
+          sw.style.borderColor='var(--teal)';
+          if(coverRemove) coverRemove.style.display='none';
+          renderPreview();
+          showAlert('bizAlert','Diseño de banner actualizado ✓', true);
+        } else {
+          showAlert('bizAlert', r.data.error||'No se pudo guardar', false);
+        }
+      };
+    });
+
+    // Subir imagen propia (Pro)
+    if(coverRemove) coverRemove.style.display = currentCover ? 'inline-flex' : 'none';
+    if(coverBtn){
+      if(isFree){
+        coverBtn.textContent = '🔒 Subir imagen (Pro)';
+        coverBtn.onclick = function(){
+          showAlert('bizAlert','El banner con imagen propia está disponible desde el plan Pro. Mientras tanto, elige uno de los diseños de arriba.', false);
+        };
+      } else {
+        coverBtn.onclick = function(){ coverInput.click(); };
+        coverInput.onchange = async function(){
+          var file = coverInput.files[0];
+          if(!file) return;
+          if(file.size > 5*1024*1024){ showAlert('bizAlert','La imagen es muy grande (máx 5MB)', false); coverInput.value=''; return; }
+          coverBtn.disabled=true; coverBtn.textContent='Subiendo…';
+          try{
+            var fd = new FormData(); fd.append('cover', file);
+            var res = await fetch(API+'/businesses/me/cover', {
+              method:'POST', headers:{ 'Authorization':'Bearer '+token }, body: fd
+            });
+            var data = await res.json().catch(function(){ return {}; });
+            if(res.ok && data.cover_url){
+              currentCover = data.cover_url + '?t=' + Date.now();
+              renderPreview();
+              coverRemove.style.display='inline-flex';
+              gallery.querySelectorAll('.bnr-swatch').forEach(function(x){ x.style.borderColor='transparent'; });
+              showAlert('bizAlert','Banner actualizado ✓', true);
+            } else {
+              showAlert('bizAlert', data.error||'No se pudo subir el banner', false);
+            }
+          }catch(e){ showAlert('bizAlert','Error al subir. Intenta de nuevo.', false); }
+          coverBtn.disabled=false; coverBtn.textContent='Subir imagen'; coverInput.value='';
+        };
+      }
+    }
+    if(coverRemove) coverRemove.onclick = async function(){
+      coverRemove.disabled=true;
+      var r = await api('DELETE','/businesses/me/cover');
+      if(r.ok){
+        currentCover = null;
+        renderPreview();
+        coverRemove.style.display='none';
+        // re-marcar el patrón actual
+        gallery.querySelectorAll('.bnr-swatch').forEach(function(x){ x.style.borderColor = (x.dataset.id===currentBanner?'var(--teal)':'transparent'); });
+        showAlert('bizAlert','Volviste al diseño predefinido', true);
+      } else { showAlert('bizAlert','No se pudo quitar la imagen', false); }
+      coverRemove.disabled=false;
+    };
+  })();
+
   document.getElementById('publicLink').textContent = 'turnifypr.com/'+b.slug;
   (function(){
     var fullUrl = 'https://turnifypr.com/'+b.slug;
