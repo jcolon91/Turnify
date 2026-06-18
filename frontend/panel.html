@@ -141,6 +141,7 @@ main{padding:22px 20px 90px;max-width:760px}
       <a data-v="horario" class="navlink">Horario</a>
       <a data-v="contabilidad" class="navlink">Contabilidad</a>
       <a data-v="negocio" class="navlink">Mi negocio</a>
+      <a data-v="cuenta" class="navlink">Mi cuenta</a>
       <div class="planbox">
         <small>Tu plan</small>
         <b id="planName">—</b>
@@ -306,9 +307,39 @@ main{padding:22px 20px 90px;max-width:760px}
           </div>
         </div>
       </section>
-    </main>
-  </div>
-</div>
+
+      <section class="view" id="view-cuenta">
+        <div class="tophead"><div><h1>Mi cuenta</h1><p>Tu plan, beneficios y configuración.</p></div></div>
+        <div class="alert" id="acctMsg"></div>
+
+        <!-- Plan actual -->
+        <div class="card" id="planCurrentCard">
+          <div class="seclabel">Tu plan actual</div>
+          <div id="planCurrent"><p style="color:var(--ink2);font-size:13px">Cargando…</p></div>
+        </div>
+
+        <!-- Planes superiores -->
+        <div class="card">
+          <div class="seclabel">Planes disponibles</div>
+          <p style="font-size:13px;color:var(--ink2);margin-bottom:12px">Mejora tu plan para desbloquear más funciones.</p>
+          <div id="planList"></div>
+        </div>
+
+        <!-- Zona de peligro -->
+        <div class="card" style="border:1.5px solid #E8B4B4;background:#FDF6F6">
+          <div class="seclabel" style="color:#A33">Zona de peligro</div>
+          <p style="font-size:13.5px;color:var(--ink);margin-bottom:6px"><b>Borrar mi cuenta</b></p>
+          <p style="font-size:13px;color:var(--ink2);margin-bottom:14px">
+            Esta acción es <b>permanente</b>. Se borrarán tus datos personales y los de tus clientes
+            (nombres, teléfonos, correos, fotos). Los registros de transacciones se conservan
+            de forma anónima por requisito fiscal. Antes de borrar, descarga tu contabilidad.
+          </p>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="btn btn-ghost btn-sm" id="downloadBeforeDelete">⬇ Descargar mi contabilidad</button>
+            <button class="btn btn-sm" id="openDeleteBtn" style="background:#C0392B;color:#fff">Borrar mi cuenta</button>
+          </div>
+        </div>
+      </section>
 
 <div id="onboard" style="display:none">
   <div class="shell" style="grid-template-columns:1fr">
@@ -337,6 +368,32 @@ main{padding:22px 20px 90px;max-width:760px}
       </div>
       <div style="text-align:center;margin-top:14px"><a id="logout2" style="font-size:12.5px;color:var(--ink2);cursor:pointer">Cerrar sesión</a></div>
     </main>
+  </div>
+</div>
+
+<div class="modal" id="deleteModal">
+  <div class="box">
+    <h3 style="color:#C0392B">⚠ Borrar mi cuenta</h3>
+    <div class="alert" id="deleteAlert"></div>
+    <p style="font-size:13.5px;color:var(--ink);margin-bottom:6px">Esto es <b>permanente e irreversible</b>. Se borrará:</p>
+    <ul style="font-size:13px;color:var(--ink2);margin:0 0 14px 18px;line-height:1.7">
+      <li>Tu cuenta y la de acceso al portal</li>
+      <li>Datos de tus clientes (nombres, teléfonos, correos)</li>
+      <li>Tu logo, fotos, servicios, equipo y horario</li>
+      <li>Tu negocio sale del directorio público</li>
+    </ul>
+    <p style="font-size:12.5px;color:var(--ink2);margin-bottom:14px;padding:10px;background:var(--paper);border-radius:9px">
+      Los registros de transacciones se conservan <b>de forma anónima</b> (sin tu nombre ni el de tus clientes)
+      por requisito fiscal de Puerto Rico y EE. UU.
+    </p>
+    <div class="field">
+      <label>Para confirmar, escribe: <b>BORRAR MI CUENTA</b></label>
+      <input id="deleteConfirm" placeholder="BORRAR MI CUENTA" autocomplete="off">
+    </div>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-ghost btn-sm" id="deleteCancel" style="flex:1">Cancelar</button>
+      <button class="btn btn-sm" id="deleteConfirmBtn" style="flex:1;background:#C0392B;color:#fff" disabled>Borrar permanentemente</button>
+    </div>
   </div>
 </div>
 
@@ -991,12 +1048,13 @@ function switchView(v){
   if(v==='equipo') loadStaff();
   if(v==='horario') loadBlocks();
   if(v==='contabilidad') loadAccounting();
+  if(v==='cuenta') loadAccount();
 }
 document.querySelectorAll('.navlink').forEach(function(a){ a.onclick=function(){ switchView(a.dataset.v); }; });
 
 function buildMobnav(){
   const nav = document.getElementById('mobnav');
-  const items = [['agenda','Agenda'],['servicios','Servicios'],['equipo','Equipo'],['horario','Horario'],['contabilidad','$'],['negocio','Negocio']];
+  const items = [['agenda','Agenda'],['servicios','Servicios'],['equipo','Equipo'],['horario','Horario'],['contabilidad','$'],['negocio','Negocio'],['cuenta','Cuenta']];
   nav.innerHTML = items.map(function(it,i){ return '<a data-v="'+it[0]+'" class="'+(i===0?'on':'')+'">'+it[1]+'</a>'; }).join('');
   nav.querySelectorAll('a').forEach(function(a){ a.onclick=function(){ switchView(a.dataset.v); }; });
 }
@@ -1038,6 +1096,114 @@ document.getElementById('cobroSave').onclick = async function(){
   btn.disabled = false; btn.textContent = 'Completar y cobrar';
   if(r.ok){ cobroModal.classList.remove('on'); loadDashboard(); }
   else { showAlert('cobroAlert', r.data.error || 'No se pudo completar', false); }
+};
+
+// ════════════════════════ MI CUENTA ════════════════════════
+// Etiquetas legibles de beneficios por plan
+const FEATURE_LABELS = {
+  deposits: 'Cobra depósitos',
+  waitlist: 'Lista de espera',
+  campaigns: 'Campañas de marketing',
+  featured: 'Aparece destacado',
+  loyalty: 'Programa de lealtad',
+  custom_branding: 'Logo y marca propia',
+  external_integrations: 'Integraciones externas',
+};
+
+async function loadAccount(){
+  clearAlert('acctMsg');
+  const r = await api('GET','/account/plan');
+  if(!r.ok){ showAlert('acctMsg', r.data.error||'No se pudo cargar tu plan', false); return; }
+  const d = r.data;
+
+  // ── Plan actual ──
+  const cur = d.plans.find(function(p){ return p.is_current; }) || {};
+  let usageHtml = '';
+  if(d.usage.max_appts_month){
+    const pct = Math.min(100, Math.round((d.usage.appts_this_month / d.usage.max_appts_month)*100));
+    usageHtml = '<div style="margin-top:10px"><div style="display:flex;justify-content:space-between;font-size:12.5px;color:var(--ink2);margin-bottom:4px">'+
+      '<span>Citas este mes</span><span>'+d.usage.appts_this_month+' / '+d.usage.max_appts_month+'</span></div>'+
+      '<div style="height:7px;background:var(--paper);border-radius:99px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+(pct>=90?'#C0392B':'var(--teal)')+'"></div></div></div>';
+  } else {
+    usageHtml = '<p style="font-size:12.5px;color:var(--ink2);margin-top:8px">Citas ilimitadas</p>';
+  }
+  let subInfo = '';
+  if(d.subscription){
+    const st = d.subscription.status;
+    const stLabel = {trialing:'En prueba',active:'Activo',past_due:'Pago pendiente',cancelled:'Cancelado'}[st]||st;
+    subInfo = '<span style="font-size:12px;padding:3px 10px;border-radius:99px;background:'+(st==='active'?'#DCF5EC':'#FBE9D7')+';color:var(--ink)">'+stLabel+'</span>';
+    if(d.subscription.current_period_end){
+      const dt = new Date(d.subscription.current_period_end);
+      subInfo += '<span style="font-size:12px;color:var(--ink2);margin-left:8px">Vence '+dt.toLocaleDateString('es-PR')+'</span>';
+    }
+  }
+  document.getElementById('planCurrent').innerHTML =
+    '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px">'+
+    '<b style="font-size:20px">'+esc(cur.name||d.current_name)+'</b>'+
+    (cur.price_monthly_cents ? '<span style="font-size:14px;color:var(--ink2)">'+money(cur.price_monthly_cents)+'/mes</span>' : '<span style="font-size:14px;color:var(--ink2)">Gratis</span>')+
+    subInfo+'</div>'+usageHtml;
+
+  // ── Lista de planes (solo upgrades + el actual marcado) ──
+  const list = document.getElementById('planList');
+  const shown = d.plans.filter(function(p){ return p.is_current || p.is_upgrade; });
+  list.innerHTML = shown.map(function(p){
+    const feats = Object.keys(FEATURE_LABELS).filter(function(k){ return p.features && p.features[k]===true; });
+    const featHtml = feats.map(function(k){ return '<li>'+FEATURE_LABELS[k]+'</li>'; }).join('');
+    const staffTxt = p.max_staff>=9999 ? 'Staff ilimitado' : (p.max_staff+' '+(p.max_staff===1?'persona':'personas'));
+    const apptTxt = p.max_appts_month ? (p.max_appts_month+' citas/mes') : 'Citas ilimitadas';
+    return '<div style="border:1.5px solid '+(p.is_current?'var(--teal)':'var(--line)')+';border-radius:13px;padding:14px;margin-bottom:10px;'+(p.is_current?'background:#F4FBF9':'')+'">'+
+      '<div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px">'+
+      '<b style="font-size:16px">'+esc(p.name)+(p.is_current?' <span style="font-size:11px;color:var(--teal-ink)">· Tu plan</span>':'')+'</b>'+
+      '<span style="font-weight:700">'+(p.price_monthly_cents?money(p.price_monthly_cents)+'<span style="font-size:11px;color:var(--ink2);font-weight:400">/mes</span>':'Gratis')+'</span>'+
+      '</div>'+
+      '<p style="font-size:12.5px;color:var(--ink2);margin:6px 0">'+staffTxt+' · '+apptTxt+'</p>'+
+      (featHtml?'<ul style="font-size:12.5px;color:var(--ink);margin:6px 0 0 18px;line-height:1.7">'+featHtml+'</ul>':'')+
+      (p.is_upgrade?'<p style="font-size:12px;color:var(--ink2);margin-top:10px">Para cambiar de plan, contáctanos por WhatsApp.</p>':'')+
+    '</div>';
+  }).join('');
+}
+
+// Descargar contabilidad antes de borrar (reusa el export del módulo accounting)
+document.getElementById('downloadBeforeDelete').onclick = async function(){
+  const to = new Date().toISOString().slice(0,10);
+  const from = '2020-01-01';
+  const url = '/accounting/export?from='+from+'&to='+to+'&type=all';
+  const btn = this; btn.disabled=true; btn.textContent='Descargando…';
+  try{
+    const res = await fetch(API+url, { headers:{ 'Authorization':'Bearer '+token } });
+    if(!res.ok) throw new Error('export');
+    const blob = await res.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'turnify-contabilidad-'+to+'.csv';
+    a.click();
+  }catch(e){ showAlert('acctMsg','No se pudo descargar. Tu plan debe ser Pro o superior para exportar.', false); }
+  btn.disabled=false; btn.textContent='⬇ Descargar mi contabilidad';
+};
+
+// Modal de borrado
+const deleteModal = document.getElementById('deleteModal');
+document.getElementById('openDeleteBtn').onclick = function(){
+  clearAlert('deleteAlert');
+  document.getElementById('deleteConfirm').value='';
+  document.getElementById('deleteConfirmBtn').disabled=true;
+  deleteModal.classList.add('on');
+};
+document.getElementById('deleteCancel').onclick = function(){ deleteModal.classList.remove('on'); };
+document.getElementById('deleteConfirm').oninput = function(){
+  document.getElementById('deleteConfirmBtn').disabled = (this.value !== 'BORRAR MI CUENTA');
+};
+document.getElementById('deleteConfirmBtn').onclick = async function(){
+  const btn=this; btn.disabled=true; btn.textContent='Borrando…';
+  const r = await api('DELETE','/account', { confirm: document.getElementById('deleteConfirm').value });
+  if(r.ok){
+    alert('Tu cuenta fue eliminada. Gracias por usar Turnify.');
+    localStorage.clear();
+    location.href='index.html';
+  } else {
+    showAlert('deleteAlert', r.data.error||'No se pudo borrar la cuenta', false);
+    btn.disabled=false; btn.textContent='Borrar permanentemente';
+  }
 };
 
 // ════════════════════════ CONTABILIDAD ════════════════════════
