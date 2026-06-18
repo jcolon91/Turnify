@@ -552,6 +552,14 @@ app.post('/api/staff', authRequired, businessScope, asyncH(async (req, res) => {
      VALUES ($1,$2,$3,$4,$5,COALESCE($6,'#0E8074')) RETURNING *`,
     [req.business.id, display_name.trim(), bio || null, avatar_url || null,
      Array.isArray(specialties) ? specialties.slice(0, 10) : null, calendar_color || null]);
+  // Ligar el nuevo profesional a los servicios que NO tienen ningún staff asignado
+  // (evita que queden servicios huérfanos e invisibles en "Cualquiera").
+  await db.query(
+    `INSERT INTO service_staff (service_id, staff_id)
+     SELECT s.id, $1 FROM services s
+      WHERE s.business_id = $2 AND s.is_active AND s.deleted_at IS NULL
+        AND NOT EXISTS (SELECT 1 FROM service_staff ss WHERE ss.service_id = s.id)
+     ON CONFLICT DO NOTHING`, [rows[0].id, req.business.id]);
   await audit(req, 'staff.create', 'staff', rows[0].id);
   res.status(201).json({ staff: rows[0] });
 }));
@@ -621,12 +629,19 @@ app.post('/api/services', authRequired, businessScope, asyncH(async (req, res) =
      VALUES ($1,$2,$3,$4,$5,$6,$7,COALESCE($8,false)) RETURNING *`,
     [req.business.id, name.trim(), description || null, duration_min, price_cents,
      Number.isInteger(deposit_cents) ? deposit_cents : null, photo_url || null, is_featured]);
-  if (Array.isArray(staff_ids))
+  if (Array.isArray(staff_ids) && staff_ids.length > 0) {
     for (const sid of staff_ids) if (isUuid(sid))
       await db.query(
         `INSERT INTO service_staff
          SELECT $1, id FROM staff WHERE id = $2 AND business_id = $3
          ON CONFLICT DO NOTHING`, [rows[0].id, sid, req.business.id]);
+  } else {
+    // Sin staff especificado → ligar a TODO el staff activo (evita servicios huérfanos)
+    await db.query(
+      `INSERT INTO service_staff
+       SELECT $1, id FROM staff WHERE business_id = $2 AND is_active AND deleted_at IS NULL
+       ON CONFLICT DO NOTHING`, [rows[0].id, req.business.id]);
+  }
   await audit(req, 'service.create', 'service', rows[0].id);
   res.status(201).json({ service: rows[0] });
 }));
