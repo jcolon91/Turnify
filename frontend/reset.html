@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nueva contraseña — Turnify</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#F1EFE5;--card:#fff;--ink:#17150F;--ink2:#5E594B;--teal:#0E8074;--teal-ink:#0A5B52;--teal-soft:#E3EFE9;--line:#E1DCCD;
+--display:"Bricolage Grotesque",sans-serif;--body:"Instrument Sans",sans-serif;--mono:"Spline Sans Mono",monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--body);color:var(--ink);background:var(--paper);min-height:100vh;display:flex;flex-direction:column}
+a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer;border:0}
+.awning{height:12px;background:repeating-linear-gradient(90deg,var(--teal) 0 26px,#0A5B52 26px 28px,#F8F5EA 28px 54px,#E7E2D1 54px 56px)}
+.stage{flex:1;display:grid;place-items:center;padding:30px 16px 50px}
+.box{width:100%;max-width:420px}
+.logo{font-family:var(--display);font-weight:800;font-size:28px;text-align:center;letter-spacing:-.02em;margin-bottom:4px}
+.logo i{font-style:normal;color:var(--teal)}
+.tag{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink2);text-align:center;margin-bottom:22px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:24px;box-shadow:0 22px 44px -24px rgba(23,21,15,.25)}
+.h1{font-family:var(--display);font-weight:800;font-size:21px;margin-bottom:6px}
+.sub{font-size:13.5px;color:var(--ink2);line-height:1.55;margin-bottom:18px}
+.field{margin-bottom:12px}
+.field label{display:block;font-size:11.5px;font-weight:700;color:var(--ink2);margin-bottom:6px}
+.field input{width:100%;font:inherit;font-size:15px;padding:13px 14px;border-radius:13px;border:1.5px solid var(--line);background:#FDFCF8;color:var(--ink)}
+.field input:focus{outline:none;border-color:var(--teal)}
+.cta{width:100%;background:var(--teal);color:#fff;font-weight:800;font-size:15px;padding:15px;border-radius:14px;margin-top:6px}
+.cta:disabled{opacity:.6;cursor:not-allowed}
+.foot{text-align:center;font-size:12px;color:var(--ink2);margin-top:16px;line-height:1.7}
+.foot a{color:var(--teal-ink);font-weight:700}
+.alert{display:none;font-size:13px;font-weight:600;padding:11px 13px;border-radius:12px;margin-bottom:14px;line-height:1.45}
+.alert.err{display:block;background:#FCE8E6;color:#A1281C;border:1px solid #F3C0BA}
+.alert.ok{display:block;background:var(--teal-soft);color:var(--teal-ink);border:1px solid #BFE0D5}
+</style>
+</head>
+<body>
+<div class="awning"></div>
+
+<div class="stage">
+  <div class="box">
+    <div class="logo">Turn<i>i</i>fy</div>
+    <div class="tag">Tu turno, sin llamadas</div>
+
+    <div class="card">
+      <div class="h1">Nueva contraseña</div>
+      <div class="sub">Escribe tu nueva contraseña. Después de guardarla, podrás entrar con ella.</div>
+      <div class="alert" id="alert"></div>
+      <div id="formWrap">
+        <div class="field"><label>NUEVA CONTRASEÑA (mín. 8 caracteres)</label><input id="pass1" type="password" placeholder="••••••••" autocomplete="new-password"></div>
+        <div class="field"><label>CONFIRMAR CONTRASEÑA</label><input id="pass2" type="password" placeholder="••••••••" autocomplete="new-password"></div>
+        <button class="cta" id="saveBtn">Guardar contraseña</button>
+      </div>
+      <div class="foot"><a href="acceso.html">← Volver a entrar</a></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '/api';
+const token = new URLSearchParams(location.search).get('token');
+
+function showAlert(msg, ok){
+  const el = document.getElementById('alert');
+  el.textContent = msg;
+  el.className = 'alert ' + (ok ? 'ok' : 'err');
+}
+
+if(!token){
+  document.getElementById('formWrap').style.display = 'none';
+  showAlert('Enlace inválido. Solicita uno nuevo desde "¿Olvidaste tu contraseña?".', false);
+}
+
+const saveBtn = document.getElementById('saveBtn');
+saveBtn.onclick = async ()=>{
+  const p1 = document.getElementById('pass1').value;
+  const p2 = document.getElementById('pass2').value;
+  if(p1.length < 8){ showAlert('La contraseña debe tener mínimo 8 caracteres.', false); return; }
+  if(p1 !== p2){ showAlert('Las contraseñas no coinciden.', false); return; }
+  saveBtn.disabled = true; saveBtn.textContent = 'Guardando…';
+  try {
+    const r = await fetch(API + '/auth/reset-password', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ token, password: p1 })
+    });
+    const data = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(data.error || 'No se pudo cambiar la contraseña.');
+    document.getElementById('formWrap').style.display = 'none';
+    showAlert('Contraseña actualizada. Redirigiendo para entrar…', true);
+    setTimeout(()=>{ location.href = 'acceso.html'; }, 2000);
+  } catch(err){
+    showAlert(err.message, false);
+    saveBtn.disabled = false; saveBtn.textContent = 'Guardar contraseña';
+  }
+};
+document.getElementById('pass2').addEventListener('keydown', e=>{ if(e.key==='Enter') saveBtn.click(); });
+</script>
+</body>
+</html>

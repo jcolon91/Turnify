@@ -67,7 +67,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer;border:0
         <div class="field"><label>EMAIL</label><input id="loginEmail" type="email" placeholder="tu@negocio.com" autocomplete="email"></div>
         <div class="field"><label>CONTRASEÑA</label><input id="loginPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
         <button class="cta" id="loginBtn">Entrar →</button>
-        <div class="foot"><a href="#">¿Olvidaste tu contraseña?</a></div>
+        <div class="foot"><a href="#" id="forgotLink">¿Olvidaste tu contraseña?</a></div>
       </div>
 
       <!-- REGISTRO -->
@@ -176,6 +176,23 @@ regBtn.onclick = async ()=>{
 // Permite enviar con Enter
 document.getElementById('loginPass').addEventListener('keydown',e=>{ if(e.key==='Enter') loginBtn.click(); });
 document.getElementById('regPass').addEventListener('keydown',e=>{ if(e.key==='Enter') regBtn.click(); });
+
+// ── Olvidé mi contraseña ──────────────────────────────────────────────────
+document.getElementById('forgotLink').addEventListener('click', async (e)=>{
+  e.preventDefault();
+  const email = document.getElementById('loginEmail').value.trim();
+  if(!email){ showAlert('loginAlert','Escribe tu email arriba y vuelve a tocar el enlace.', false); return; }
+  const link = e.target;
+  link.textContent = 'Enviando…';
+  try {
+    const data = await apiPost('/auth/forgot-password', { email });
+    showAlert('loginAlert', data.message || 'Si ese email está registrado, te enviamos un enlace.', true);
+  } catch(err){
+    showAlert('loginAlert', err.message, false);
+  } finally {
+    link.textContent = '¿Olvidaste tu contraseña?';
+  }
+});
 </script>
 </body>
 </html>

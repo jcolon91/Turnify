@@ -221,6 +221,49 @@ app.post('/api/auth/login', authLimiter, asyncH(async (req, res) => {
   res.json({ user: u, access_token: signAccess(u), refresh_token: refresh });
 }));
 
+// Pedir restablecer contraseña: siempre responde igual (no revela qué emails existen)
+app.post('/api/auth/forgot-password', authLimiter, asyncH(async (req, res) => {
+  const { email } = req.body || {};
+  const generic = { ok: true, message: 'Si ese email está registrado, te enviamos un enlace para restablecer tu contraseña.' };
+  if (!isEmail(email)) return res.json(generic);
+  const { rows } = await db.query(
+    `SELECT id, full_name, email FROM users WHERE email = $1 AND deleted_at IS NULL`,
+    [email.toLowerCase()]);
+  const u = rows[0];
+  if (u) {
+    const token = crypto.randomBytes(48).toString('base64url');
+    const exp = new Date(Date.now() + 3600 * 1000); // 1 hora
+    await db.query(
+      `INSERT INTO password_resets (user_id, token_hash, expires_at) VALUES ($1,$2,$3)`,
+      [u.id, sha256(token), exp]);
+    const link = `https://turnifypr.com/reset.html?token=${token}`;
+    try {
+      const e = emailReset(u.full_name, link);
+      sendEmail(u.email, e.subject, e.text, e.html).catch(err => console.error('reset email:', err.message));
+    } catch (err) { console.error('reset email build:', err.message); }
+  }
+  return res.json(generic);
+}));
+
+// Aplicar nueva contraseña con el token del email
+app.post('/api/auth/reset-password', authLimiter, asyncH(async (req, res) => {
+  const { token, password } = req.body || {};
+  if (!isStr(token, 200)) return bad(res, 'Enlace inválido', 400);
+  if (!isStr(password, 100) || password.length < 8) return bad(res, 'Contraseña mínima de 8 caracteres');
+  const { rows } = await db.query(
+    `SELECT id, user_id FROM password_resets
+      WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now()`,
+    [sha256(token)]);
+  const pr = rows[0];
+  if (!pr) return bad(res, 'El enlace expiró o ya fue usado. Solicita uno nuevo.', 400);
+  const hash = await bcrypt.hash(password, 12);
+  await db.query(`UPDATE users SET password_hash = $1 WHERE id = $2`, [hash, pr.user_id]);
+  await db.query(`UPDATE password_resets SET used_at = now() WHERE id = $1`, [pr.id]);
+  // Seguridad: cerrar todas las sesiones activas tras cambiar la contraseña
+  await db.query(`UPDATE refresh_tokens SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL`, [pr.user_id]);
+  return res.json({ ok: true, message: 'Contraseña actualizada. Ya puedes entrar.' });
+}));
+
 app.post('/api/auth/refresh', authLimiter, asyncH(async (req, res) => {
   const { refresh_token } = req.body || {};
   if (!isStr(refresh_token, 200)) return bad(res, 'Refresh token requerido', 401);
@@ -1384,6 +1427,20 @@ function emailWelcome(name) {
       <h1 style="margin:0 0 10px 0;font-size:21px;font-weight:800;color:#17150F">Hola ${first}, tu cuenta ya está activa</h1>
       <p style="margin:0 0 18px 0;font-size:15px;color:#5E594B;line-height:1.6">El próximo paso es crear tu negocio. Configura tus servicios, tu horario y empieza a recibir citas sin llamadas ni mensajes de ida y vuelta.</p>
       <a href="https://turnifypr.com/panel.html" style="display:inline-block;background:#0E8074;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:13px 22px;border-radius:12px">Crear mi negocio</a>
+    </td></tr>`);
+  return { subject, text, html };
+}
+
+function emailReset(name, link) {
+  const first = (name || '').trim().split(' ')[0] || 'Hola';
+  const subject = 'Restablece tu contraseña de Turnify';
+  const text = `Hola ${first},\n\nRecibimos una solicitud para restablecer tu contraseña. Abre este enlace (válido por 1 hora):\n\n${link}\n\nSi no fuiste tú, ignora este correo: tu contraseña sigue igual.\n\n— El equipo de Turnify`;
+  const html = emailShell(`
+    <tr><td style="padding:20px 28px 0 28px">
+      <h1 style="margin:0 0 10px 0;font-size:21px;font-weight:800;color:#17150F">Restablece tu contraseña</h1>
+      <p style="margin:0 0 18px 0;font-size:15px;color:#5E594B;line-height:1.6">Recibimos una solicitud para cambiar la contraseña de tu cuenta. Este enlace es válido por 1 hora.</p>
+      <a href="${link}" style="display:inline-block;background:#0E8074;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:13px 22px;border-radius:12px">Crear nueva contraseña</a>
+      <p style="margin:18px 0 0 0;font-size:13px;color:#5E594B;line-height:1.6">Si no fuiste tú, ignora este correo. Tu contraseña sigue igual.</p>
     </td></tr>`);
   return { subject, text, html };
 }
