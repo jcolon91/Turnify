@@ -1359,8 +1359,12 @@ function buildMessage(template, ctx) {
   switch (template) {
     case 'confirm':
       return `✅ *${biz.name}*\nTu cita quedó ${appt.status === 'pending_deposit' ? 'reservada (pendiente de depósito)' : 'confirmada'}:\n\n💈 ${appt.service_name}\n🗓 ${when}\n🎟 Código: ${appt.confirmation_code}\n\n${appt.status === 'pending_deposit' && biz.ath_phone ? `Para confirmar, envía el depósito de $${(appt.deposit_cents / 100).toFixed(2)} por ATH Móvil a ${biz.ath_phone} y responde con tu referencia.\n\n` : ''}Para cancelar o mover tu cita, responde a este mensaje.`;
+    case 'reminder_48h':
+      return `📅 *${biz.name}*\nTu cita es en 2 días:\n\n💈 ${appt.service_name}\n🗓 ${when}\n\nSi necesitas mover la fecha, este es buen momento para avisarnos. Responde aquí.`;
     case 'reminder_24h':
       return `⏰ *Recordatorio — ${biz.name}*\nTu cita es mañana:\n\n💈 ${appt.service_name}\n🗓 ${when}\n\nSi no puedes llegar, avísanos respondiendo aquí. 🙏`;
+    case 'reminder_1h':
+      return `🔔 *${biz.name}*\n¡Te esperamos en 1 hora!\n\n💈 ${appt.service_name}\n🗓 ${when}\n📍 ${biz.address_line || ''}`;
     case 'reminder_2h':
       return `🔔 *${biz.name}*\n¡Te esperamos en 2 horas!\n\n💈 ${appt.service_name}\n🗓 ${when}\n📍 ${biz.address_line || ''}`;
     case 'manual_assign':
@@ -1445,11 +1449,73 @@ function emailReset(name, link) {
   return { subject, text, html };
 }
 
+// Email HTML elegante para confirmaciones y recordatorios de cita
+function emailAppt(template, ctx) {
+  const { biz, appt } = ctx;
+  const when = appt?.starts_at ? fmtPR(appt.starts_at) : '';
+  const svc  = appt?.service_name || 'tu servicio';
+  const code = appt?.confirmation_code || '';
+  const addr = biz?.address_line || '';
+  let title, intro, extra = '';
+  switch (template) {
+    case 'confirm':
+      title = appt.status === 'pending_deposit' ? 'Tu cita está reservada' : 'Tu cita está confirmada';
+      intro = appt.status === 'pending_deposit'
+        ? 'Tu cita quedó reservada, pendiente de depósito.'
+        : 'Tu cita quedó confirmada. Te esperamos.';
+      if (appt.status === 'pending_deposit' && biz.ath_phone)
+        extra = `Para confirmar, envía el depósito de $${(appt.deposit_cents / 100).toFixed(2)} por ATH Móvil a ${biz.ath_phone} y responde con tu referencia.`;
+      break;
+    case 'reminder_48h':
+      title = 'Tu cita es en 2 días';
+      intro = 'Si necesitas mover la fecha, este es buen momento para avisarle al negocio.';
+      break;
+    case 'reminder_24h':
+      title = 'Tu cita es mañana';
+      intro = 'Si no puedes llegar, avísale al negocio respondiendo a este correo o por WhatsApp.';
+      break;
+    case 'reminder_1h':
+      title = 'Tu cita es en 1 hora';
+      intro = 'Te esperamos. ¡Nos vemos pronto!';
+      break;
+    case 'manual_assign':
+      title = 'Te conseguimos turno';
+      intro = 'Si no puedes llegar, avísale al negocio respondiendo aquí.';
+      break;
+    default:
+      title = 'Actualización de tu cita';
+      intro = '';
+  }
+  const subject = `${title} — ${biz.name}`;
+  const rowsArr = [
+    ['Servicio', svc],
+    ['Fecha', when],
+    code ? ['Código', code] : null,
+    addr ? ['Lugar', addr] : null,
+  ].filter(Boolean);
+  const rowsHtml = rowsArr.map(([k, v]) =>
+    `<tr><td style="padding:5px 0;font-size:13px;color:#5E594B;width:84px;vertical-align:top">${k}</td><td style="padding:5px 0;font-size:14px;font-weight:600;color:#17150F">${v}</td></tr>`
+  ).join('');
+  const html = emailShell(`
+    <tr><td style="padding:20px 28px 0 28px">
+      <h1 style="margin:0 0 4px 0;font-size:21px;font-weight:800;color:#17150F">${title}</h1>
+      <p style="margin:0 0 16px 0;font-size:14px;color:#5E594B">${biz.name}</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FDFCF8;border:1px solid #E1DCCD;border-radius:12px;margin-bottom:14px">
+        <tr><td style="padding:10px 14px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rowsHtml}</table></td></tr>
+      </table>
+      ${intro ? `<p style="margin:0;font-size:14px;color:#5E594B;line-height:1.6">${intro}</p>` : ''}
+      ${extra ? `<p style="margin:14px 0 0 0;font-size:14px;color:#0A5B52;line-height:1.6;font-weight:600">${extra}</p>` : ''}
+    </td></tr>`);
+  const text = buildMessage(template, ctx).replace(/\*/g, '');
+  return { subject, text, html };
+}
+
 // Encola recordatorios 24h y 2h (idempotente: marca la cita)
 async function queueReminders() {
   for (const [col, tpl, from, to] of [
+    ['reminder_48h_sent_at', 'reminder_48h', 47.5, 48.5],
     ['reminder_24h_sent_at', 'reminder_24h', 23.5, 24.5],
-    ['reminder_2h_sent_at',  'reminder_2h',  1.5,  2.5],
+    ['reminder_1h_sent_at',  'reminder_1h',   0.5,  1.5],
   ]) {
     const { rows } = await db.query(
       `UPDATE appointments a SET ${col} = now()
@@ -1457,11 +1523,16 @@ async function queueReminders() {
        WHERE c.id = a.client_id AND a.status = 'confirmed' AND a.${col} IS NULL
          AND a.starts_at BETWEEN now() + ($1 || ' hours')::interval
                               AND now() + ($2 || ' hours')::interval
-       RETURNING a.id, a.business_id, c.phone`, [from, to]);
-    for (const r of rows)
+       RETURNING a.id, a.business_id, c.phone, c.email`, [from, to]);
+    for (const r of rows) {
       await db.query(
         `INSERT INTO message_log (business_id, appointment_id, channel, recipient, template)
          VALUES ($1,$2,'whatsapp',$3,$4)`, [r.business_id, r.id, r.phone, tpl]);
+      if (r.email)
+        await db.query(
+          `INSERT INTO message_log (business_id, appointment_id, channel, recipient, template)
+           VALUES ($1,$2,'email',$3,$4)`, [r.business_id, r.id, r.email, tpl]);
+    }
   }
 }
 
@@ -1477,14 +1548,18 @@ async function dispatchMessages() {
       WHERE m.status = 'queued'
       ORDER BY m.created_at LIMIT 20`);
   for (const m of rows) {
-    const text = buildMessage(m.template, {
+    const ctx = {
       biz: { name: m.name, ath_phone: m.ath_phone, address_line: m.address_line },
       appt: m,
-    });
+    };
     try {
-      const out = m.channel === 'whatsapp'
-        ? await sendWhatsApp(m.recipient, text)
-        : await sendEmail(m.recipient, `Tu cita — ${m.name}`, text.replace(/\*/g, ''));
+      let out;
+      if (m.channel === 'whatsapp') {
+        out = await sendWhatsApp(m.recipient, buildMessage(m.template, ctx));
+      } else {
+        const e = emailAppt(m.template, ctx);
+        out = await sendEmail(m.recipient, e.subject, e.text, e.html);
+      }
       if (out.skipped) continue;   // proveedor sin configurar: se queda queued
       await db.query(`UPDATE message_log SET status = 'sent', sent_at = now(), provider_ref = $2 WHERE id = $1`,
         [m.id, out.id || null]);
