@@ -542,18 +542,25 @@ main{padding:22px 20px 90px;max-width:760px}
 
 <script src="turnify-banners.js"></script>
 <script>
-// CAPTURADOR DE ERRORES TEMPORAL (para diagnóstico)
-window.addEventListener('error', function(ev){
+// CAPTURADOR DE ERRORES TEMPORAL REFORZADO (para diagnóstico)
+function mostrarError(titulo, detalle){
   var box = document.getElementById('boot');
   if(box){
     box.style.display='block';
     box.innerHTML = '<div style="padding:20px;text-align:left;font-family:monospace;font-size:12px;color:#A1281C;background:#FCE8E6;border-radius:10px;margin:20px">'+
-      '<b>Error detectado:</b><br>'+
-      (ev.message||'?')+'<br><br>'+
-      '<b>Archivo:</b> '+(ev.filename||'?').split('/').pop()+'<br>'+
-      '<b>Línea:</b> '+(ev.lineno||'?')+':'+(ev.colno||'?')+
-      '</div>';
+      '<b>'+titulo+'</b><br><br>'+detalle+'</div>';
   }
+}
+window.addEventListener('error', function(ev){
+  mostrarError('Error JS detectado:',
+    (ev.message||'?')+'<br><br><b>Archivo:</b> '+(ev.filename||'?').split('/').pop()+
+    '<br><b>Línea:</b> '+(ev.lineno||'?')+':'+(ev.colno||'?'));
+});
+window.addEventListener('unhandledrejection', function(ev){
+  var r = ev.reason;
+  mostrarError('Promesa rechazada (async):',
+    (r && r.message ? r.message : String(r))+'<br><br><b>Stack:</b><br>'+
+    ((r && r.stack ? r.stack : '?').split('\n').slice(0,4).join('<br>')));
 });
 const API = '/api';
 const token = localStorage.getItem('turnify_token');
