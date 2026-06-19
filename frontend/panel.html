@@ -359,6 +359,9 @@ main{padding:22px 20px 90px;max-width:760px}
           </div>
         </div>
       </section>
+    </main>
+  </div>
+</div>
 
 <div id="onboard" style="display:none">
   <div class="shell" style="grid-template-columns:1fr">
@@ -542,26 +545,6 @@ main{padding:22px 20px 90px;max-width:760px}
 
 <script src="turnify-banners.js"></script>
 <script>
-// CAPTURADOR DE ERRORES TEMPORAL REFORZADO (para diagnóstico)
-function mostrarError(titulo, detalle){
-  var box = document.getElementById('boot');
-  if(box){
-    box.style.display='block';
-    box.innerHTML = '<div style="padding:20px;text-align:left;font-family:monospace;font-size:12px;color:#A1281C;background:#FCE8E6;border-radius:10px;margin:20px">'+
-      '<b>'+titulo+'</b><br><br>'+detalle+'</div>';
-  }
-}
-window.addEventListener('error', function(ev){
-  mostrarError('Error JS detectado:',
-    (ev.message||'?')+'<br><br><b>Archivo:</b> '+(ev.filename||'?').split('/').pop()+
-    '<br><b>Línea:</b> '+(ev.lineno||'?')+':'+(ev.colno||'?'));
-});
-window.addEventListener('unhandledrejection', function(ev){
-  var r = ev.reason;
-  mostrarError('Promesa rechazada (async):',
-    (r && r.message ? r.message : String(r))+'<br><br><b>Stack:</b><br>'+
-    ((r && r.stack ? r.stack : '?').split('\n').slice(0,4).join('<br>')));
-});
 const API = '/api';
 const token = localStorage.getItem('turnify_token');
 if(!token){ location.href = 'acceso.html'; }
@@ -776,21 +759,35 @@ document.getElementById('bellBtn').onclick = async function(){
 };
 
 async function boot(){
-  const r = await api('GET','/businesses/me');
-  if(r.status === 404){
-    document.getElementById('boot').style.display='none';
-    document.getElementById('onboard').style.display='block';
-    loadOnboardingOptions();
+  let r;
+  try {
+    r = await api('GET','/businesses/me');
+  } catch(e){
+    document.getElementById('boot').textContent = 'No se pudo conectar. Recarga la página.';
     return;
   }
-  if(!r.ok){ document.getElementById('boot').textContent = 'No se pudo cargar. Recarga la página.'; return; }
+  // Sin negocio todavía → mostrar onboarding (crear negocio)
+  if(r.status === 404){
+    document.getElementById('boot').style.display='none';
+    document.getElementById('app').style.display='none';
+    document.getElementById('onboard').style.display='block';
+    try { loadOnboardingOptions(); } catch(e){}
+    return;
+  }
+  if(!r.ok || !r.data || !r.data.business){
+    document.getElementById('boot').textContent = 'No se pudo cargar. Recarga la página.';
+    return;
+  }
+  // Tiene negocio → mostrar el panel
   BIZ = r.data.business;
   document.getElementById('boot').style.display='none';
+  document.getElementById('onboard').style.display='none';
   document.getElementById('app').style.display='block';
-  fillBusiness(r.data);
-  buildMobnav();
-  loadDashboard();
-  loadNotifCount();
+  // Cada parte en su propio try para que un fallo no rompa todo el panel
+  try { fillBusiness(r.data); } catch(e){ console.error('fillBusiness', e); }
+  try { buildMobnav(); } catch(e){ console.error('buildMobnav', e); }
+  try { loadDashboard(); } catch(e){ console.error('loadDashboard', e); }
+  try { loadNotifCount(); } catch(e){ console.error('loadNotifCount', e); }
 }
 
 async function loadOnboardingOptions(){
