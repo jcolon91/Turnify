@@ -198,6 +198,11 @@ app.post('/api/auth/register', authLimiter, asyncH(async (req, res) => {
     throw e;
   }
   const refresh = await issueRefresh(user.id, req);
+  // Email de bienvenida (no bloquea el registro si Resend falla)
+  try {
+    const w = emailWelcome(user.full_name);
+    sendEmail(user.email, w.subject, w.text, w.html).catch(e => console.error('welcome email:', e.message));
+  } catch (e) { console.error('welcome email build:', e.message); }
   res.status(201).json({ user, access_token: signAccess(user), refresh_token: refresh });
 }));
 
@@ -1338,16 +1343,49 @@ async function sendWhatsApp(phone, text) {
   return { id: j?.key?.id || null };
 }
 
-async function sendEmail(to, subject, text) {
+async function sendEmail(to, subject, text, html) {
   if (!RESEND_API_KEY) return { skipped: true };
+  const payload = { from: EMAIL_FROM, to: [to], subject, text };
+  if (html) payload.html = html;
   const r = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${RESEND_API_KEY}` },
-    body: JSON.stringify({ from: EMAIL_FROM, to: [to], subject, text }),
+    body: JSON.stringify(payload),
   });
   if (!r.ok) throw new Error(`Resend ${r.status}`);
   const j = await r.json().catch(() => ({}));
   return { id: j?.id || null };
+}
+
+// Plantilla base de emails (marca Turnify, sin emojis)
+function emailShell(innerHtml) {
+  return `<!doctype html><html><body style="margin:0;padding:0;background:#F1EFE5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F1EFE5;padding:32px 16px">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border:1px solid #E1DCCD;border-radius:18px;overflow:hidden">
+        <tr><td style="padding:28px 28px 0 28px">
+          <div style="font-size:24px;font-weight:800;letter-spacing:-.02em;color:#17150F">Turn<span style="color:#0E8074">i</span>fy</div>
+        </td></tr>
+        ${innerHtml}
+        <tr><td style="padding:20px 28px 28px 28px;border-top:1px solid #E1DCCD">
+          <p style="margin:0;font-size:12px;color:#5E594B;line-height:1.5">Turnify — Tu turno, sin llamadas.<br>Recibiste este correo porque creaste una cuenta en turnifypr.com</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table></body></html>`;
+}
+
+function emailWelcome(name) {
+  const first = (name || '').trim().split(' ')[0] || 'Hola';
+  const subject = 'Bienvenido a Turnify';
+  const text = `Hola ${first},\n\nTu cuenta en Turnify ya está activa. El próximo paso es crear tu negocio para empezar a recibir citas.\n\nEntra aquí: https://turnifypr.com/panel.html\n\n— El equipo de Turnify`;
+  const html = emailShell(`
+    <tr><td style="padding:20px 28px 0 28px">
+      <h1 style="margin:0 0 10px 0;font-size:21px;font-weight:800;color:#17150F">Hola ${first}, tu cuenta ya está activa</h1>
+      <p style="margin:0 0 18px 0;font-size:15px;color:#5E594B;line-height:1.6">El próximo paso es crear tu negocio. Configura tus servicios, tu horario y empieza a recibir citas sin llamadas ni mensajes de ida y vuelta.</p>
+      <a href="https://turnifypr.com/panel.html" style="display:inline-block;background:#0E8074;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:13px 22px;border-radius:12px">Crear mi negocio</a>
+    </td></tr>`);
+  return { subject, text, html };
 }
 
 // Encola recordatorios 24h y 2h (idempotente: marca la cita)
