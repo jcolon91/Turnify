@@ -542,6 +542,19 @@ main{padding:22px 20px 90px;max-width:760px}
 
 <script src="turnify-banners.js"></script>
 <script>
+// CAPTURADOR DE ERRORES TEMPORAL (para diagnóstico)
+window.addEventListener('error', function(ev){
+  var box = document.getElementById('boot');
+  if(box){
+    box.style.display='block';
+    box.innerHTML = '<div style="padding:20px;text-align:left;font-family:monospace;font-size:12px;color:#A1281C;background:#FCE8E6;border-radius:10px;margin:20px">'+
+      '<b>Error detectado:</b><br>'+
+      (ev.message||'?')+'<br><br>'+
+      '<b>Archivo:</b> '+(ev.filename||'?').split('/').pop()+'<br>'+
+      '<b>Línea:</b> '+(ev.lineno||'?')+':'+(ev.colno||'?')+
+      '</div>';
+  }
+});
 const API = '/api';
 const token = localStorage.getItem('turnify_token');
 if(!token){ location.href = 'acceso.html'; }
