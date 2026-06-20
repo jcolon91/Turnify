@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Entrar — Turnify</title>
+<title>Entrar — Bukéame</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -52,7 +52,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer;border:0
 
 <div class="stage">
   <div class="box">
-    <div class="logo">Turn<i>i</i>fy</div>
+    <div class="logo">Buk<i>é</i>ame</div>
     <div class="tag">Tu turno, sin llamadas</div>
 
     <div class="card">
@@ -119,9 +119,9 @@ async function apiPost(path, body){
 
 // Guarda la sesión y redirige según si es admin o dueño de negocio
 function saveSessionAndGo(data){
-  localStorage.setItem('turnify_token', data.access_token);
-  localStorage.setItem('turnify_refresh', data.refresh_token);
-  localStorage.setItem('turnify_user', JSON.stringify(data.user));
+  localStorage.setItem('bukeame_token', data.access_token);
+  localStorage.setItem('bukeame_refresh', data.refresh_token);
+  localStorage.setItem('bukeame_user', JSON.stringify(data.user));
   if(data.user && data.user.is_platform_admin){
     location.href = 'admin.html';
   } else {

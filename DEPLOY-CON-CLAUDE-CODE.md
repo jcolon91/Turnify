@@ -1,6 +1,6 @@
-# Deploy de Turnify con Claude Code — Guía de arranque
+# Deploy de Bukéame con Claude Code — Guía de arranque
 
-Esta guía te lleva de cero a Turnify corriendo, usando Claude Code en tu VPS de Hostinger. Tú supervisas desde el móvil con Remote Control.
+Esta guía te lleva de cero a Bukéame corriendo, usando Claude Code en tu VPS de Hostinger. Tú supervisas desde el móvil con Remote Control.
 
 ---
 
@@ -9,7 +9,7 @@ Esta guía te lleva de cero a Turnify corriendo, usando Claude Code en tu VPS de
 1. Conectarte a tu VPS por SSH (una vez)
 2. Crear un usuario seguro (no-root) para Claude Code
 3. Instalar Claude Code en el VPS
-4. Darle el "prompt maestro" para que instale Turnify
+4. Darle el "prompt maestro" para que instale Bukéame
 5. Supervisar desde el móvil con Remote Control
 
 ---
@@ -19,7 +19,7 @@ Esta guía te lleva de cero a Turnify corriendo, usando Claude Code en tu VPS de
 - **Acceso SSH a tu VPS** (IP del servidor + tu forma de conectarte)
 - **Tu plan de Claude** (Max recomendado para Remote Control; verifica si Pro te lo permite)
 - **El app de Claude en tu teléfono**, actualizado a la última versión
-- **El repo ya subido** a `github.com/jcolon91/Turnify` ✅ (ya lo tienes)
+- **El repo ya subido** a `github.com/jcolon91/Bukeame` ✅ (ya lo tienes)
 
 ---
 
@@ -95,15 +95,15 @@ Una vez en la sesión de Claude Code (desde la terminal o ya controlando desde e
 
 ---
 
-> Vas a instalar mi aplicación "Turnify" en este VPS de Hostinger. Es CRÍTICO que mantengas aislamiento total de mi otra aplicación "Wifnix" que ya corre en este mismo servidor — no debes tocar nada de Wifnix.
+> Vas a instalar mi aplicación "Bukéame" en este VPS de Hostinger. Es CRÍTICO que mantengas aislamiento total de mi otra aplicación "Wifnix" que ya corre en este mismo servidor — no debes tocar nada de Wifnix.
 >
 > Pasos:
 > 1. Primero corre estos comandos de diagnóstico de SOLO LECTURA y muéstrame la salida: `pm2 list`, `node -v && psql --version`, `ss -tlnp | grep -E ':(3000|3001|5432)'`, `sudo -u postgres psql -l`, `ls /etc/nginx/sites-enabled/`, `free -h`
-> 2. Clona el repositorio: `https://github.com/jcolon91/Turnify.git` en `/var/www/turnify`
-> 3. Sigue exactamente la guía que está en `docs/DEPLOY.md` del repositorio. Esa guía tiene todos los pasos: crear la base de datos `turnify` con usuario `turnify_user` aislado, cargar los schemas, configurar el backend, arrancar con PM2 como `turnify-api` en el puerto 3001, y configurar Nginx para `turnifypr.com`.
+> 2. Clona el repositorio: `https://github.com/jcolon91/Bukeame.git` en `/var/www/turnify`
+> 3. Sigue exactamente la guía que está en `docs/DEPLOY.md` del repositorio. Esa guía tiene todos los pasos: crear la base de datos `turnify` con usuario `turnify_user` aislado, cargar los schemas, configurar el backend, arrancar con PM2 como `turnify-api` en el puerto 3001, y configurar Nginx para `bukeame.com`.
 > 4. Para el archivo `.env`: genera secretos seguros para JWT_SECRET y JWT_REFRESH_SECRET con `openssl rand -base64 48`. Para las credenciales de Evolution (WhatsApp) y Resend (email), déjalas con placeholders y avísame cuáles necesito llenar después.
 > 5. Antes de cada comando que modifique algo, explícame qué vas a hacer. No ejecutes nada destructivo sin confirmarme.
-> 6. Reglas de aislamiento que NO puedes violar: usa la carpeta `/var/www/turnify` (no `/var/www/wifnix`), el proceso PM2 `turnify-api` (no `wifnix-api`), el puerto 3001 (Wifnix usa 3000), la base de datos `turnify` con usuario `turnify_user`, y asegúrate de correr `REVOKE ALL ON DATABASE wifnix FROM turnify_user` para que Turnify nunca pueda tocar la base de datos de Wifnix.
+> 6. Reglas de aislamiento que NO puedes violar: usa la carpeta `/var/www/turnify` (no `/var/www/wifnix`), el proceso PM2 `turnify-api` (no `wifnix-api`), el puerto 3001 (Wifnix usa 3000), la base de datos `turnify` con usuario `turnify_user`, y asegúrate de correr `REVOKE ALL ON DATABASE wifnix FROM turnify_user` para que Bukéame nunca pueda tocar la base de datos de Wifnix.
 > 7. Al final, verifica que todo corre con `curl http://localhost:3001/api/health` y muéstrame el resultado.
 >
 > Procede paso a paso, mostrándome la salida de cada comando.
@@ -116,7 +116,7 @@ Claude Code va a:
 1. Correr el diagnóstico y mostrarte el estado del servidor
 2. Clonar el repo
 3. Ir ejecutando el `DEPLOY.md` paso a paso, pidiéndote confirmación en los pasos que modifican algo
-4. Levantar Turnify y confirmarte que responde
+4. Levantar Bukéame y confirmarte que responde
 
 Tú solo supervisas y confirmas desde el móvil.
 
@@ -128,7 +128,7 @@ Estas cosas Claude Code no las puede hacer solo (requieren tus cuentas externas)
 
 | Qué | Dónde |
 |---|---|
-| Apuntar el dominio `turnifypr.com` al IP del VPS | Tu panel de DNS (donde compraste el dominio) |
+| Apuntar el dominio `bukeame.com` al IP del VPS | Tu panel de DNS (donde compraste el dominio) |
 | Credenciales de Evolution API (WhatsApp) | Llenar en el `.env` |
 | Credenciales de Resend (email) | Llenar en el `.env` |
 | Certificado SSL | Claude Code lo intenta con certbot, pero necesita que el DNS ya apunte al server |
@@ -140,7 +140,7 @@ Estas cosas Claude Code no las puede hacer solo (requieren tus cuentas externas)
 - **Nunca como root.** Claude Code corre como el usuario `deploy` con permisos limitados.
 - **El `.env` nunca se sube a GitHub** (ya está en `.gitignore`).
 - **Remote Control es seguro:** tu servidor solo hace conexiones salientes por HTTPS, no abre puertos de entrada.
-- **Wifnix está protegido:** el aislamiento por usuario de base de datos y el `REVOKE` garantizan que Turnify no pueda tocar a Wifnix.
+- **Wifnix está protegido:** el aislamiento por usuario de base de datos y el `REVOKE` garantizan que Bukéame no pueda tocar a Wifnix.
 
 ---
 
@@ -149,7 +149,7 @@ Estas cosas Claude Code no las puede hacer solo (requieren tus cuentas externas)
 Claude Code mismo puede diagnosticar y arreglar. Pero si quieres parar todo:
 
 ```bash
-pm2 stop turnify-api      # detiene solo Turnify, Wifnix sigue corriendo
+pm2 stop turnify-api      # detiene solo Bukéame, Wifnix sigue corriendo
 ```
 
 Y si necesitas revisar qué pasó:

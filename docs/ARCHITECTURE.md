@@ -1,14 +1,14 @@
-# Arquitectura y decisiones — Turnify
+# Arquitectura y decisiones — Bukéame
 
-Este documento registra las decisiones técnicas y de negocio detrás de Turnify.
+Este documento registra las decisiones técnicas y de negocio detrás de Bukéame.
 
 ---
 
 ## Filosofía central
 
-**Transparencia radical.** Cero cargos ocultos, cero comisión por los clientes del negocio. El negocio conecta su propia cuenta de pago y recibe el dinero directo — Turnify nunca custodia fondos (menos riesgo legal y regulatorio).
+**Transparencia radical.** Cero cargos ocultos, cero comisión por los clientes del negocio. El negocio conecta su propia cuenta de pago y recibe el dinero directo — Bukéame nunca custodia fondos (menos riesgo legal y regulatorio).
 
-**WhatsApp como caballo de batalla.** En Puerto Rico todo el mundo usa WhatsApp, y no requiere registro 10DLC como el SMS. Es gratis e ilimitado en Turnify. El SMS queda para Fase 2.
+**WhatsApp como caballo de batalla.** En Puerto Rico todo el mundo usa WhatsApp, y no requiere registro 10DLC como el SMS. Es gratis e ilimitado en Bukéame. El SMS queda para Fase 2.
 
 ---
 
@@ -55,10 +55,10 @@ Los planes pagos: ambos `true`.
 Límite **a nivel de base de datos** (trigger `enforce_photo_limit`), no solo en la app. Imposible saturar el servidor aunque alguien intente saltarse el frontend por la API.
 
 ### Gift cards: el negocio custodia el dinero
-El cliente compra una gift card y paga por los procesadores del negocio. El dinero va directo al negocio; Turnify solo lleva el registro del saldo. Esto evita que Turnify sea responsable de "fondos no reclamados" (regulación de gift cards), trasladando esa carga al negocio.
+El cliente compra una gift card y paga por los procesadores del negocio. El dinero va directo al negocio; Bukéame solo lleva el registro del saldo. Esto evita que Bukéame sea responsable de "fondos no reclamados" (regulación de gift cards), trasladando esa carga al negocio.
 
 ### Programa de lealtad: lo paga el negocio
-"Cada N visitas, 1 gratis." El negocio decide ofrecerlo; Turnify solo cuenta (trigger `loyalty_on_complete`). Turnify nunca regala servicios ni paga nada — es el contador automático.
+"Cada N visitas, 1 gratis." El negocio decide ofrecerlo; Bukéame solo cuenta (trigger `loyalty_on_complete`). Bukéame nunca regala servicios ni paga nada — es el contador automático.
 
 ### Lista de espera con oferta protegida de 30 minutos
 El flujo más delicado del sistema:
@@ -83,7 +83,7 @@ Si asigna manualmente a alguien con una oferta automática pendiente, esa oferta
 
 ## Aislamiento en el servidor
 
-Turnify convive con Wifnix en el mismo VPS pero totalmente separado: carpeta, proceso PM2, puerto, base de datos y usuario distintos. El usuario `turnify_user` no tiene permisos sobre la base de Wifnix. Ver [`DEPLOY.md`](DEPLOY.md).
+Bukéame convive con Wifnix en el mismo VPS pero totalmente separado: carpeta, proceso PM2, puerto, base de datos y usuario distintos. El usuario `turnify_user` no tiene permisos sobre la base de Wifnix. Ver [`DEPLOY.md`](DEPLOY.md).
 
 ---
 

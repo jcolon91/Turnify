@@ -1,16 +1,16 @@
-# Turnify
+# Bukéame
 
 > **Tu turno, sin llamadas.** — Plataforma de reservas de citas + marketplace, hecha en Puerto Rico.
 
-Turnify es un SaaS de gestión de citas para barberías, salones, spas, uñas y cualquier negocio de servicios. Transparencia radical: cero cargos ocultos, cero comisión por los clientes del negocio, y WhatsApp ilimitado gratis.
+Bukéame es un SaaS de gestión de citas para barberías, salones, spas, uñas y cualquier negocio de servicios. Transparencia radical: cero cargos ocultos, cero comisión por los clientes del negocio, y WhatsApp ilimitado gratis.
 
 Producto de **Wifnix LLC** · Caguas, Puerto Rico.
 
 ---
 
-## ¿Por qué Turnify?
+## ¿Por qué Bukéame?
 
-A diferencia de Booksy, Fresha, Vagaro y otros, Turnify:
+A diferencia de Booksy, Fresha, Vagaro y otros, Bukéame:
 
 - **No cobra comisión por tus clientes.** El negocio conecta su propia cuenta de pago (ATH Móvil, Stripe, PayPal, Klarna) y recibe el dinero directo.
 - **WhatsApp ilimitado gratis** — sin límites de SMS, sin costos por mensaje. En PR todo el mundo usa WhatsApp.
@@ -23,7 +23,7 @@ A diferencia de Booksy, Fresha, Vagaro y otros, Turnify:
 ## Estructura del repositorio
 
 ```
-Turnify/
+Bukeame/
 ├── backend/          API REST en Node.js + Express
 │   ├── server.js              Servidor principal (auth, citas, disponibilidad, CRM)
 │   ├── module-revenue.js      Productos, gift cards, add-ons, destacados

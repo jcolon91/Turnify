@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Bukéame</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#F1EFE5;--card:#fff;--ink:#17150F;--ink2:#5E594B;--teal:#0E8074;--teal-ink:#0A5B52;--teal-soft:#E3EFE9;--mango:#EFA12F;--line:#E1DCCD;--r:18px;
+--display:"Bricolage Grotesque",sans-serif;--body:"Instrument Sans",sans-serif;--mono:"Spline Sans Mono",monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--body);color:var(--ink);background:var(--paper);-webkit-font-smoothing:antialiased;min-height:100vh}
+a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer;border:0}
+.wrap{max-width:1100px;margin:0 auto;padding:0 16px}
+
+/* Header */
+.top{background:var(--ink);color:#FFF8EC;padding:14px 0}
+.top .wrap{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.logo{font-family:var(--display);font-weight:800;font-size:22px;letter-spacing:-.02em}
+.logo i{font-style:normal;color:#9FE8D5}
+.adminbadge{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;background:rgba(159,232,213,.16);color:#9FE8D5;padding:4px 9px;border-radius:99px;margin-left:8px}
+.logout{font-size:12.5px;color:#CFC9B6;display:flex;align-items:center;gap:6px}
+
+/* Estado de carga / error */
+.state{text-align:center;padding:60px 20px;color:var(--ink2)}
+.state.err{color:#A1281C}
+
+/* Secciones */
+.section{margin:26px 0}
+.seclabel{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--ink2);margin-bottom:14px}
+
+/* Tarjetas de métricas */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.metric{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px 18px}
+.metric .n{font-family:var(--display);font-weight:800;font-size:30px;line-height:1;letter-spacing:-.02em}
+.metric .l{font-size:12px;color:var(--ink2);margin-top:6px}
+.metric .sub{font-family:var(--mono);font-size:10px;color:var(--teal-ink);margin-top:8px}
+.metric.hi{background:var(--ink);color:#FFF8EC}
+.metric.hi .l{color:#CFC9B6}.metric.hi .sub{color:#9FE8D5}
+
+/* Mini-desglose de estados */
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.chip{font-size:11.5px;font-weight:600;padding:5px 11px;border-radius:99px;background:#EDE9DB;color:var(--ink2)}
+.planbtn{font-size:12px;font-weight:700;padding:6px 12px;border-radius:9px;background:var(--ink);color:#FFF8EC;white-space:nowrap}
+.planbtn:hover{opacity:.88}
+.chip b{font-family:var(--mono)}
+.chip.green{background:var(--teal-soft);color:var(--teal-ink)}
+.chip.amber{background:#FBEFD8;color:#92590E}
+.chip.red{background:#FCE8E6;color:#A1281C}
+
+/* Tablas */
+.tablecard{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tablecard .empty{padding:26px;text-align:center;color:var(--ink2);font-size:13px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink2);padding:11px 14px;border-bottom:1px solid var(--line);background:#FAF8F1}
+td{padding:11px 14px;border-bottom:1px solid #F0ECDF;vertical-align:middle}
+tr:last-child td{border-bottom:0}
+.biz{font-weight:700}
+.muted{color:var(--ink2);font-size:12px}
+.pill{display:inline-block;font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;text-transform:capitalize}
+.pill.active{background:var(--teal-soft);color:var(--teal-ink)}
+.pill.trialing{background:#FBEFD8;color:#92590E}
+.pill.cancelled{background:#EDE9DB;color:var(--ink2)}
+.pill.past_due{background:#FCE8E6;color:#A1281C}
+.plan{font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;color:var(--ink)}
+.days{font-family:var(--mono);font-weight:700}
+.days.soon{color:#A1281C}
+.wa{font-family:var(--mono);font-size:12px;color:var(--teal-ink)}
+.actbtn{font-size:12px;font-weight:700;padding:7px 12px;border-radius:9px;background:var(--teal);color:#fff;white-space:nowrap}
+.actbtn.off{background:#EDE9DB;color:var(--ink2)}
+.actbtn:disabled{opacity:.6}
+
+/* responsive: scroll horizontal en tablas en móvil */
+.scrollx{overflow-x:auto;-webkit-overflow-scrolling:touch}
+@media(max-width:560px){
+  .metric .n{font-size:26px}
+  th,td{padding:9px 11px}
+}
+.foot{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);padding:30px 0}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div class="wrap">
+    <div><span class="logo">Buk<i>é</i>ame</span><span class="adminbadge">Admin</span></div>
+    <a class="logout" id="logout" href="#">Cerrar sesión</a>
+  </div>
+</div>
+
+<div class="wrap">
+  <div id="loading" class="state">Cargando tablero…</div>
+  <div id="error" class="state err" style="display:none"></div>
+
+  <div id="dash" style="display:none">
+
+    <!-- MÉTRICAS -->
+    <div class="section">
+      <div class="seclabel">Resumen de la plataforma</div>
+      <div class="cards" id="metricCards"></div>
+      <div class="chips" id="statusChips"></div>
+    </div>
+
+    <!-- POR VENCER (trials) -->
+    <div class="section">
+      <div class="seclabel">Trials por vencer (próximos 7 días)</div>
+      <div class="tablecard">
+        <div class="scrollx">
+          <table id="trialsTable"><thead><tr>
+            <th>Negocio</th><th>Dueño</th><th>WhatsApp</th><th>Plan</th><th>Vence en</th>
+          </tr></thead><tbody></tbody></table>
+        </div>
+        <div class="empty" id="trialsEmpty" style="display:none">No hay trials por vencer esta semana.</div>
+      </div>
+    </div>
+
+    <!-- NEGOCIOS RECIENTES -->
+    <div class="section">
+      <div class="seclabel">Últimos negocios registrados</div>
+      <div class="tablecard">
+        <div class="scrollx">
+          <table id="bizTable"><thead><tr>
+            <th>Negocio</th><th>Dueño</th><th>Plan</th><th>Estado</th><th>Registrado</th><th>Acción</th>
+          </tr></thead><tbody></tbody></table>
+        </div>
+        <div class="empty" id="bizEmpty" style="display:none">Aún no hay negocios registrados.</div>
+      </div>
+    </div>
+
+    <!-- CITAS RECIENTES -->
+    <div class="section">
+      <div class="seclabel">Últimas citas en la plataforma</div>
+      <div class="tablecard">
+        <div class="scrollx">
+          <table id="apptTable"><thead><tr>
+            <th>Negocio</th><th>Cliente</th><th>Fecha</th><th>Estado</th>
+          </tr></thead><tbody></tbody></table>
+        </div>
+        <div class="empty" id="apptEmpty" style="display:none">Aún no hay citas agendadas.</div>
+      </div>
+    </div>
+
+    <!-- REFERIDOS -->
+    <div class="section">
+      <div class="seclabel">Referidos</div>
+      <div class="tablecard">
+        <div class="scrollx">
+          <table id="refTable"><thead><tr>
+            <th>Negocio referido</th><th>Lo refirió</th><th>Estado del referido</th><th>Referral</th><th>Acción</th>
+          </tr></thead><tbody></tbody></table>
+        </div>
+        <div class="empty" id="refEmpty" style="display:none">Aún no hay referidos.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="foot">Bukéame · Panel de administrador</div>
+
+<div id="planModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#fff;border-radius:18px;max-width:380px;width:100%;padding:22px">
+    <h3 style="font-family:var(--display,sans-serif);font-size:19px;margin-bottom:4px">Cambiar plan</h3>
+    <p id="pmBiz" style="font-size:13px;color:var(--ink2,#666);margin-bottom:16px"></p>
+    <label style="font-size:12px;font-weight:700;display:block;margin-bottom:6px">Plan</label>
+    <select id="pmPlan" style="width:100%;padding:11px;border:1.5px solid #ddd;border-radius:10px;font-size:14px;margin-bottom:14px">
+      <option value="free">Free (gratis)</option>
+      <option value="pro">Pro — $14.99</option>
+      <option value="studio">Studio — $19.99</option>
+      <option value="team">Team — $29.99</option>
+      <option value="grande">Grande — $44.99</option>
+      <option value="ilimitado">Ilimitado — $59.99</option>
+    </select>
+    <label style="font-size:12px;font-weight:700;display:block;margin-bottom:6px">Duración (meses)</label>
+    <input id="pmMonths" type="number" value="1" min="1" max="24" style="width:100%;padding:11px;border:1.5px solid #ddd;border-radius:10px;font-size:14px;margin-bottom:8px">
+    <p style="font-size:11.5px;color:var(--ink2,#666);margin-bottom:16px">Para planes de pago, define cuántos meses dura antes de vencer. Para Free no aplica.</p>
+    <div id="pmAlert" style="display:none;font-size:13px;padding:9px;border-radius:8px;margin-bottom:12px"></div>
+    <div style="display:flex;gap:8px">
+      <button id="pmCancel" style="flex:1;padding:11px;border-radius:10px;background:#EDE9DB;color:#333;font-weight:700">Cancelar</button>
+      <button id="pmSave" style="flex:1;padding:11px;border-radius:10px;background:#0E8074;color:#fff;font-weight:700">Aplicar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '/api';
+const token = localStorage.getItem('bukeame_token');
+
+// Si no hay sesión, al login
+if(!token){ location.href = 'acceso.html'; }
+
+document.getElementById('logout').onclick = (e)=>{
+  e.preventDefault();
+  localStorage.removeItem('bukeame_token');
+  localStorage.removeItem('bukeame_refresh');
+  localStorage.removeItem('bukeame_user');
+  location.href = 'acceso.html';
+};
+
+// Formato de fecha corto en español
+function fdate(iso){
+  if(!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('es-PR',{day:'numeric',month:'short',year:'numeric'});
+}
+function fdatetime(iso){
+  if(!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('es-PR',{day:'numeric',month:'short'}) + ' ' +
+         d.toLocaleTimeString('es-PR',{hour:'numeric',minute:'2-digit'});
+}
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+// ── Referidos ──────────────────────────────────────────────────────────────
+async function loadReferrals(){
+  try{
+    const r = await fetch(API + '/admin/referrals', { headers:{ 'Authorization':'Bearer '+token } });
+    if(!r.ok) return;
+    const data = await r.json();
+    renderReferrals(data.referrals || []);
+  }catch(e){}
+}
+
+function renderReferrals(refs){
+  const tb = document.querySelector('#refTable tbody');
+  if(refs.length === 0){
+    document.getElementById('refTable').style.display = 'none';
+    document.getElementById('refEmpty').style.display = 'block';
+    return;
+  }
+  tb.innerHTML = refs.map(r=>{
+    const subStatus = r.referido_sub_status || '—';
+    let accion = '';
+    if(r.status === 'pending'){
+      accion = `<button class="actbtn" data-id="${esc(r.id)}" data-act="activate">Marcar pagado ✓</button>`;
+    } else if(r.status === 'active'){
+      accion = `<button class="actbtn off" data-id="${esc(r.id)}" data-act="deactivate">Desactivar</button>`;
+    } else {
+      accion = '<span class="muted">Inactivo</span>';
+    }
+    const estadoRef = r.status==='pending' ? '<span class="pill trialing">pendiente de pago</span>'
+                    : r.status==='active'  ? '<span class="pill active">activo · $5/mes</span>'
+                    : '<span class="pill cancelled">inactivo</span>';
+    return `<tr>
+      <td class="biz">${esc(r.referido_nombre)}<div class="muted">${esc(r.referido_email)} · plan ${esc(r.referido_plan||'free')} (${esc(subStatus)})</div></td>
+      <td>${esc(r.refiere_nombre)}<div class="muted">${esc(r.refiere_email)}</div></td>
+      <td>${estadoRef}</td>
+      <td><span class="plan">${esc(r.code_used)}</span></td>
+      <td>${accion}</td>
+    </tr>`;
+  }).join('');
+
+  // Conectar botones de acción
+  document.querySelectorAll('.actbtn').forEach(btn=>{
+    btn.onclick = async ()=>{
+      const id = btn.dataset.id, act = btn.dataset.act;
+      const msg = act==='activate'
+        ? '¿Confirmar que este negocio pagó su primer mes? Esto activa el crédito de $5/mes para quien lo refirió.'
+        : '¿Desactivar este referido? Se removerá el crédito de quien lo refirió.';
+      if(!confirm(msg)) return;
+      btn.disabled = true; btn.textContent = '…';
+      try{
+        const r = await fetch(API + '/admin/referrals/'+id+'/'+act, {
+          method:'POST', headers:{ 'Authorization':'Bearer '+token }
+        });
+        if(r.ok){ loadReferrals(); }
+        else { alert('No se pudo completar. Intenta de nuevo.'); btn.disabled=false; }
+      }catch(e){ alert('Error de conexión.'); btn.disabled=false; }
+    };
+  });
+}
+
+async function load(){
+  try{
+    const r = await fetch(API + '/admin/overview', {
+      headers:{ 'Authorization': 'Bearer ' + token }
+    });
+    if(r.status === 401){ location.href = 'acceso.html'; return; }
+    if(r.status === 403){
+      showError('Esta cuenta no tiene permisos de administrador. Si crees que es un error, contacta soporte.');
+      return;
+    }
+    if(!r.ok){ showError('No se pudo cargar el tablero. Intenta recargar.'); return; }
+    const data = await r.json();
+    render(data);
+    loadReferrals();
+  }catch(err){
+    showError('Error de conexión. Verifica tu internet e intenta de nuevo.');
+  }
+}
+
+function showError(msg){
+  document.getElementById('loading').style.display = 'none';
+  const e = document.getElementById('error');
+  e.textContent = msg; e.style.display = 'block';
+}
+
+function render(data){
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('dash').style.display = 'block';
+
+  const m = data.metricas;
+  const neg = m.negocios || {};
+
+  // Tarjetas de métricas
+  document.getElementById('metricCards').innerHTML = `
+    <div class="metric hi">
+      <div class="n">${neg.total||0}</div>
+      <div class="l">Negocios totales</div>
+      <div class="sub">${neg.activos||0} activos · ${neg.en_trial||0} en trial</div>
+    </div>
+    <div class="metric">
+      <div class="n">${m.usuarios||0}</div>
+      <div class="l">Usuarios registrados</div>
+    </div>
+    <div class="metric">
+      <div class="n">${(m.citas&&m.citas.total)||0}</div>
+      <div class="l">Citas agendadas</div>
+      <div class="sub">${(m.citas&&m.citas.ultimos_30d)||0} en 30 días</div>
+    </div>
+    <div class="metric">
+      <div class="n">${(m.citas&&m.citas.proximas)||0}</div>
+      <div class="l">Citas próximas</div>
+    </div>`;
+
+  // Chips de estado
+  const chips = [];
+  chips.push(`<span class="chip green">Activos <b>${neg.activos||0}</b></span>`);
+  chips.push(`<span class="chip amber">En trial <b>${neg.en_trial||0}</b></span>`);
+  if(neg.morosos) chips.push(`<span class="chip red">Morosos <b>${neg.morosos}</b></span>`);
+  chips.push(`<span class="chip">Cancelados <b>${neg.cancelados||0}</b></span>`);
+  (m.por_plan||[]).forEach(p=>{
+    chips.push(`<span class="chip">Plan ${esc(p.plan_code)} <b>${p.n}</b></span>`);
+  });
+  document.getElementById('statusChips').innerHTML = chips.join('');
+
+  // Tabla: trials por vencer
+  const trials = data.por_vencer || [];
+  const tb = document.querySelector('#trialsTable tbody');
+  if(trials.length === 0){
+    document.getElementById('trialsTable').style.display = 'none';
+    document.getElementById('trialsEmpty').style.display = 'block';
+  } else {
+    tb.innerHTML = trials.map(t=>{
+      const soon = t.dias_restantes <= 2;
+      const wa = t.whatsapp ? `<a class="wa" href="https://wa.me/${esc(String(t.whatsapp).replace(/\D/g,''))}" target="_blank">${esc(t.whatsapp)}</a>` : '<span class="muted">—</span>';
+      return `<tr>
+        <td class="biz">${esc(t.name)}</td>
+        <td>${esc(t.owner_name)}<div class="muted">${esc(t.owner_email)}</div></td>
+        <td>${wa}</td>
+        <td><span class="plan">${esc(t.plan_code)}</span></td>
+        <td><span class="days ${soon?'soon':''}">${t.dias_restantes} día${t.dias_restantes===1?'':'s'}</span></td>
+      </tr>`;
+    }).join('');
+  }
+
+  // Tabla: últimos negocios
+  const biz = data.ultimos_negocios || [];
+  const bb = document.querySelector('#bizTable tbody');
+  if(biz.length === 0){
+    document.getElementById('bizTable').style.display = 'none';
+    document.getElementById('bizEmpty').style.display = 'block';
+  } else {
+    bb.innerHTML = biz.map(b=>{
+      const st = b.status || 'active';
+      return `<tr>
+        <td class="biz">${esc(b.name)}<div class="muted">/${esc(b.slug)}</div></td>
+        <td>${esc(b.owner_name)}<div class="muted">${esc(b.owner_email)}</div></td>
+        <td><span class="plan">${esc(b.plan_code||'free')}</span></td>
+        <td><span class="pill ${esc(st)}">${esc(st)}</span></td>
+        <td class="muted">${fdate(b.created_at)}</td>
+        <td><button class="planbtn" data-id="${esc(b.id)}" data-name="${esc(b.name)}" data-plan="${esc(b.plan_code||'free')}">Cambiar plan</button></td>
+      </tr>`;
+    }).join('');
+    // Enganchar botones de cambiar plan
+    document.querySelectorAll('.planbtn').forEach(function(btn){
+      btn.onclick = function(){ openPlanChange(btn.dataset.id, btn.dataset.name, btn.dataset.plan); };
+    });
+  }
+
+  // Tabla: citas recientes
+  const appts = data.citas_recientes || [];
+  const ab = document.querySelector('#apptTable tbody');
+  if(appts.length === 0){
+    document.getElementById('apptTable').style.display = 'none';
+    document.getElementById('apptEmpty').style.display = 'block';
+  } else {
+    ab.innerHTML = appts.map(a=>`<tr>
+      <td class="biz">${esc(a.negocio)}</td>
+      <td>${esc(a.cliente||'—')}</td>
+      <td class="muted">${fdatetime(a.starts_at)}</td>
+      <td><span class="pill ${esc(a.status)}">${esc(String(a.status).replace(/_/g,' '))}</span></td>
+    </tr>`).join('');
+  }
+}
+
+// ── Cambiar plan de un negocio (admin manual) ──
+let pmCurrentId = null;
+function openPlanChange(id, name, currentPlan){
+  pmCurrentId = id;
+  document.getElementById('pmBiz').textContent = name + ' · plan actual: ' + (currentPlan||'free').toUpperCase();
+  document.getElementById('pmPlan').value = currentPlan || 'free';
+  document.getElementById('pmMonths').value = 1;
+  var al = document.getElementById('pmAlert'); al.style.display = 'none';
+  document.getElementById('planModal').style.display = 'flex';
+}
+document.getElementById('pmCancel').onclick = function(){
+  document.getElementById('planModal').style.display = 'none';
+};
+document.getElementById('pmSave').onclick = async function(){
+  if(!pmCurrentId) return;
+  var plan = document.getElementById('pmPlan').value;
+  var months = parseInt(document.getElementById('pmMonths').value,10) || 1;
+  var al = document.getElementById('pmAlert');
+  var saveBtn = document.getElementById('pmSave');
+  saveBtn.disabled = true; saveBtn.textContent = 'Aplicando…';
+  try {
+    var r = await fetch(API + '/admin/businesses/' + pmCurrentId + '/plan', {
+      method:'POST',
+      headers:{ 'Authorization':'Bearer '+token, 'Content-Type':'application/json' },
+      body: JSON.stringify({ plan_code: plan, months: months })
+    });
+    var data = await r.json().catch(function(){ return {}; });
+    if(r.ok){
+      al.style.display='block'; al.style.background='#E3EFE9'; al.style.color='#0A5B52';
+      al.textContent = 'Plan actualizado ✓';
+      setTimeout(function(){ document.getElementById('planModal').style.display='none'; load(); }, 900);
+    } else {
+      al.style.display='block'; al.style.background='#FBE4E4'; al.style.color='#A33';
+      al.textContent = data.error || 'No se pudo cambiar el plan';
+    }
+  } catch(e){
+    al.style.display='block'; al.style.background='#FBE4E4'; al.style.color='#A33';
+    al.textContent = 'Error de conexión';
+  }
+  saveBtn.disabled = false; saveBtn.textContent = 'Aplicar';
+};
+
+load();
+</script>
+</body>
+</html>

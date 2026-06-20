@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lista de espera — Bukéame</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#F1EFE5;--card:#fff;--ink:#17150F;--ink2:#5E594B;--teal:#0E8074;--teal-ink:#0A5B52;--teal-soft:#E3EFE9;--mango:#EFA12F;--line:#E1DCCD;
+--display:"Bricolage Grotesque",sans-serif;--body:"Instrument Sans",sans-serif;--mono:"Spline Sans Mono",monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--body);color:var(--ink);background:var(--paper);-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+.bootload{min-height:100vh;display:grid;place-items:center;color:var(--ink2);font-size:14px}
+.nav{background:var(--card);border-bottom:1px solid var(--line);padding:14px 18px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:50}
+.nav a.back{font-size:18px}.nav .logo{font-family:var(--display);font-weight:800;font-size:19px}.nav .logo i{font-style:normal;color:var(--teal)}
+.wrap{max-width:600px;margin:0 auto;padding:24px 16px 60px}
+h1{font-family:var(--display);font-weight:800;font-size:26px;letter-spacing:-.02em;margin-bottom:4px}
+.sub{font-size:13px;color:var(--ink2);margin-bottom:20px}
+.wl{background:var(--card);border:1.5px solid var(--line);border-radius:16px;padding:14px;display:flex;gap:12px;align-items:center;margin-bottom:10px}
+.wl .pos{width:30px;height:30px;border-radius:50%;background:var(--teal-soft);color:var(--teal-ink);font-weight:800;font-family:var(--display);display:grid;place-items:center;flex:none}
+.wl .grow{flex:1;min-width:0}
+.wl h4{font-size:15px;font-weight:700}
+.wl p{font-size:12.5px;color:var(--ink2);margin-top:2px}
+.wl .offered{font-size:10px;font-weight:700;background:#FBEFD8;color:#8a5a13;padding:2px 8px;border-radius:99px;font-family:var(--mono)}
+.wl .del{color:#A1281C;font-size:12px;font-weight:600;flex:none}
+.empty{text-align:center;color:var(--ink2);font-size:14px;padding:40px 20px;line-height:1.6;background:var(--card);border:1px dashed var(--line);border-radius:16px}
+.locked{text-align:center;padding:36px 24px;background:linear-gradient(135deg,#11221E,#0A5B52);color:#FFF8EC;border-radius:20px}
+.locked .ic{font-size:40px;margin-bottom:12px}
+.locked h2{font-family:var(--display);font-weight:800;font-size:22px;margin-bottom:8px}
+.locked p{font-size:14px;opacity:.9;line-height:1.55;margin-bottom:18px}
+.locked a{display:inline-block;background:#FFF8EC;color:var(--teal-ink);font-weight:700;font-size:14px;padding:12px 22px;border-radius:12px}
+.info{background:var(--teal-soft);border-radius:14px;padding:14px 16px;font-size:13px;color:var(--teal-ink);line-height:1.5;margin-bottom:18px}
+.foot{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);padding:20px 0 40px}
+</style>
+</head>
+<body>
+<div id="boot" class="bootload">Cargando…</div>
+<div id="app" style="display:none">
+<nav class="nav"><a href="panel.html" class="back">←</a><span class="logo">Buk<i>é</i>ame</span></nav>
+<div class="wrap">
+  <h1>Lista de espera</h1>
+  <p class="sub">Clientes esperando un espacio.</p>
+  <div id="content"></div>
+</div>
+</div>
+<div class="foot">Hecho con Bukéame · bukeamepr.com</div>
+
+<script>
+const API='/api';
+const token=localStorage.getItem('bukeame_token');
+if(!token){ location.href='acceso.html'; }
+function esc(s){return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+async function api(method,path,body){
+  const opts={method,headers:{'Authorization':'Bearer '+token}};
+  if(body){opts.headers['Content-Type']='application/json';opts.body=JSON.stringify(body);}
+  const r=await fetch(API+path,opts);
+  if(r.status===401){localStorage.clear();location.href='acceso.html';throw new Error('s');}
+  let data={};try{data=await r.json();}catch(e){}
+  return {status:r.status,ok:r.ok,data};
+}
+
+async function load(){
+  const r=await api('GET','/waitlist');
+  document.getElementById('boot').style.display='none';
+  document.getElementById('app').style.display='block';
+  const content=document.getElementById('content');
+  // si el plan no incluye lista de espera, da 403
+  if(r.status===403){
+    content.innerHTML='<div class="locked"><div class="ic">⏳</div><h2>Lista de espera</h2><p>Cuando se llena tu agenda, los clientes pueden anotarse en lista de espera y les avisas si se abre un espacio. Disponible en el plan Studio.</p><a href="panel.html">Ver planes</a></div>';
+    return;
+  }
+  const list=(r.ok&&r.data.waitlist)?r.data.waitlist:(r.ok&&Array.isArray(r.data)?r.data:[]);
+  content.innerHTML='<div class="info">💡 Cuando se abra un espacio, podrás ofrecerlo a quien esté en la lista. Recibirán un aviso por WhatsApp.</div>';
+  if(list.length===0){
+    content.innerHTML+='<div class="empty">No hay nadie en lista de espera.<br>Cuando tu agenda se llene, los clientes podrán anotarse.</div>';
+    return;
+  }
+  content.innerHTML+=list.map(function(w,i){
+    const offered=w.offer_state&&w.offer_state!=='none'?'<span class="offered">Ofrecido</span>':'';
+    return '<div class="wl"><div class="pos">'+(w.position||i+1)+'</div><div class="grow"><h4>'+esc(w.full_name||'Cliente')+' '+offered+'</h4><p>'+(w.service_name?esc(w.service_name):'Cualquier servicio')+(w.staff_name?(' · '+esc(w.staff_name)):'')+'</p></div><button class="del" data-id="'+esc(w.id)+'">Quitar</button></div>';
+  }).join('');
+  content.querySelectorAll('.del').forEach(function(b){
+    b.onclick=async function(){ if(!confirm('¿Quitar de la lista?'))return; const r=await api('DELETE','/waitlist/'+b.dataset.id); if(r.ok)load(); };
+  });
+}
+load();
+</script>
+</body>
+</html>

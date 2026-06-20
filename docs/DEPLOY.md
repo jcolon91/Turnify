@@ -1,14 +1,14 @@
-# Guía de instalación — Turnify en Hostinger VPS
+# Guía de instalación — Bukéame en Hostinger VPS
 
-Esta guía instala Turnify en el mismo VPS donde corre Wifnix, **completamente aislado** para que nunca se toquen.
+Esta guía instala Bukéame en el mismo VPS donde corre Wifnix, **completamente aislado** para que nunca se toquen.
 
 > ⚠️ **Antes de empezar:** corre los comandos de diagnóstico de la sección 0 y compártelos, para calibrar los pasos a tu servidor exacto.
 
 ---
 
-## Aislamiento: Turnify vs Wifnix
+## Aislamiento: Bukéame vs Wifnix
 
-| | Wifnix | Turnify |
+| | Wifnix | Bukéame |
 |---|---|---|
 | Carpeta | `/var/www/wifnix` | `/var/www/turnify` |
 | Proceso PM2 | `wifnix-api` | `turnify-api` |
@@ -47,7 +47,7 @@ sudo -u postgres psql
 Dentro de psql:
 
 ```sql
--- Crear usuario y base de datos de Turnify
+-- Crear usuario y base de datos de Bukéame
 CREATE USER turnify_user WITH PASSWORD 'PON_UN_PASSWORD_FUERTE_AQUI';
 CREATE DATABASE turnify OWNER turnify_user;
 
@@ -63,7 +63,7 @@ REVOKE ALL ON DATABASE wifnix FROM turnify_user;
 
 ```bash
 cd /var/www
-sudo git clone https://github.com/jcolon91/Turnify.git turnify
+sudo git clone https://github.com/jcolon91/Bukeame.git turnify
 sudo chown -R $USER:$USER /var/www/turnify
 cd /var/www/turnify
 ```
@@ -102,7 +102,7 @@ nano .env
 En el `.env`, llena:
 - `DATABASE_URL` con el password que pusiste en el paso 1
 - `JWT_SECRET` y `JWT_REFRESH_SECRET` — genera cada uno con `openssl rand -base64 48`
-- `CORS_ORIGINS` con `https://turnifypr.com`
+- `CORS_ORIGINS` con `https://bukeame.com`
 - Las credenciales de Evolution (WhatsApp) y Resend (email)
 
 ---
@@ -131,12 +131,12 @@ Debe responder: `{"ok":true,"service":"turnify-api",...}`
 
 ---
 
-## 6. Nginx — server block para turnifypr.com
+## 6. Nginx — server block para bukeame.com
 
 Crea el archivo:
 
 ```bash
-sudo nano /etc/nginx/sites-available/turnifypr.com
+sudo nano /etc/nginx/sites-available/bukeame.com
 ```
 
 Contenido:
@@ -144,7 +144,7 @@ Contenido:
 ```nginx
 server {
     listen 80;
-    server_name turnifypr.com www.turnifypr.com;
+    server_name bukeame.com www.bukeame.com;
 
     # Frontend (HTML estático)
     root /var/www/turnify/frontend;
@@ -169,7 +169,7 @@ server {
 Activar y recargar:
 
 ```bash
-sudo ln -s /etc/nginx/sites-available/turnifypr.com /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/bukeame.com /etc/nginx/sites-enabled/
 sudo nginx -t          # validar configuración
 sudo systemctl reload nginx
 ```
@@ -179,7 +179,7 @@ sudo systemctl reload nginx
 ## 7. SSL (HTTPS) con Let's Encrypt
 
 ```bash
-sudo certbot --nginx -d turnifypr.com -d www.turnifypr.com
+sudo certbot --nginx -d bukeame.com -d www.bukeame.com
 ```
 
 Certbot configura HTTPS automáticamente y renueva solo.

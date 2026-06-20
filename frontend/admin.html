@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin — Turnify</title>
+<title>Admin — Bukéame</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -83,7 +83,7 @@ tr:last-child td{border-bottom:0}
 
 <div class="top">
   <div class="wrap">
-    <div><span class="logo">Turn<i>i</i>fy</span><span class="adminbadge">Admin</span></div>
+    <div><span class="logo">Buk<i>é</i>ame</span><span class="adminbadge">Admin</span></div>
     <a class="logout" id="logout" href="#">Cerrar sesión</a>
   </div>
 </div>
@@ -156,7 +156,7 @@ tr:last-child td{border-bottom:0}
   </div>
 </div>
 
-<div class="foot">Turnify · Panel de administrador</div>
+<div class="foot">Bukéame · Panel de administrador</div>
 
 <div id="planModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;align-items:center;justify-content:center;padding:20px">
   <div style="background:#fff;border-radius:18px;max-width:380px;width:100%;padding:22px">
@@ -184,16 +184,16 @@ tr:last-child td{border-bottom:0}
 
 <script>
 const API = '/api';
-const token = localStorage.getItem('turnify_token');
+const token = localStorage.getItem('bukeame_token');
 
 // Si no hay sesión, al login
 if(!token){ location.href = 'acceso.html'; }
 
 document.getElementById('logout').onclick = (e)=>{
   e.preventDefault();
-  localStorage.removeItem('turnify_token');
-  localStorage.removeItem('turnify_refresh');
-  localStorage.removeItem('turnify_user');
+  localStorage.removeItem('bukeame_token');
+  localStorage.removeItem('bukeame_refresh');
+  localStorage.removeItem('bukeame_user');
   location.href = 'acceso.html';
 };
 

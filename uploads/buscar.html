@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Buscar negocios — Bukéame</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#F1EFE5;--card:#fff;--ink:#17150F;--ink2:#5E594B;--teal:#0E8074;--teal-ink:#0A5B52;--teal-soft:#E3EFE9;--mango:#EFA12F;--line:#E1DCCD;
+--display:"Bricolage Grotesque",sans-serif;--body:"Instrument Sans",sans-serif;--mono:"Spline Sans Mono",monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--body);color:var(--ink);background:var(--paper);-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+input,select{font:inherit}
+.nav{background:var(--card);border-bottom:1px solid var(--line);padding:14px 18px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.nav .logo{font-family:var(--display);font-weight:800;font-size:21px}.nav .logo i{font-style:normal;color:var(--teal)}
+.nav a.login{font-size:13px;font-weight:600;color:var(--teal-ink)}
+.hero{text-align:center;padding:30px 18px 10px}
+.hero h1{font-family:var(--display);font-weight:800;font-size:clamp(24px,5vw,32px);letter-spacing:-.02em;margin-bottom:6px}
+.hero p{font-size:14.5px;color:var(--ink2)}
+.wrap{max-width:680px;margin:0 auto;padding:0 16px}
+.searchbar{display:flex;gap:8px;margin:18px 0 10px}
+.searchbar input{flex:1;padding:14px 16px;border:1.5px solid var(--line);border-radius:13px;background:var(--card);font-size:15px}
+.searchbar input:focus{outline:none;border-color:var(--teal)}
+.searchbar button{background:var(--teal);color:#fff;font-weight:700;padding:0 22px;border-radius:13px}
+.filters{display:flex;gap:8px;overflow-x:auto;padding:6px 0 14px;-webkit-overflow-scrolling:touch}
+.chip{flex:none;padding:8px 15px;border:1.5px solid var(--line);border-radius:99px;font-size:13px;font-weight:600;cursor:pointer;background:var(--card);white-space:nowrap}
+.chip.sel{border-color:var(--teal);background:var(--teal);color:#fff}
+.results{padding:6px 0 40px}
+.count{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);margin-bottom:12px}
+.biz{background:var(--card);border:1.5px solid var(--line);border-radius:18px;padding:16px;display:flex;gap:14px;align-items:center;margin-bottom:12px;cursor:pointer;transition:.15s}
+.biz:hover{border-color:var(--teal);transform:translateY(-1px)}
+.biz .logo{width:62px;height:62px;border-radius:16px;background:var(--teal-soft);display:grid;place-items:center;font-family:var(--display);font-weight:800;font-size:24px;color:var(--teal);flex:none;overflow:hidden}
+.biz .logo img{width:100%;height:100%;object-fit:cover}
+.biz .grow{flex:1;min-width:0}
+.biz h3{font-family:var(--display);font-weight:800;font-size:18px;letter-spacing:-.01em}
+.biz .cats{font-size:12.5px;color:var(--ink2);margin-top:3px}
+.biz .loc{font-size:12px;color:var(--ink2);margin-top:4px;display:flex;align-items:center;gap:5px}
+.biz .rating{font-size:13px;font-weight:700;color:var(--teal-ink);flex:none;text-align:right}
+.biz .feat{display:inline-block;font-size:9px;font-weight:700;background:#FBEFD8;color:#8a5a13;padding:2px 7px;border-radius:99px;margin-left:6px;vertical-align:middle;font-family:var(--mono);letter-spacing:.05em}
+.empty{text-align:center;color:var(--ink2);font-size:14px;padding:40px 20px;line-height:1.6}
+.loading{text-align:center;color:var(--ink2);font-size:14px;padding:40px}
+.foot{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);padding:24px 0 40px}
+</style>
+</head>
+<body>
+<nav class="nav">
+  <a href="index.html" class="logo">Buk<i>é</i>ame</a>
+  <a href="acceso.html" class="login">Soy negocio →</a>
+</nav>
+
+<div class="hero">
+  <h1>Encuentra tu próximo turno</h1>
+  <p>Barberías, salones y más en Puerto Rico</p>
+</div>
+
+<div class="wrap">
+  <div class="searchbar">
+    <input id="q" placeholder="Busca por nombre o servicio…" autocomplete="off">
+    <button id="searchBtn">Buscar</button>
+  </div>
+  <div class="filters" id="catFilters"></div>
+  <div class="results" id="results">
+    <div class="loading">Cargando negocios…</div>
+  </div>
+</div>
+<div class="foot">Hecho con Bukéame · bukeamepr.com</div>
+
+<script>
+const API = '/api';
+let selectedCat = '';
+
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+// Cargar categorías para los filtros
+async function loadCats(){
+  try{
+    const r = await fetch(API+'/public/categories');
+    const data = await r.json();
+    const el = document.getElementById('catFilters');
+    let html = '<div class="chip sel" data-slug="">Todas</div>';
+    (data.categories||[]).forEach(function(c){
+      html += '<div class="chip" data-slug="'+esc(c.slug)+'">'+esc(c.name_es||c.name)+'</div>';
+    });
+    el.innerHTML = html;
+    el.querySelectorAll('.chip').forEach(function(chip){
+      chip.onclick = function(){
+        el.querySelectorAll('.chip').forEach(c=>c.classList.remove('sel'));
+        chip.classList.add('sel');
+        selectedCat = chip.dataset.slug;
+        search();
+      };
+    });
+  }catch(e){}
+}
+
+async function search(){
+  const q = document.getElementById('q').value.trim();
+  const results = document.getElementById('results');
+  results.innerHTML = '<div class="loading">Buscando…</div>';
+  try{
+    let url = API+'/public/search?';
+    const params = [];
+    if(q) params.push('q='+encodeURIComponent(q));
+    if(selectedCat) params.push('category='+encodeURIComponent(selectedCat));
+    url += params.join('&');
+    const r = await fetch(url);
+    const data = await r.json();
+    const list = data.businesses || data.results || [];
+    if(list.length === 0){
+      results.innerHTML = '<div class="empty">No encontramos negocios'+(q?' para "'+esc(q)+'"':'')+'.<br>Prueba con otra búsqueda.</div>';
+      return;
+    }
+    results.innerHTML = '<div class="count">'+list.length+' negocio'+(list.length>1?'s':'')+'</div>'+
+      list.map(function(b){
+        const initial = (b.name||'?').charAt(0).toUpperCase();
+        const logo = b.logo_url ? '<img src="'+esc(b.logo_url)+'" alt="">' : initial;
+        const cats = (b.categories||[]).map(c=>esc(c.name)).join(' · ');
+        const feat = b.is_featured ? '<span class="feat">Destacado</span>' : '';
+        const rating = b.rating_count>0 ? '★ '+Number(b.rating_avg).toFixed(1) : 'Nuevo';
+        const loc = b.municipality ? '<div class="loc">📍 '+esc(b.municipality)+(b.distance_km?(' · '+b.distance_km+' km'):'')+'</div>' : '';
+        return '<a class="biz" href="negocio.html?slug='+encodeURIComponent(b.slug)+'"><div class="logo">'+logo+'</div><div class="grow"><h3>'+esc(b.name)+feat+'</h3>'+(cats?'<div class="cats">'+cats+'</div>':'')+loc+'</div><div class="rating">'+rating+'</div></a>';
+      }).join('');
+  }catch(e){
+    results.innerHTML = '<div class="empty">No se pudo cargar. Intenta de nuevo.</div>';
+  }
+}
+
+document.getElementById('searchBtn').onclick = search;
+document.getElementById('q').addEventListener('keydown', function(e){ if(e.key==='Enter') search(); });
+
+// arranque
+loadCats();
+search();
+</script>
+</body>
+</html>

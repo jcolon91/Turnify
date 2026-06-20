@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Lista de espera — Turnify</title>
+<title>Lista de espera — Bukéame</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -37,18 +37,18 @@ h1{font-family:var(--display);font-weight:800;font-size:26px;letter-spacing:-.02
 <body>
 <div id="boot" class="bootload">Cargando…</div>
 <div id="app" style="display:none">
-<nav class="nav"><a href="panel.html" class="back">←</a><span class="logo">Turn<i>i</i>fy</span></nav>
+<nav class="nav"><a href="panel.html" class="back">←</a><span class="logo">Buk<i>é</i>ame</span></nav>
 <div class="wrap">
   <h1>Lista de espera</h1>
   <p class="sub">Clientes esperando un espacio.</p>
   <div id="content"></div>
 </div>
 </div>
-<div class="foot">Hecho con Turnify · turnifypr.com</div>
+<div class="foot">Hecho con Bukéame · bukeame.com</div>
 
 <script>
 const API='/api';
-const token=localStorage.getItem('turnify_token');
+const token=localStorage.getItem('bukeame_token');
 if(!token){ location.href='acceso.html'; }
 function esc(s){return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 async function api(method,path,body){
