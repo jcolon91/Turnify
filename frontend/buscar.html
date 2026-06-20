@@ -6,47 +6,72 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
-:root{--paper:#F1EFE5;--card:#fff;--ink:#17150F;--ink2:#5E594B;--teal:#0E8074;--teal-ink:#0A5B52;--teal-soft:#E3EFE9;--mango:#EFA12F;--line:#E1DCCD;
---display:"Bricolage Grotesque",sans-serif;--body:"Instrument Sans",sans-serif;--mono:"Spline Sans Mono",monospace}
+:root{
+  --bg:#F1EFE5;--bg2:#F7F4EA;--card:#FFFFFF;--card-soft:#EDE9DB;--border:#E1DCCD;
+  --text:#17150F;--muted:#5E594B;--muted2:#B3AD9C;--green:#0E8074;--green-ink:#FFFFFF;
+  --green-soft:#E3EFE9;--green-glow:rgba(14,128,116,.45);
+  --awning:repeating-linear-gradient(90deg,#0E8074 0 26px,#0A5B52 26px 28px,#F8F5EA 28px 54px,#E7E2D1 54px 56px);
+  --display:"Bricolage Grotesque",sans-serif;--body:"Instrument Sans",sans-serif;--mono:"Spline Sans Mono",monospace;
+  /* alias viejos → nuevos */
+  --paper:var(--bg);--ink:var(--text);--ink2:var(--muted);--teal:var(--green);--teal-ink:var(--green);--teal-soft:var(--green-soft);--mango:#EFA12F;--line:var(--border)}
+html[data-theme="dark"]{
+  --bg:#0B1A13;--bg2:#0E2218;--card:#12251B;--card-soft:rgba(255,255,255,.05);--border:rgba(255,255,255,.1);
+  --text:#ECEAE0;--muted:#8AA197;--muted2:#5d6f66;--green:#36E27B;--green-ink:#08160F;
+  --green-soft:rgba(54,226,123,.12);--green-glow:rgba(54,226,123,.3);
+  --awning:repeating-linear-gradient(90deg,#36E27B 0 26px,#0d6b46 26px 28px,#0E2218 28px 54px,#10241A 54px 56px)}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:var(--body);color:var(--ink);background:var(--paper);-webkit-font-smoothing:antialiased}
 a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
 input,select{font:inherit}
-.nav{background:var(--card);border-bottom:1px solid var(--line);padding:14px 18px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
-.nav .logo{font-family:var(--display);font-weight:800;font-size:21px}.nav .logo i{font-style:normal;color:var(--teal)}
-.nav a.login{font-size:13px;font-weight:600;color:var(--teal-ink)}
+.nav{background:var(--card);border-bottom:1px solid var(--border);padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:10px;position:sticky;top:0;z-index:50}
+.nav .logo{font-family:var(--display);font-weight:800;font-size:21px}.nav .logo i{font-style:normal;color:var(--green)}
+.nav .navright{display:flex;align-items:center;gap:12px}
+.nav a.login{font-size:13px;font-weight:600;color:var(--green)}
+.theme-tg{display:inline-flex;background:var(--card-soft);border:1px solid var(--border);border-radius:11px;padding:3px}
+.theme-tg button{font:700 12.5px 'Instrument Sans',sans-serif;padding:6px 13px;border-radius:8px;cursor:pointer;border:0;background:transparent;color:var(--muted)}
+.theme-tg button.on{background:var(--green);color:var(--green-ink)}
 .hero{text-align:center;padding:30px 18px 10px}
 .hero h1{font-family:var(--display);font-weight:800;font-size:clamp(24px,5vw,32px);letter-spacing:-.02em;margin-bottom:6px}
-.hero p{font-size:14.5px;color:var(--ink2)}
+.hero p{font-size:14.5px;color:var(--muted)}
 .wrap{max-width:680px;margin:0 auto;padding:0 16px}
 .searchbar{display:flex;gap:8px;margin:18px 0 10px}
-.searchbar input{flex:1;padding:14px 16px;border:1.5px solid var(--line);border-radius:13px;background:var(--card);font-size:15px}
-.searchbar input:focus{outline:none;border-color:var(--teal)}
-.searchbar button{background:var(--teal);color:#fff;font-weight:700;padding:0 22px;border-radius:13px}
+.searchbar input{flex:1;padding:14px 16px;border:1.5px solid var(--border);border-radius:14px;background:var(--card);color:var(--text);font-size:15px}
+.searchbar input:focus{outline:none;border-color:var(--green)}
+.searchbar button{background:var(--green);color:var(--green-ink);font-weight:700;padding:0 22px;border-radius:14px}
 .filters{display:flex;gap:8px;overflow-x:auto;padding:6px 0 14px;-webkit-overflow-scrolling:touch}
-.chip{flex:none;padding:8px 15px;border:1.5px solid var(--line);border-radius:99px;font-size:13px;font-weight:600;cursor:pointer;background:var(--card);white-space:nowrap}
-.chip.sel{border-color:var(--teal);background:var(--teal);color:#fff}
+.chip{flex:none;padding:8px 15px;border:1.5px solid var(--border);border-radius:99px;font-size:13px;font-weight:600;cursor:pointer;background:var(--card);color:var(--text);white-space:nowrap}
+.chip.sel{border-color:var(--green);background:var(--green);color:var(--green-ink)}
 .results{padding:6px 0 40px}
-.count{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);margin-bottom:12px}
-.biz{background:var(--card);border:1.5px solid var(--line);border-radius:18px;padding:16px;display:flex;gap:14px;align-items:center;margin-bottom:12px;cursor:pointer;transition:.15s}
-.biz:hover{border-color:var(--teal);transform:translateY(-1px)}
-.biz .logo{width:62px;height:62px;border-radius:16px;background:var(--teal-soft);display:grid;place-items:center;font-family:var(--display);font-weight:800;font-size:24px;color:var(--teal);flex:none;overflow:hidden}
+.count{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
+.biz{background:var(--card);border:1.5px solid var(--border);border-radius:18px;padding:16px;display:flex;gap:14px;align-items:center;margin-bottom:12px;cursor:pointer;transition:.15s;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.biz:hover{border-color:var(--green);transform:translateY(-1px)}
+.biz .logo{width:62px;height:62px;border-radius:16px;background:var(--green-soft);display:grid;place-items:center;font-family:var(--display);font-weight:800;font-size:24px;color:var(--green);flex:none;overflow:hidden}
 .biz .logo img{width:100%;height:100%;object-fit:cover}
 .biz .grow{flex:1;min-width:0}
 .biz h3{font-family:var(--display);font-weight:800;font-size:18px;letter-spacing:-.01em}
-.biz .cats{font-size:12.5px;color:var(--ink2);margin-top:3px}
-.biz .loc{font-size:12px;color:var(--ink2);margin-top:4px;display:flex;align-items:center;gap:5px}
-.biz .rating{font-size:13px;font-weight:700;color:var(--teal-ink);flex:none;text-align:right}
-.biz .feat{display:inline-block;font-size:9px;font-weight:700;background:#FBEFD8;color:#8a5a13;padding:2px 7px;border-radius:99px;margin-left:6px;vertical-align:middle;font-family:var(--mono);letter-spacing:.05em}
-.empty{text-align:center;color:var(--ink2);font-size:14px;padding:40px 20px;line-height:1.6}
-.loading{text-align:center;color:var(--ink2);font-size:14px;padding:40px}
-.foot{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);padding:24px 0 40px}
+.biz .cats{font-size:12.5px;color:var(--muted);margin-top:3px}
+.biz .loc{font-size:12px;color:var(--muted);margin-top:4px;display:flex;align-items:center;gap:5px}
+.biz .rating{font-size:13px;font-weight:700;color:var(--green);font-family:var(--mono);flex:none;text-align:right}
+.biz .feat{display:inline-block;font-size:9px;font-weight:700;background:var(--green-soft);color:var(--green);padding:2px 7px;border-radius:99px;margin-left:6px;vertical-align:middle;font-family:var(--mono);letter-spacing:.05em}
+.empty{text-align:center;color:var(--muted);font-size:14px;padding:40px 20px;line-height:1.6}
+.loading{text-align:center;color:var(--muted);font-size:14px;padding:40px}
+.foot{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);padding:24px 0 40px}
 </style>
 </head>
 <body>
+<script>
+(function(){var t=localStorage.getItem('bukeame_theme')||'light';document.documentElement.setAttribute('data-theme',t);
+window.__setTheme=function(t){localStorage.setItem('bukeame_theme',t);document.documentElement.setAttribute('data-theme',t);
+  document.querySelectorAll('.theme-tg button').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-theme-set')===t);});};
+document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('[data-theme-set]').forEach(function(b){b.addEventListener('click',function(){window.__setTheme(b.getAttribute('data-theme-set'));});});window.__setTheme(localStorage.getItem('bukeame_theme')||'light');});})();
+</script>
+<div style="height:12px;background:var(--awning)"></div>
 <nav class="nav">
   <a href="index.html" class="logo">Buk<i>é</i>ame</a>
-  <a href="acceso.html" class="login">Soy negocio →</a>
+  <div class="navright">
+    <div class="theme-tg"><button type="button" data-theme-set="light">Claro</button><button type="button" data-theme-set="dark">Oscuro</button></div>
+    <a href="acceso.html" class="login">Soy negocio →</a>
+  </div>
 </nav>
 
 <div class="hero">

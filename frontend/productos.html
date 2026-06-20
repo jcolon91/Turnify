@@ -6,54 +6,78 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
-:root{--paper:#F1EFE5;--card:#fff;--ink:#17150F;--ink2:#5E594B;--teal:#0E8074;--teal-ink:#0A5B52;--teal-soft:#E3EFE9;--mango:#EFA12F;--line:#E1DCCD;
---display:"Bricolage Grotesque",sans-serif;--body:"Instrument Sans",sans-serif;--mono:"Spline Sans Mono",monospace}
+:root{
+  --bg:#F1EFE5;--bg2:#F7F4EA;--card:#FFFFFF;--card-soft:#EDE9DB;--border:#E1DCCD;
+  --text:#17150F;--muted:#5E594B;--muted2:#B3AD9C;--green:#0E8074;--green-ink:#FFFFFF;
+  --green-soft:#E3EFE9;--green-glow:rgba(14,128,116,.45);
+  --awning:repeating-linear-gradient(90deg,#0E8074 0 26px,#0A5B52 26px 28px,#F8F5EA 28px 54px,#E7E2D1 54px 56px);
+  --mango:#EFA12F;
+  --display:"Bricolage Grotesque",sans-serif;--body:"Instrument Sans",sans-serif;--mono:"Spline Sans Mono",monospace;
+  /* alias viejas → nuevas */
+  --paper:var(--bg);--ink:var(--text);--ink2:var(--muted);--teal:var(--green);--teal-ink:var(--green);--teal-soft:var(--green-soft);--line:var(--border);
+}
+html[data-theme="dark"]{
+  --bg:#0B1A13;--bg2:#0E2218;--card:#12251B;--card-soft:rgba(255,255,255,.05);--border:rgba(255,255,255,.1);
+  --text:#ECEAE0;--muted:#8AA197;--muted2:#5d6f66;--green:#36E27B;--green-ink:#08160F;
+  --green-soft:rgba(54,226,123,.12);--green-glow:rgba(54,226,123,.3);
+  --awning:repeating-linear-gradient(90deg,#36E27B 0 26px,#0d6b46 26px 28px,#0E2218 28px 54px,#10241A 54px 56px);
+}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:var(--body);color:var(--ink);background:var(--paper);-webkit-font-smoothing:antialiased}
+body{font-family:var(--body);color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased}
 a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
 input,textarea{font:inherit}
-.bootload{min-height:100vh;display:grid;place-items:center;color:var(--ink2);font-size:14px}
-.nav{background:var(--card);border-bottom:1px solid var(--line);padding:14px 18px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:50}
-.nav a.back{font-size:18px}.nav .logo{font-family:var(--display);font-weight:800;font-size:19px}.nav .logo i{font-style:normal;color:var(--teal)}
+.bootload{min-height:100vh;display:grid;place-items:center;color:var(--muted);font-size:14px}
+.nav{background:var(--card);border-bottom:1px solid var(--border);padding:14px 18px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:50}
+.nav a.back{font-size:18px;color:var(--text)}.nav .logo{font-family:var(--display);font-weight:800;font-size:19px}.nav .logo i{font-style:normal;color:var(--green)}
+.theme-tg{display:inline-flex;background:var(--card-soft);border:1px solid var(--border);border-radius:11px;padding:3px}
+.theme-tg button{font:700 12.5px 'Instrument Sans',sans-serif;padding:6px 13px;border-radius:8px;cursor:pointer;border:0;background:transparent;color:var(--muted)}
+.theme-tg button.on{background:var(--green);color:var(--green-ink)}
 .wrap{max-width:600px;margin:0 auto;padding:24px 16px 60px}
 .tophead{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px}
 h1{font-family:var(--display);font-weight:800;font-size:26px;letter-spacing:-.02em}
-.sub{font-size:13px;color:var(--ink2);margin-top:3px}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:700;font-size:14px;padding:10px 16px;border-radius:12px;cursor:pointer;background:var(--teal);color:#fff}
+.sub{font-size:13px;color:var(--muted);margin-top:3px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:700;font-size:14px;padding:10px 16px;border-radius:14px;cursor:pointer;background:var(--green);color:var(--green-ink)}
 .btn:disabled{opacity:.55}
-.prod{background:var(--card);border:1.5px solid var(--line);border-radius:16px;padding:14px;display:flex;gap:13px;align-items:center;margin-bottom:10px}
-.prod .ph{width:60px;height:60px;border-radius:12px;background:var(--teal-soft);flex:none;display:grid;place-items:center;font-size:24px;overflow:hidden}
+.prod{background:var(--card);border:1.5px solid var(--border);border-radius:16px;padding:14px;display:flex;gap:13px;align-items:center;margin-bottom:10px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.prod .ph{width:60px;height:60px;border-radius:12px;background:var(--card-soft);flex:none;display:grid;place-items:center;font-size:24px;overflow:hidden}
 .prod .ph img{width:100%;height:100%;object-fit:cover}
 .prod .grow{flex:1;min-width:0}
 .prod h4{font-size:15px;font-weight:700}
-.prod p{font-size:12.5px;color:var(--ink2);margin-top:2px}
-.prod .price{font-family:var(--mono);font-weight:700;font-size:15px;color:var(--teal-ink)}
+.prod p{font-size:12.5px;color:var(--muted);margin-top:2px}
+.prod .price{font-family:var(--mono);font-weight:700;font-size:15px;color:var(--green)}
 .prod .del{color:#A1281C;font-size:12px;font-weight:600}
-.empty{text-align:center;color:var(--ink2);font-size:14px;padding:40px 20px;line-height:1.6;background:var(--card);border:1px dashed var(--line);border-radius:16px}
-.locked{text-align:center;padding:36px 24px;background:linear-gradient(135deg,#11221E,#0A5B52);color:#FFF8EC;border-radius:20px}
+.empty{text-align:center;color:var(--muted);font-size:14px;padding:40px 20px;line-height:1.6;background:var(--card);border:1px dashed var(--border);border-radius:16px}
+.locked{text-align:center;padding:36px 24px;background:linear-gradient(135deg,var(--green),var(--bg2));color:var(--green-ink);border-radius:20px}
 .locked .ic{font-size:40px;margin-bottom:12px}
 .locked h2{font-family:var(--display);font-weight:800;font-size:22px;margin-bottom:8px}
 .locked p{font-size:14px;opacity:.9;line-height:1.55;margin-bottom:18px}
-.locked a{display:inline-block;background:#FFF8EC;color:var(--teal-ink);font-weight:700;font-size:14px;padding:12px 22px;border-radius:12px}
+.locked a{display:inline-block;background:var(--card);color:var(--green);font-weight:700;font-size:14px;padding:12px 22px;border-radius:14px}
 .modal{display:none;position:fixed;inset:0;background:rgba(20,18,12,.5);z-index:100;align-items:center;justify-content:center;padding:18px}
 .modal.on{display:flex}
-.modal .box{background:var(--card);border-radius:18px;padding:22px;max-width:420px;width:100%}
+.modal .box{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:22px;max-width:420px;width:100%}
 .modal h3{font-family:var(--display);font-weight:800;font-size:19px;margin-bottom:16px}
 .field{margin-bottom:14px}
-.field label{display:block;font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);margin-bottom:6px}
-.field input,.field textarea{width:100%;padding:12px;border:1.5px solid var(--line);border-radius:11px;background:#FCFBF7}
-.field input:focus,.field textarea:focus{outline:none;border-color:var(--teal)}
+.field label{display:block;font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.field input,.field textarea{width:100%;padding:12px;border:1.5px solid var(--border);border-radius:11px;background:var(--bg2);color:var(--text)}
+.field input:focus,.field textarea:focus{outline:none;border-color:var(--green)}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.btn-ghost{background:var(--card);border:1.5px solid var(--line);color:var(--ink)}
+.btn-ghost{background:var(--card);border:1.5px solid var(--border);color:var(--text)}
 .alert{display:none;font-size:13px;font-weight:600;padding:11px 13px;border-radius:11px;margin-bottom:12px}
 .alert.err{display:block;background:#FCE8E6;color:#A1281C;border:1px solid #F3C0BA}
-.foot{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);padding:20px 0 40px}
+.foot{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);padding:20px 0 40px}
 </style>
 </head>
 <body>
+<script>
+(function(){var t=localStorage.getItem('bukeame_theme')||'light';document.documentElement.setAttribute('data-theme',t);
+window.__setTheme=function(t){localStorage.setItem('bukeame_theme',t);document.documentElement.setAttribute('data-theme',t);
+  document.querySelectorAll('.theme-tg button').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-theme-set')===t);});};
+document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('[data-theme-set]').forEach(function(b){b.addEventListener('click',function(){window.__setTheme(b.getAttribute('data-theme-set'));});});window.__setTheme(localStorage.getItem('bukeame_theme')||'light');});})();
+</script>
+<div style="height:12px;background:var(--awning)"></div>
 <div id="boot" class="bootload">Cargando…</div>
 <div id="app" style="display:none">
-<nav class="nav"><a href="panel.html" class="back">←</a><span class="logo">Buk<i>é</i>ame</span></nav>
+<nav class="nav"><a href="panel.html" class="back">←</a><span class="logo">Buk<i>é</i>ame</span><div class="theme-tg" style="margin-left:auto"><button type="button" data-theme-set="light">Claro</button><button type="button" data-theme-set="dark">Oscuro</button></div></nav>
 <div class="wrap">
   <div class="tophead">
     <div><h1>Tienda</h1><p class="sub" id="sub">Vende productos a tus clientes.</p></div>

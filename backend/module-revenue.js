@@ -1,5 +1,5 @@
 // ============================================================================
-//  TURNIFY API — módulo A: REVENUE
+//  BUKEAME API — módulo A: REVENUE
 //  Productos/tienda · Gift cards · Add-ons · Destacados
 // ----------------------------------------------------------------------------
 //  Se ENCHUFA al server.js base:
@@ -14,11 +14,17 @@ const crypto = require('crypto');
 
 module.exports.mount = function (app, ctx) {
   const { db, authRequired, businessScope, h } = ctx;
-  const { asyncH, bad, isStr, isUuid, isEmail, isPhone, normPhone, audit, notify } = h;
+  const { asyncH, bad, isStr, isUuid, isEmail, isPhone, normPhone, audit, notify, bookingLimiter } = h;
 
   // ---- helpers locales ----
   const cents = v => Number.isInteger(v) && v >= 0 && v <= 100000000; // ≤ $1M
   const posInt = v => Number.isInteger(v) && v > 0;
+
+  // SEGURIDAD (monetización): por defecto NO se concede una función paga sin confirmar
+  // el pago. Mientras el cobro es manual (ATH), el admin la concede tras recibir el
+  // dinero vía POST /api/admin/businesses/:id/addons (y .../featured).
+  // Si quieres volver al auto-activado sin cobro, pon SELF_SERVE_PAID=true en el .env.
+  const SELF_SERVE_PAID = process.env.SELF_SERVE_PAID === 'true';
 
   // genera código legible para gift cards: <PREFIJO>-GIFT-XXXX (sin caracteres ambiguos)
   function giftCode(slug) {
@@ -74,6 +80,16 @@ module.exports.mount = function (app, ctx) {
       return bad(res, 'El dominio propio requiere un plan pago', 403);
 
     const price = cat.rows[0].price_cents;
+
+    // SEGURIDAD: sin pago confirmado NO se concede la función paga. Registramos la
+    // solicitud; el admin la activa al recibir el dinero (POST /api/admin/businesses/:id/addons).
+    if (!SELF_SERVE_PAID) {
+      await audit(req, 'addon.request', 'addon', null, { code, price_cents: price });
+      await notify(req.business.id, 'system', 'Solicitud de add-on recibida',
+        `Pediste activar "${cat.rows[0].name}". Te lo activamos al confirmar el pago.`, { code });
+      return bad(res, `Para activar "${cat.rows[0].name}" ($${(price / 100).toFixed(2)}) confirma el pago. Te lo activamos enseguida.`, 402);
+    }
+
     const { rows } = await db.query(
       `INSERT INTO addons (business_id, code, price_cents)
        VALUES ($1,$2,$3)
@@ -224,7 +240,7 @@ module.exports.mount = function (app, ctx) {
   // ==========================================================================
   //  PEDIDOS de productos (público — el cliente compra en la página)
   // ==========================================================================
-  app.post('/api/public/:slug/orders', asyncH(async (req, res) => {
+  app.post('/api/public/:slug/orders', bookingLimiter, asyncH(async (req, res) => {
     const { items, buyer_name, buyer_phone, buyer_email, fulfillment, gift_code } = req.body || {};
     if (!isStr(buyer_name, 120)) return bad(res, 'Tu nombre es requerido');
     if (!Array.isArray(items) || !items.length || items.length > 50) return bad(res, 'Carrito inválido');
@@ -254,26 +270,50 @@ module.exports.mount = function (app, ctx) {
       });
     }
 
-    // gift card (opcional)
-    let giftId = null, giftApplied = 0;
+    // gift card (opcional): validamos existencia/saldo aquí, pero el monto final se
+    // recalcula DENTRO de la transacción con bloqueo de fila (anti doble-gasto en carrera).
+    let giftId = null;
     if (isStr(gift_code, 40)) {
       const g = await db.query(
-        `SELECT id, balance_cents, status FROM gift_cards
+        `SELECT id, status FROM gift_cards
           WHERE business_id = $1 AND code = $2`, [biz.id, gift_code.trim().toUpperCase()]);
       if (!g.rows[0] || !['active', 'partial'].includes(g.rows[0].status))
         return bad(res, 'Gift card inválida o sin saldo', 400);
       giftId = g.rows[0].id;
-      giftApplied = Math.min(g.rows[0].balance_cents, total);
     }
 
     const client = await db.connect();
     try {
       await client.query('BEGIN');
-      // descontar inventario con bloqueo
-      for (const it of validItems)
-        await client.query(
+      // descontar inventario; si algún producto ya no alcanza, abortar (no sobrevender)
+      for (const it of validItems) {
+        const u = await client.query(
           `UPDATE products SET stock = stock - $1
             WHERE id = $2 AND (stock IS NULL OR stock >= $1)`, [it.qty, it.product_id]);
+        if (u.rowCount === 0) {
+          await client.query('ROLLBACK');
+          return bad(res, `Sin suficiente inventario de ${it.name}`, 409);
+        }
+      }
+
+      // Aplicar gift card con BLOQUEO de fila + guard de saldo (anti doble-gasto)
+      let giftApplied = 0;
+      if (giftId) {
+        const gl = await client.query(
+          `SELECT balance_cents, status FROM gift_cards
+            WHERE id = $1 AND business_id = $2 FOR UPDATE`, [giftId, biz.id]);
+        const gc = gl.rows[0];
+        if (gc && ['active', 'partial'].includes(gc.status) && gc.balance_cents > 0) {
+          giftApplied = Math.min(gc.balance_cents, total);
+          await client.query(
+            `INSERT INTO gift_card_redemptions (gift_card_id, amount_cents) VALUES ($1,$2)`,
+            [giftId, giftApplied]);
+          await client.query(
+            `UPDATE gift_cards SET balance_cents = balance_cents - $1,
+                status = CASE WHEN balance_cents - $1 <= 0 THEN 'redeemed' ELSE 'partial' END
+              WHERE id = $2 AND balance_cents >= $1`, [giftApplied, giftId]);
+        }
+      }
 
       const { rows } = await client.query(
         `INSERT INTO product_orders (business_id, buyer_name, buyer_phone, buyer_email,
@@ -285,15 +325,6 @@ module.exports.mount = function (app, ctx) {
          JSON.stringify(validItems), total,
          fulfillment === 'shipping' ? 'shipping' : 'pickup', giftId]);
 
-      if (giftId && giftApplied > 0) {
-        await client.query(
-          `INSERT INTO gift_card_redemptions (gift_card_id, amount_cents) VALUES ($1,$2)`,
-          [giftId, giftApplied]);
-        await client.query(
-          `UPDATE gift_cards SET balance_cents = balance_cents - $1,
-              status = CASE WHEN balance_cents - $1 <= 0 THEN 'redeemed' ELSE 'partial' END
-            WHERE id = $2`, [giftApplied, giftId]);
-      }
       await client.query('COMMIT');
 
       await notify(biz.id, 'order', 'Nueva venta de producto',
@@ -327,7 +358,7 @@ module.exports.mount = function (app, ctx) {
   }));
 
   // ==========================================================================
-  //  GIFT CARDS (negocio custodia el dinero; Turnify lleva el saldo)
+  //  GIFT CARDS (negocio custodia el dinero; Bukeame lleva el saldo)
   // ==========================================================================
   // El negocio debe tener el add-on gift_cards activo
   async function requireGiftAddon(req, res, next) {
@@ -337,7 +368,7 @@ module.exports.mount = function (app, ctx) {
   }
 
   // pública: comprar una gift card
-  app.post('/api/public/:slug/gift-cards', asyncH(async (req, res) => {
+  app.post('/api/public/:slug/gift-cards', bookingLimiter, asyncH(async (req, res) => {
     const { amount_cents, purchaser_name, purchaser_email, recipient_name, recipient_email, message } = req.body || {};
     if (!cents(amount_cents) || amount_cents < 500) return bad(res, 'Monto mínimo $5');
     if (amount_cents > 50000) return bad(res, 'Monto máximo $500');
@@ -437,6 +468,15 @@ module.exports.mount = function (app, ctx) {
     const price = await db.query(`SELECT price_cents FROM addon_catalog WHERE code = 'featured'`);
     const total = price.rows[0].price_cents * weeks;
     const ends = new Date(Date.now() + weeks * 7 * 864e5);
+
+    // SEGURIDAD: el destacado afecta a TODO el marketplace (sales primero). Sin pago
+    // confirmado NO se concede; el admin lo activa al cobrar (POST /api/admin/businesses/:id/featured).
+    if (!SELF_SERVE_PAID) {
+      await audit(req, 'featured.request', 'featured', null, { weeks, total });
+      await notify(req.business.id, 'system', 'Solicitud de destacado recibida',
+        `Pediste ${weeks} semana(s) de destacado. Te lo activamos al confirmar el pago.`, { weeks });
+      return bad(res, `Para destacar tu negocio ${weeks} semana(s) ($${(total / 100).toFixed(2)}) confirma el pago. Te lo activamos enseguida.`, 402);
+    }
 
     // registramos el destacado como pendiente de pago (el cobro real lo hace Stripe en otra fase)
     const { rows } = await db.query(

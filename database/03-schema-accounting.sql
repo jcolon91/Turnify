@@ -1,5 +1,5 @@
 -- ============================================================================
--- TURNIFY · Schema de Contabilidad (v1.2)
+-- BUKEAME · Schema de Contabilidad (v1.2)
 -- Tabla de gastos manuales del negocio + índices para reportes a escala.
 -- Idempotente: se puede correr varias veces sin romper nada.
 -- ============================================================================

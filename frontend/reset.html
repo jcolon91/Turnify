@@ -6,35 +6,58 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
-:root{--paper:#F1EFE5;--card:#fff;--ink:#17150F;--ink2:#5E594B;--teal:#0E8074;--teal-ink:#0A5B52;--teal-soft:#E3EFE9;--line:#E1DCCD;
---display:"Bricolage Grotesque",sans-serif;--body:"Instrument Sans",sans-serif;--mono:"Spline Sans Mono",monospace}
+:root{
+  --bg:#F1EFE5;--bg2:#F7F4EA;--card:#FFFFFF;--card-soft:#EDE9DB;--border:#E1DCCD;
+  --text:#17150F;--muted:#5E594B;--muted2:#B3AD9C;--green:#0E8074;--green-ink:#FFFFFF;
+  --green-soft:#E3EFE9;--green-glow:rgba(14,128,116,.45);
+  --awning:repeating-linear-gradient(90deg,#0E8074 0 26px,#0A5B52 26px 28px,#F8F5EA 28px 54px,#E7E2D1 54px 56px);
+  /* alias viejas -> nuevas */
+  --paper:var(--bg);--ink:var(--text);--ink2:var(--muted);--teal:var(--green);--teal-ink:var(--green);--teal-soft:var(--green-soft);--line:var(--border);
+  --display:"Bricolage Grotesque",sans-serif;--body:"Instrument Sans",sans-serif;--mono:"Spline Sans Mono",monospace}
+html[data-theme="dark"]{
+  --bg:#0B1A13;--bg2:#0E2218;--card:#12251B;--card-soft:rgba(255,255,255,.05);--border:rgba(255,255,255,.1);
+  --text:#ECEAE0;--muted:#8AA197;--muted2:#5d6f66;--green:#36E27B;--green-ink:#08160F;
+  --green-soft:rgba(54,226,123,.12);--green-glow:rgba(54,226,123,.3);
+  --awning:repeating-linear-gradient(90deg,#36E27B 0 26px,#0d6b46 26px 28px,#0E2218 28px 54px,#10241A 54px 56px)}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:var(--body);color:var(--ink);background:var(--paper);min-height:100vh;display:flex;flex-direction:column}
 a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer;border:0}
-.awning{height:12px;background:repeating-linear-gradient(90deg,var(--teal) 0 26px,#0A5B52 26px 28px,#F8F5EA 28px 54px,#E7E2D1 54px 56px)}
+.awning{height:12px;background:var(--awning)}
+.topbar{display:flex;justify-content:flex-end;padding:10px 16px 0}
+.theme-tg{display:inline-flex;background:var(--card-soft);border:1px solid var(--border);border-radius:11px;padding:3px}
+.theme-tg button{font:700 12.5px 'Instrument Sans',sans-serif;padding:6px 13px;border-radius:8px;cursor:pointer;border:0;background:transparent;color:var(--muted)}
+.theme-tg button.on{background:var(--green);color:var(--green-ink)}
 .stage{flex:1;display:grid;place-items:center;padding:30px 16px 50px}
 .box{width:100%;max-width:420px}
 .logo{font-family:var(--display);font-weight:800;font-size:28px;text-align:center;letter-spacing:-.02em;margin-bottom:4px}
-.logo i{font-style:normal;color:var(--teal)}
+.logo i{font-style:normal;color:var(--green)}
 .tag{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink2);text-align:center;margin-bottom:22px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:24px;box-shadow:0 22px 44px -24px rgba(23,21,15,.25)}
 .h1{font-family:var(--display);font-weight:800;font-size:21px;margin-bottom:6px}
 .sub{font-size:13.5px;color:var(--ink2);line-height:1.55;margin-bottom:18px}
 .field{margin-bottom:12px}
 .field label{display:block;font-size:11.5px;font-weight:700;color:var(--ink2);margin-bottom:6px}
-.field input{width:100%;font:inherit;font-size:15px;padding:13px 14px;border-radius:13px;border:1.5px solid var(--line);background:#FDFCF8;color:var(--ink)}
-.field input:focus{outline:none;border-color:var(--teal)}
-.cta{width:100%;background:var(--teal);color:#fff;font-weight:800;font-size:15px;padding:15px;border-radius:14px;margin-top:6px}
+.field input{width:100%;font:inherit;font-size:15px;padding:13px 14px;border-radius:13px;border:1.5px solid var(--border);background:var(--bg2);color:var(--text)}
+.field input:focus{outline:none;border-color:var(--green)}
+.cta{width:100%;background:var(--green);color:var(--green-ink);font-weight:800;font-size:15px;padding:15px;border-radius:14px;margin-top:6px}
 .cta:disabled{opacity:.6;cursor:not-allowed}
 .foot{text-align:center;font-size:12px;color:var(--ink2);margin-top:16px;line-height:1.7}
-.foot a{color:var(--teal-ink);font-weight:700}
+.foot a{color:var(--green);font-weight:700}
 .alert{display:none;font-size:13px;font-weight:600;padding:11px 13px;border-radius:12px;margin-bottom:14px;line-height:1.45}
 .alert.err{display:block;background:#FCE8E6;color:#A1281C;border:1px solid #F3C0BA}
-.alert.ok{display:block;background:var(--teal-soft);color:var(--teal-ink);border:1px solid #BFE0D5}
+html[data-theme="dark"] .alert.err{background:rgba(225,80,60,.15);color:#FFB4A8;border-color:rgba(225,80,60,.4)}
+.alert.ok{display:block;background:var(--green-soft);color:var(--green);border:1px solid var(--green-soft)}
 </style>
 </head>
 <body>
+<script>
+(function(){var t=localStorage.getItem('bukeame_theme')||'light';document.documentElement.setAttribute('data-theme',t);
+window.__setTheme=function(t){localStorage.setItem('bukeame_theme',t);document.documentElement.setAttribute('data-theme',t);
+  document.querySelectorAll('.theme-tg button').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-theme-set')===t);});};
+document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('[data-theme-set]').forEach(function(b){b.addEventListener('click',function(){window.__setTheme(b.getAttribute('data-theme-set'));});});window.__setTheme(localStorage.getItem('bukeame_theme')||'light');});})();
+</script>
 <div class="awning"></div>
+<div class="topbar"><div class="theme-tg"><button type="button" data-theme-set="light">Claro</button><button type="button" data-theme-set="dark">Oscuro</button></div></div>
 
 <div class="stage">
   <div class="box">

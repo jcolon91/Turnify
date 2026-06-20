@@ -1,5 +1,5 @@
 -- ============================================================================
---  TURNIFY — Schema PostgreSQL v1.1  (incremental sobre v1.0)
+--  BUKEAME — Schema PostgreSQL v1.1  (incremental sobre v1.0)
 --  Aplica DESPUÉS del schema base. Añade: gift cards, lealtad, te-toca,
 --  lista de espera con oferta 30min, destacados, add-ons, trial 15d premium.
 -- ----------------------------------------------------------------------------
@@ -123,7 +123,7 @@ INSERT INTO addon_catalog (code, name, price_cents, billing, description) VALUES
 ON CONFLICT (code) DO NOTHING;
 
 -- ============================================================================
--- 5. GIFT CARDS (el negocio custodia el dinero; Turnify lleva el saldo)
+-- 5. GIFT CARDS (el negocio custodia el dinero; Bukeame lleva el saldo)
 -- ============================================================================
 CREATE TABLE gift_cards (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -168,7 +168,7 @@ CREATE TABLE loyalty_programs (
 CREATE TRIGGER trg_loyalty_upd BEFORE UPDATE ON loyalty_programs
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
--- Progreso por cliente (Turnify es solo el contador)
+-- Progreso por cliente (Bukeame es solo el contador)
 CREATE TABLE loyalty_progress (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   business_id     uuid NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
@@ -360,7 +360,7 @@ COMMIT;
 -- · Trial premium 15 días: v_effective_plan decide features (trial o plan real)
 -- · Tiers equipo: team $29.99/10 · grande $44.99/20 · ilimitado $59.99
 -- · Add-ons a la carta: tienda, SMS(Telnyx), dominio, gift cards, reportes, featured
--- · Gift cards: negocio custodia $, Turnify lleva saldo y redenciones
+-- · Gift cards: negocio custodia $, Bukeame lleva saldo y redenciones
 -- · Lealtad: "cada N visitas 1 gratis", lo paga el negocio, trigger automático
 -- · Te-toca: recordatorio a inactivos según ritmo del cliente
 -- · Lista espera 30min: held (protegida) + offered (nueva) + expira sin perder base

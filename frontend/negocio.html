@@ -6,8 +6,21 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
-:root{--paper:#F1EFE5;--card:#fff;--ink:#17150F;--ink2:#5E594B;--teal:#0E8074;--teal-ink:#0A5B52;--teal-soft:#E3EFE9;--mango:#EFA12F;--line:#E1DCCD;--r:18px;
---display:"Bricolage Grotesque",sans-serif;--body:"Instrument Sans",sans-serif;--mono:"Spline Sans Mono",monospace}
+:root{
+  /* ── Paleta nueva Bukéame (CLARO por defecto) ── */
+  --bg:#F1EFE5;--bg2:#F7F4EA;--card:#FFFFFF;--card-soft:#EDE9DB;--border:#E1DCCD;
+  --text:#17150F;--muted:#5E594B;--muted2:#B3AD9C;--green:#0E8074;--green-ink:#FFFFFF;
+  --green-soft:#E3EFE9;--green-glow:rgba(14,128,116,.45);
+  --awning:repeating-linear-gradient(90deg,#0E8074 0 26px,#0A5B52 26px 28px,#F8F5EA 28px 54px,#E7E2D1 54px 56px);
+  --mango:#EFA12F;--r:18px;
+  /* ── Mapeo de variables viejas → nuevas (NO romper estilos existentes) ── */
+  --paper:var(--bg);--ink:var(--text);--ink2:var(--muted);--teal:var(--green);--teal-ink:var(--green);--teal-soft:var(--green-soft);--line:var(--border);
+  --display:"Bricolage Grotesque",sans-serif;--body:"Instrument Sans",sans-serif;--mono:"Spline Sans Mono",monospace}
+html[data-theme="dark"]{
+  --bg:#0B1A13;--bg2:#0E2218;--card:#12251B;--card-soft:rgba(255,255,255,.05);--border:rgba(255,255,255,.1);
+  --text:#ECEAE0;--muted:#8AA197;--muted2:#5d6f66;--green:#36E27B;--green-ink:#08160F;
+  --green-soft:rgba(54,226,123,.12);--green-glow:rgba(54,226,123,.3);
+  --awning:repeating-linear-gradient(90deg,#36E27B 0 26px,#0d6b46 26px 28px,#0E2218 28px 54px,#10241A 54px 56px)}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:var(--body);color:var(--ink);background:var(--paper);-webkit-font-smoothing:antialiased}
 button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
@@ -61,7 +74,7 @@ input,select,textarea{font:inherit}
 /* Servicios */
 .svc{background:var(--card);border:1.5px solid var(--line);border-radius:16px;padding:15px 16px;display:flex;align-items:center;gap:13px;margin-bottom:10px;cursor:pointer;transition:.15s}
 .svc:hover{border-color:var(--teal)}
-.svc.sel{border-color:var(--teal);background:var(--teal-soft)}
+.svc.sel{border-color:var(--green);background:var(--green-soft)}
 .svc .grow{flex:1;min-width:0}
 .svc h4{font-size:15.5px;font-weight:700}
 .svc p{font-size:12.5px;color:var(--ink2);margin-top:3px}
@@ -101,7 +114,7 @@ input,select,textarea{font:inherit}
 
 /* Botón flotante reservar */
 .book-fab{position:fixed;left:0;right:0;bottom:0;z-index:30;padding:14px 18px calc(14px + env(safe-area-inset-bottom));background:linear-gradient(to top,var(--paper) 70%,transparent);display:flex;justify-content:center}
-.book-fab button{width:100%;max-width:604px;background:var(--teal);color:#fff;font-weight:700;font-size:16px;padding:16px;border-radius:14px;box-shadow:0 6px 20px rgba(14,128,116,.35)}
+.book-fab button{width:100%;max-width:604px;background:var(--green);color:var(--green-ink);font-weight:700;font-size:16px;padding:16px;border-radius:14px;box-shadow:0 6px 20px var(--green-glow)}
 .book-fab button:active{transform:scale(.99)}
 
 /* ───────── Modal de reserva ───────── */
@@ -115,15 +128,15 @@ input,select,textarea{font:inherit}
 .seclabel{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--ink2);margin:22px 0 12px;text-align:center}
 .steps{display:flex;gap:6px;justify-content:center;margin:18px 0 6px}
 .step-dot{width:8px;height:8px;border-radius:99px;background:var(--line)}
-.step-dot.on{background:var(--teal);width:22px}
+.step-dot.on{background:var(--green);width:22px}
 
 .staffrow{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:8px}
 .staffchip{padding:9px 15px;border:1.5px solid var(--line);border-radius:99px;font-size:13.5px;font-weight:600;cursor:pointer;background:var(--card)}
-.staffchip.sel{border-color:var(--teal);background:var(--teal);color:#fff}
+.staffchip.sel{border-color:var(--green);background:var(--green);color:var(--green-ink)}
 
 .dates{display:flex;gap:8px;overflow-x:auto;padding:4px 0 10px;-webkit-overflow-scrolling:touch}
 .datebtn{flex:none;width:62px;padding:10px 0;border:1.5px solid var(--line);border-radius:14px;text-align:center;cursor:pointer;background:var(--card)}
-.datebtn.sel{border-color:var(--teal);background:var(--teal);color:#fff}
+.datebtn.sel{border-color:var(--green);background:var(--green);color:var(--green-ink)}
 .datebtn .dow{font-size:11px;font-family:var(--mono);text-transform:uppercase;opacity:.8}
 .datebtn .dnum{font-family:var(--display);font-weight:800;font-size:19px;margin-top:2px}
 .datebtn .mon{font-size:10px;opacity:.7}
@@ -131,7 +144,7 @@ input,select,textarea{font:inherit}
 .slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(82px,1fr));gap:8px;margin-top:4px}
 .slot{padding:11px 0;border:1.5px solid var(--line);border-radius:12px;text-align:center;font-family:var(--mono);font-weight:700;font-size:13px;cursor:pointer;background:var(--card)}
 .slot:hover{border-color:var(--teal)}
-.slot.sel{border-color:var(--teal);background:var(--teal);color:#fff}
+.slot.sel{border-color:var(--green);background:var(--green);color:var(--green-ink)}
 .slots-empty{text-align:center;color:var(--ink2);font-size:13.5px;padding:24px;background:var(--card);border:1px dashed var(--line);border-radius:14px;line-height:1.6}
 
 .field{margin-bottom:14px}
@@ -145,10 +158,11 @@ input,select,textarea{font:inherit}
 .summary .row span:first-child{color:var(--ink2)}
 
 .btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;font-weight:700;font-size:16px;padding:15px;border-radius:14px;cursor:pointer}
-.btn-teal{background:var(--teal);color:#fff}
+.btn-teal{background:var(--green);color:var(--green-ink)}
 .btn:disabled{opacity:.55;cursor:not-allowed}
 .alert{display:none;font-size:13px;font-weight:600;padding:12px 14px;border-radius:12px;margin-bottom:14px;line-height:1.5}
 .alert.err{display:block;background:#FCE8E6;color:#A1281C;border:1px solid #F3C0BA}
+html[data-theme="dark"] .alert.err{background:rgba(255,90,70,.14);color:#FFB3A8;border-color:rgba(255,90,70,.3)}
 
 .view{display:none}.view.on{display:block}
 .backbtn{font-size:13px;color:var(--ink2);font-weight:600;margin-bottom:4px;display:inline-flex;align-items:center;gap:5px;cursor:pointer}
@@ -161,20 +175,45 @@ input,select,textarea{font:inherit}
 .success .code{font-family:var(--mono);font-weight:700;font-size:20px;color:var(--teal-ink);background:var(--teal-soft);display:inline-block;padding:8px 18px;border-radius:12px;margin:12px 0;letter-spacing:.1em}
 
 .foot{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);padding:26px 0 120px}
+
+/* ── Awning (marquesina) ── */
+.awning{height:12px;background:var(--awning)}
+
+/* ── Toggle Claro/Oscuro ── */
+.theme-tg{display:inline-flex;background:var(--card-soft);border:1px solid var(--border);border-radius:11px;padding:3px}
+.theme-tg button{font:700 12.5px 'Instrument Sans',sans-serif;padding:6px 13px;border-radius:8px;cursor:pointer;border:0;background:transparent;color:var(--muted)}
+.theme-tg button.on{background:var(--green);color:var(--green-ink)}
+/* Posición del toggle dentro del topnav del hero (legible sobre la foto) */
+.topnav .theme-tg{background:rgba(0,0,0,.3);border-color:rgba(255,255,255,.25);backdrop-filter:blur(6px)}
+.topnav .theme-tg button{color:rgba(255,255,255,.85)}
+.topnav .theme-tg button.on{background:var(--green);color:var(--green-ink)}
 </style>
 </head>
 <body>
 
+<script>
+(function(){var t=localStorage.getItem('bukeame_theme')||'light';document.documentElement.setAttribute('data-theme',t);
+window.__setTheme=function(t){localStorage.setItem('bukeame_theme',t);document.documentElement.setAttribute('data-theme',t);
+  document.querySelectorAll('.theme-tg button').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-theme-set')===t);});};
+document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('[data-theme-set]').forEach(function(b){b.addEventListener('click',function(){window.__setTheme(b.getAttribute('data-theme-set'));});});window.__setTheme(localStorage.getItem('bukeame_theme')||'light');});})();
+</script>
+
 <div id="boot" class="bootload">Cargando…</div>
 
 <div id="page" style="display:none">
+
+  <!-- Awning (marquesina, sello visual Bukéame) -->
+  <div class="awning"></div>
 
   <!-- HERO -->
   <header class="hero">
     <div class="hero-bg" id="heroBg"></div>
     <nav class="topnav">
       <button class="burger" id="openDrawer"><span></span><span></span><span></span></button>
-      <button class="share" id="shareBtn" title="Compartir"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg></button>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="theme-tg"><button type="button" data-theme-set="light">Claro</button><button type="button" data-theme-set="dark">Oscuro</button></div>
+        <button class="share" id="shareBtn" title="Compartir"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg></button>
+      </div>
     </nav>
     <div class="hero-inner">
       <div class="hero-logo" id="bizLogo"></div>
@@ -369,6 +408,7 @@ async function boot(){
     state.staff = data.staff||[];
     state.hours = data.hours||[];
     state.reviews = data.reviews||[];
+    state.payment_methods = data.payment_methods||[];
     renderProfile();
     renderServices();
     document.getElementById('boot').style.display='none';
@@ -469,6 +509,11 @@ function renderProfile(){
   if(b.cancellation_hours>0) pol.push('<div class="inforow"><span class="ic">'+ICONS.clock+'</span><span class="lbl" style="min-width:0">Cancelación</span><span class="val">Cancela con al menos '+b.cancellation_hours+' hora'+(b.cancellation_hours>1?'s':'')+' de anticipación.</span></div>');
   if(b.deposit_default_cents>0) pol.push('<div class="inforow"><span class="ic">'+ICONS.dollar+'</span><span class="lbl" style="min-width:0">Depósito</span><span class="val">Algunos servicios requieren un depósito al reservar.</span></div>');
   if(b.no_show_policy) pol.push('<div class="inforow"><span class="ic">'+ICONS.doc+'</span><span class="lbl" style="min-width:0">No-show</span><span class="val">'+esc(b.no_show_policy)+'</span></div>');
+  if(state.payment_methods && state.payment_methods.length){
+    var PAYLBL = { ath_movil:'ATH Móvil', cash:'Efectivo', stripe:'Tarjeta · Apple Pay · Google Pay · Klarna', paypal:'PayPal' };
+    var pm = state.payment_methods.map(function(p){ return PAYLBL[p]||p; }).join(' · ');
+    pol.push('<div class="inforow"><span class="ic">'+ICONS.dollar+'</span><span class="lbl" style="min-width:0">Pagos</span><span class="val">'+esc(pm)+'</span></div>');
+  }
   if(pol.length){
     document.getElementById('sec-policies').style.display='block';
     document.getElementById('policyList').innerHTML = pol.join('');

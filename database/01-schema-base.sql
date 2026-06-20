@@ -1,5 +1,5 @@
 -- ============================================================================
---  BOOKÉA — Schema PostgreSQL v1.0
+--  BUKEAME — Schema PostgreSQL v1.0
 --  SaaS de citas multi-tenant + marketplace (Puerto Rico first)
 --  DB: turnify · VPS: 2.24.70.107 · Convive aislado de la DB "wifnix"
 -- ----------------------------------------------------------------------------
@@ -128,7 +128,7 @@ CREATE INDEX idx_refresh_user ON refresh_tokens(user_id) WHERE revoked_at IS NUL
 CREATE TABLE businesses (
   id                    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_user_id         uuid NOT NULL REFERENCES users(id),
-  slug                  citext NOT NULL UNIQUE,      -- turnifypr.com/<slug>  (SEO)
+  slug                  citext NOT NULL UNIQUE,      -- bukeame.com/<slug>  (SEO)
   name                  text NOT NULL,
   bio                   text,
   -- Contacto / ubicación

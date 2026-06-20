@@ -1,8 +1,8 @@
 {
-  "name": "turnify-api",
+  "name": "bukeame-api",
   "version": "1.0.0",
   "private": true,
-  "description": "Bookéa — SaaS de citas multi-tenant + marketplace (PR first)",
+  "description": "Bukeame — SaaS de citas multi-tenant + marketplace (PR first)",
   "main": "server.js",
   "engines": { "node": ">=18" },
   "scripts": {

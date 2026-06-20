@@ -1,5 +1,5 @@
 // ============================================================================
-//  BOOKÉA API — server.js v1.0
+//  BUKEAME API — server.js v1.0
 //  Express :3001 · PostgreSQL "turnify" · Aislado de wifnix-api (:3000) — totalmente aislado
 // ----------------------------------------------------------------------------
 //  DEPLOY (VPS 2.24.70.107):
@@ -38,12 +38,17 @@ const {
   EVOLUTION_API_KEY,
   EVOLUTION_INSTANCE = 'turnify',
   RESEND_API_KEY,           // emails (opcional)
-  EMAIL_FROM = 'Turnify <citas@turnifypr.com>',
+  EMAIL_FROM = 'Bukeame <citas@bukeame.com>',
   NODE_ENV = 'production',
 } = process.env;
 
 if (!DATABASE_URL || !JWT_SECRET) {
   console.error('FALTA DATABASE_URL o JWT_SECRET en .env'); process.exit(1);
+}
+// El JWT_SECRET débil hace que cualquiera pueda forjar tokens. Exigimos ≥32 chars.
+if (JWT_SECRET.length < 32) {
+  console.error('JWT_SECRET demasiado corto: usa mínimo 32 caracteres (openssl rand -base64 48)');
+  process.exit(1);
 }
 
 const TZ_OFFSET = '-04:00';            // PR no observa DST (AST fijo)
@@ -68,6 +73,17 @@ const LOGO_DIR   = path.join(UPLOAD_DIR, 'logos');
 const COVER_DIR  = path.join(UPLOAD_DIR, 'covers');
 try { fs.mkdirSync(LOGO_DIR, { recursive: true }); } catch (e) { /* ya existe */ }
 try { fs.mkdirSync(COVER_DIR, { recursive: true }); } catch (e) { /* ya existe */ }
+
+// Borra un archivo de /uploads de forma SEGURA. Toma solo el basename y verifica
+// que el path resuelto quede DENTRO del dir permitido → neutraliza path traversal
+// (ej. logo_url = "/uploads/logos/../../../.env" ya no puede borrar nada externo).
+function safeUnlinkUpload(urlPath, allowedDir) {
+  if (!urlPath || typeof urlPath !== 'string') return;
+  const resolved = path.resolve(allowedDir, path.basename(urlPath));
+  if (resolved !== path.join(path.resolve(allowedDir), path.basename(urlPath))) return;
+  if (!resolved.startsWith(path.resolve(allowedDir) + path.sep)) return;
+  fs.unlink(resolved, () => {});   // silencioso si no existe
+}
 // Servir las imágenes subidas como archivos estáticos
 app.use('/uploads', express.static(UPLOAD_DIR, { maxAge: '7d', immutable: false }));
 // Multer en memoria: validamos tipo y tamaño antes de procesar con sharp
@@ -82,11 +98,21 @@ const uploadLogo = multer({
 });
 
 const origins = CORS_ORIGINS.split(',').map(s => s.trim()).filter(Boolean);
-app.use(cors({ origin: origins.length ? origins : true, credentials: false }));
+// En producción NUNCA reflejamos cualquier origen: si no hay lista, negamos por
+// defecto (evita que un sitio cualquiera consuma el API). En dev sí abrimos.
+const corsOrigin = origins.length ? origins : (NODE_ENV === 'production' ? false : true);
+if (!origins.length && NODE_ENV === 'production')
+  console.warn('⚠ CORS_ORIGINS vacío en producción: el API rechazará peticiones cross-origin.');
+app.use(cors({ origin: corsOrigin, credentials: false }));
 
 app.use(rateLimit({ windowMs: 60_000, max: 300, standardHeaders: true, legacyHeaders: false }));
 const authLimiter   = rateLimit({ windowMs: 15 * 60_000, max: 20,  message: { error: 'Demasiados intentos. Espera 15 minutos.' } });
 const publicLimiter = rateLimit({ windowMs: 60_000,      max: 60,  message: { error: 'Vas muy rápido. Intenta en un minuto.' } });
+// Endpoints de ticket por código (ver/cancelar/ref ATH): límite duro para que
+// nadie pueda enumerar/brute-forcear códigos de confirmación de otros clientes.
+const codeLimiter   = rateLimit({ windowMs: 60_000,      max: 10,  message: { error: 'Demasiadas consultas. Intenta en un minuto.' } });
+// Creación pública (citas, órdenes, gift cards, lista de espera): anti-spam.
+const bookingLimiter = rateLimit({ windowMs: 60_000,     max: 12,  message: { error: 'Demasiadas solicitudes seguidas. Espera un minuto.' } });
 
 // ----------------------------------------------------------------------------
 // HELPERS
@@ -96,13 +122,18 @@ const bad    = (res, msg, code = 400) => res.status(code).json({ error: msg });
 const sha256 = s => crypto.createHash('sha256').update(s).digest('hex');
 
 const isStr   = (v, max = 500) => typeof v === 'string' && v.trim().length > 0 && v.length <= max;
-const isPhone = v => typeof v === 'string' && /^\+?[0-9\s\-().]{10,17}$/.test(v);
-const normPhone = v => {
-  const d = String(v).replace(/\D/g, '');
-  if (d.length === 10) return '+1' + d;          // 7871234567 → +17871234567
-  if (d.length === 11 && d.startsWith('1')) return '+' + d;
-  return '+' + d;
-};
+// Teléfono → E.164 (PR/US, plan norteamericano). Normaliza a +1XXXXXXXXXX.
+// Valida 10 dígitos con código de área válido (empieza en 2-9): rechaza typos,
+// largos malos y letras. Asegura que WhatsApp/SMS lleguen (número malo = recordatorio perdido).
+function toE164(v) {
+  if (typeof v !== 'string' && typeof v !== 'number') return null;
+  let d = String(v).replace(/\D/g, '');
+  if (d.length === 11 && d[0] === '1') d = d.slice(1);   // 1XXXXXXXXXX → XXXXXXXXXX
+  if (!/^[2-9]\d{9}$/.test(d)) return null;              // 10 dígitos, área 2-9
+  return '+1' + d;
+}
+const isPhone   = v => toE164(v) !== null;
+const normPhone = v => toE164(v);   // null si inválido; todos los callers validan con isPhone antes
 const isEmail = v => typeof v === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) && v.length <= 254;
 const isUuid  = v => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
 const isDate  = v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
@@ -112,8 +143,19 @@ const slugify = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
   .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
 
 function genReferralCode(name) {
-  const base = slugify(name).replace(/-/g, '').slice(0, 10).toUpperCase() || 'BOOKEA';
+  const base = slugify(name).replace(/-/g, '').slice(0, 10).toUpperCase() || 'BUKEAME';
   return base + '-' + crypto.randomInt(100, 999);
+}
+
+// Código de confirmación con alta entropía → NO enumerable.
+// Formato: <PREFIJO>-MMDD-XXXXX (5 chars de un alfabeto sin O/0/I/1/L = 31^5 ≈ 28M).
+// Antes era -NNN (900 combos), brute-forceable. Ahora + el codeLimiter lo cierra.
+const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+function confirmCode(prefix, starts) {
+  let suf = '';
+  for (let i = 0; i < 5; i++) suf += CODE_ALPHABET[crypto.randomInt(CODE_ALPHABET.length)];
+  const mmdd = String(starts.getMonth() + 1).padStart(2, '0') + String(starts.getDate()).padStart(2, '0');
+  return `${prefix || 'BK'}-${mmdd}-${suf}`;
 }
 
 async function audit(req, action, entity = null, entityId = null, data = {}) {
@@ -183,7 +225,7 @@ app.post('/api/auth/register', authLimiter, asyncH(async (req, res) => {
   if (!isStr(full_name, 120)) return bad(res, 'Nombre requerido');
   if (!isEmail(email))        return bad(res, 'Email válido requerido');
   if (!isStr(password, 100) || password.length < 8) return bad(res, 'Contraseña mínima de 8 caracteres');
-  if (phone && !isPhone(phone)) return bad(res, 'Teléfono inválido');
+  if (phone && !isPhone(phone)) return bad(res, 'Teléfono inválido (usa un número de PR/US de 10 dígitos)');
 
   const hash = await bcrypt.hash(password, 12);
   let user;
@@ -194,7 +236,8 @@ app.post('/api/auth/register', authLimiter, asyncH(async (req, res) => {
       [full_name.trim(), email.toLowerCase(), phone ? normPhone(phone) : null, hash]);
     user = rows[0];
   } catch (e) {
-    if (e.code === '23505') return bad(res, 'Ese email o teléfono ya está registrado', 409);
+    // Mensaje neutral: no confirmamos si fue el email o el teléfono (anti-enumeración).
+    if (e.code === '23505') return bad(res, 'No pudimos crear la cuenta con esos datos. ¿Ya tienes cuenta? Inicia sesión.', 409);
     throw e;
   }
   const refresh = await issueRefresh(user.id, req);
@@ -236,7 +279,7 @@ app.post('/api/auth/forgot-password', authLimiter, asyncH(async (req, res) => {
     await db.query(
       `INSERT INTO password_resets (user_id, token_hash, expires_at) VALUES ($1,$2,$3)`,
       [u.id, sha256(token), exp]);
-    const link = `https://turnifypr.com/reset.html?token=${token}`;
+    const link = `https://bukeame.com/reset.html?token=${token}`;
     try {
       const e = emailReset(u.full_name, link);
       sendEmail(u.email, e.subject, e.text, e.html).catch(err => console.error('reset email:', err.message));
@@ -294,6 +337,8 @@ app.post('/api/businesses', authRequired, asyncH(async (req, res) => {
   const b = req.body || {};
   if (!isStr(b.name, 120)) return bad(res, 'Nombre del negocio requerido');
   if (!b.accept_terms)     return bad(res, 'Debes aceptar los términos y condiciones');
+  if (b.phone && !isPhone(b.phone))       return bad(res, 'Teléfono del negocio inválido (usa un número de PR/US de 10 dígitos)');
+  if (b.whatsapp && !isPhone(b.whatsapp)) return bad(res, 'WhatsApp del negocio inválido (usa un número de PR/US de 10 dígitos)');
 
   const exists = await db.query(`SELECT 1 FROM businesses WHERE owner_user_id = $1 AND deleted_at IS NULL`, [req.user.id]);
   if (exists.rows[0]) return bad(res, 'Ya tienes un negocio registrado', 409);
@@ -377,6 +422,9 @@ app.get('/api/businesses/me', authRequired, businessScope, asyncH(async (req, re
 }));
 
 // Perfil editable: solo campos permitidos (whitelist)
+// logo_url/cover_url son editables pero VALIDADOS (solo null o una ruta /uploads/...
+// segura, ver guard en el PATCH). Antes, al ser texto libre, un dueño podía ponerlos
+// en "/uploads/logos/../../.env" y borrar archivos al cambiar/quitar el logo.
 const BIZ_EDITABLE = ['name','bio','phone','whatsapp','email','address_line','municipality_id',
   'lat','lng','logo_url','cover_url','theme','social','ath_phone','deposit_default_cents',
   'cancellation_hours','no_show_policy','booking_lead_min','booking_horizon_days',
@@ -390,6 +438,10 @@ app.patch('/api/businesses/me', authRequired, businessScope, asyncH(async (req, 
       if (!isPhone(v)) return bad(res, `${k} inválido`); v = normPhone(v);
     }
     if (k === 'email' && v && !isEmail(v)) return bad(res, 'Email inválido');
+    // logo_url/cover_url: solo null (limpiar) o una ruta nuestra segura → bloquea path traversal
+    if ((k === 'logo_url' || k === 'cover_url') && v != null &&
+        (typeof v !== 'string' || !/^\/uploads\/(logos|covers)\/[A-Za-z0-9._-]+$/.test(v)))
+      return bad(res, `${k} inválido`);
     vals.push(v); sets.push(`${k} = $${vals.length}`);
   }
   if (Array.isArray(req.body?.category_ids)) {
@@ -431,12 +483,8 @@ app.post('/api/businesses/me/logo', authRequired, businessScope,
       return bad(res, 'La imagen no se pudo procesar. Prueba con otra.');
     }
     const logoUrl = `/uploads/logos/${filename}`;
-    // Borrar el logo anterior si era un archivo nuestro
-    const prev = req.business.logo_url;
-    if (prev && prev.startsWith('/uploads/logos/')) {
-      const prevPath = path.join(__dirname, prev.replace(/^\//, ''));
-      fs.unlink(prevPath, () => {});   // silencioso si no existe
-    }
+    // Borrar el logo anterior si era un archivo nuestro (de forma segura)
+    safeUnlinkUpload(req.business.logo_url, LOGO_DIR);
     const { rows } = await db.query(
       `UPDATE businesses SET logo_url = $1 WHERE id = $2 RETURNING *`, [logoUrl, req.business.id]);
     await audit(req, 'business.logo', 'business', req.business.id, {});
@@ -445,11 +493,7 @@ app.post('/api/businesses/me/logo', authRequired, businessScope,
 
 // Quitar el logo del negocio
 app.delete('/api/businesses/me/logo', authRequired, businessScope, asyncH(async (req, res) => {
-  const prev = req.business.logo_url;
-  if (prev && prev.startsWith('/uploads/logos/')) {
-    const prevPath = path.join(__dirname, prev.replace(/^\//, ''));
-    fs.unlink(prevPath, () => {});
-  }
+  safeUnlinkUpload(req.business.logo_url, LOGO_DIR);
   const { rows } = await db.query(
     `UPDATE businesses SET logo_url = NULL WHERE id = $1 RETURNING *`, [req.business.id]);
   await audit(req, 'business.logo.delete', 'business', req.business.id, {});
@@ -481,11 +525,7 @@ app.post('/api/businesses/me/cover', authRequired, businessScope,
       return bad(res, 'La imagen no se pudo procesar. Prueba con otra.');
     }
     const coverUrl = `/uploads/covers/${filename}`;
-    const prev = req.business.cover_url;
-    if (prev && prev.startsWith('/uploads/covers/')) {
-      const prevPath = path.join(__dirname, prev.replace(/^\//, ''));
-      fs.unlink(prevPath, () => {});
-    }
+    safeUnlinkUpload(req.business.cover_url, COVER_DIR);
     const { rows } = await db.query(
       `UPDATE businesses SET cover_url = $1 WHERE id = $2 RETURNING *`, [coverUrl, req.business.id]);
     await audit(req, 'business.cover', 'business', req.business.id, {});
@@ -494,11 +534,7 @@ app.post('/api/businesses/me/cover', authRequired, businessScope,
 
 // Quitar el banner con imagen (vuelve al patrón predefinido)
 app.delete('/api/businesses/me/cover', authRequired, businessScope, asyncH(async (req, res) => {
-  const prev = req.business.cover_url;
-  if (prev && prev.startsWith('/uploads/covers/')) {
-    const prevPath = path.join(__dirname, prev.replace(/^\//, ''));
-    fs.unlink(prevPath, () => {});
-  }
+  safeUnlinkUpload(req.business.cover_url, COVER_DIR);
   const { rows } = await db.query(
     `UPDATE businesses SET cover_url = NULL WHERE id = $1 RETURNING *`, [req.business.id]);
   await audit(req, 'business.cover.delete', 'business', req.business.id, {});
@@ -856,7 +892,7 @@ app.get('/api/public/search', publicLimiter, asyncH(async (req, res) => {
   res.json({ results: rows });
 }));
 
-// Perfil público (la página SEO turnifypr.com/<slug>)
+// Perfil público (la página SEO bukeame.com/<slug>)
 app.get('/api/public/:slug', publicLimiter, asyncH(async (req, res) => {
   const { rows } = await db.query(
     `SELECT b.id, b.slug, b.name, b.bio, b.phone, b.whatsapp, b.address_line, b.lat, b.lng,
@@ -872,7 +908,7 @@ app.get('/api/public/:slug', publicLimiter, asyncH(async (req, res) => {
   const biz = rows[0];
   if (!biz) return bad(res, 'Negocio no encontrado', 404);
 
-  const [services, staff, hours, reviews] = await Promise.all([
+  const [services, staff, hours, reviews, payMethods] = await Promise.all([
     db.query(`SELECT id, name, description, duration_min, price_cents, deposit_cents, photo_url, is_featured
               FROM services WHERE business_id = $1 AND is_active AND deleted_at IS NULL
               ORDER BY is_featured DESC, sort_order`, [biz.id]),
@@ -882,8 +918,15 @@ app.get('/api/public/:slug', publicLimiter, asyncH(async (req, res) => {
     db.query(`SELECT r.rating, r.comment, r.business_reply, r.created_at, c.full_name
               FROM reviews r JOIN clients c ON c.id = r.client_id
               WHERE r.business_id = $1 AND r.is_published ORDER BY r.created_at DESC LIMIT 10`, [biz.id]),
+    // Métodos de pago que el negocio activó (resiliente si la migración 07 aún no corre)
+    db.query(`SELECT provider FROM payment_providers
+              WHERE business_id = $1 AND is_enabled = true AND status = 'connected'`, [biz.id])
+      .catch(() => ({ rows: [] })),
   ]);
-  res.json({ business: biz, services: services.rows, staff: staff.rows, hours: hours.rows, reviews: reviews.rows });
+  res.json({
+    business: biz, services: services.rows, staff: staff.rows, hours: hours.rows, reviews: reviews.rows,
+    payment_methods: payMethods.rows.map(r => r.provider),
+  });
 }));
 
 // Disponibilidad: ?service_id=&date=YYYY-MM-DD[&staff_id=]
@@ -926,14 +969,14 @@ app.get('/api/public/:slug/availability', publicLimiter, asyncH(async (req, res)
 }));
 
 // CREAR CITA (público, sin cuenta)
-app.post('/api/public/:slug/appointments', publicLimiter, asyncH(async (req, res) => {
+app.post('/api/public/:slug/appointments', bookingLimiter, asyncH(async (req, res) => {
   const { service_id, staff_id, start_iso, full_name, phone, email, client_notes, payment_method } = req.body || {};
   // service_id puede ser uno (string) o varios (array). Normalizamos a lista.
   const serviceIds = (Array.isArray(service_id) ? service_id : String(service_id || '').split(','))
     .map(s => String(s).trim()).filter(isUuid);
   if (!serviceIds.length) return bad(res, 'Servicio requerido');
   if (!isStr(full_name, 120)) return bad(res, 'Tu nombre es requerido');
-  if (!isPhone(phone)) return bad(res, 'Tu WhatsApp es requerido para el recordatorio');
+  if (!isPhone(phone)) return bad(res, 'Tu WhatsApp debe ser un número válido de PR/US (10 dígitos) — ahí enviamos el recordatorio');
   const starts = new Date(start_iso || '');
   if (isNaN(starts) || starts < new Date()) return bad(res, 'Horario inválido');
 
@@ -1022,9 +1065,7 @@ app.post('/api/public/:slug/appointments', publicLimiter, asyncH(async (req, res
 
     // intenta cada staff candidato; el EXCLUDE constraint resuelve carreras
     let appt = null;
-    const code = (biz.slug.replace(/[^a-z]/g, '').slice(0, 2).toUpperCase() || 'BK') + '-' +
-      String(starts.getMonth() + 1).padStart(2, '0') + String(starts.getDate()).padStart(2, '0') +
-      '-' + crypto.randomInt(100, 999);
+    const code = confirmCode(biz.slug.replace(/[^a-z]/g, '').slice(0, 2).toUpperCase() || 'BK', starts);
 
     for (const sid of validFor) {
       try {
@@ -1085,7 +1126,7 @@ app.post('/api/public/:slug/appointments', publicLimiter, asyncH(async (req, res
 }));
 
 // Ver cita por código (ticket)
-app.get('/api/public/appointments/:code', publicLimiter, asyncH(async (req, res) => {
+app.get('/api/public/appointments/:code', codeLimiter, asyncH(async (req, res) => {
   const { rows } = await db.query(
     `SELECT a.confirmation_code, a.status, a.starts_at, a.service_name, a.price_cents, a.deposit_cents,
             a.client_notes, st.display_name AS staff_name,
@@ -1101,7 +1142,7 @@ app.get('/api/public/appointments/:code', publicLimiter, asyncH(async (req, res)
 }));
 
 // Cliente reporta su referencia ATH Móvil → el negocio verifica
-app.post('/api/public/appointments/:code/ath-reference', publicLimiter, asyncH(async (req, res) => {
+app.post('/api/public/appointments/:code/ath-reference', codeLimiter, asyncH(async (req, res) => {
   const { reference } = req.body || {};
   if (!isStr(reference, 60)) return bad(res, 'Referencia requerida');
   const { rows } = await db.query(
@@ -1117,7 +1158,7 @@ app.post('/api/public/appointments/:code/ath-reference', publicLimiter, asyncH(a
 }));
 
 // Cancelación por el cliente (respeta la política)
-app.post('/api/public/appointments/:code/cancel', publicLimiter, asyncH(async (req, res) => {
+app.post('/api/public/appointments/:code/cancel', codeLimiter, asyncH(async (req, res) => {
   const { rows } = await db.query(
     `SELECT a.id, a.business_id, a.starts_at, a.status, a.service_name, b.cancellation_hours,
             c.full_name
@@ -1172,13 +1213,18 @@ app.post('/api/appointments', authRequired, businessScope, asyncH(async (req, re
   const sv = await db.query(`SELECT * FROM services WHERE id = $1 AND business_id = $2`, [service_id, req.business.id]);
   if (!sv.rows[0]) return bad(res, 'Servicio no encontrado', 404);
   const s = sv.rows[0];
+  // El staff DEBE ser de este negocio (sin esto se podría inyectar una cita en
+  // la agenda del staff de otro tenant vía el constraint global anti-doble-booking).
+  const stf = await db.query(
+    `SELECT 1 FROM staff WHERE id = $1 AND business_id = $2 AND deleted_at IS NULL`,
+    [staff_id, req.business.id]);
+  if (!stf.rows[0]) return bad(res, 'Profesional no encontrado', 404);
   const cl = await db.query(
     `INSERT INTO clients (business_id, full_name, phone)
      VALUES ($1,$2,$3)
      ON CONFLICT (business_id, phone) DO UPDATE SET full_name = EXCLUDED.full_name
      RETURNING id`, [req.business.id, full_name.trim(), normPhone(phone)]);
-  const code = 'WK-' + String(starts.getMonth() + 1).padStart(2, '0') +
-    String(starts.getDate()).padStart(2, '0') + '-' + crypto.randomInt(100, 999);
+  const code = confirmCode('WK', starts);
   try {
     const { rows } = await db.query(
       `INSERT INTO appointments (business_id, client_id, staff_id, service_id, service_name,
@@ -1296,6 +1342,62 @@ app.get('/api/clients', authRequired, businessScope, asyncH(async (req, res) => 
   res.json({ clients: rows });
 }));
 
+// Perfil completo de un cliente: info + citas próximas/previas + gift cards + lealtad
+app.get('/api/clients/:id', authRequired, businessScope, asyncH(async (req, res) => {
+  if (!isUuid(req.params.id)) return bad(res, 'ID inválido');
+  const c = await db.query(
+    `SELECT id, full_name, phone, email, notes, no_show_count, total_visits,
+            total_spent_cents, last_visit_at, is_blocked, created_at
+       FROM clients WHERE id = $1 AND business_id = $2`, [req.params.id, req.business.id]);
+  if (!c.rows[0]) return bad(res, 'Cliente no encontrado', 404);
+  const client = c.rows[0];
+
+  const [upcoming, past, gifts, loyalty] = await Promise.all([
+    // Próximas: citas vivas a futuro
+    db.query(
+      `SELECT a.id, a.starts_at, a.status, a.service_name, a.price_cents, a.confirmation_code,
+              st.display_name AS staff_name
+         FROM appointments a LEFT JOIN staff st ON st.id = a.staff_id
+        WHERE a.client_id = $1 AND a.business_id = $2
+          AND a.status = ANY($3) AND a.starts_at >= now()
+        ORDER BY a.starts_at ASC`, [client.id, req.business.id, ALIVE]),
+    // Previas: ya pasaron o quedaron cerradas (completed/no_show/cancelled)
+    db.query(
+      `SELECT a.id, a.starts_at, a.status, a.service_name, a.price_cents,
+              st.display_name AS staff_name
+         FROM appointments a LEFT JOIN staff st ON st.id = a.staff_id
+        WHERE a.client_id = $1 AND a.business_id = $2
+          AND (a.starts_at < now() OR a.status IN ('completed','no_show','cancelled_client','cancelled_business'))
+        ORDER BY a.starts_at DESC LIMIT 20`, [client.id, req.business.id]),
+    // Gift cards ligadas por email (la tabla no tiene client_id)
+    client.email
+      ? db.query(
+          `SELECT code, balance_cents, initial_cents, status, expires_at, created_at,
+                  (recipient_email = $2) AS is_recipient
+             FROM gift_cards
+            WHERE business_id = $1 AND (purchaser_email = $2 OR recipient_email = $2)
+            ORDER BY created_at DESC`, [req.business.id, client.email])
+      : Promise.resolve({ rows: [] }),
+    // Progreso de lealtad del cliente (si el negocio tiene programa)
+    db.query(
+      `SELECT lp.visits_required, lp.reward_text, lp.is_active,
+              COALESCE(pr.current_count,0)    AS current_count,
+              COALESCE(pr.rewards_earned,0)   AS rewards_earned,
+              COALESCE(pr.rewards_redeemed,0) AS rewards_redeemed
+         FROM loyalty_programs lp
+         LEFT JOIN loyalty_progress pr ON pr.business_id = lp.business_id AND pr.client_id = $2
+        WHERE lp.business_id = $1`, [req.business.id, client.id]),
+  ]);
+
+  res.json({
+    client,
+    upcoming: upcoming.rows,
+    past: past.rows,
+    gift_cards: gifts.rows,
+    loyalty: loyalty.rows[0] || null,
+  });
+}));
+
 app.patch('/api/clients/:id', authRequired, businessScope, asyncH(async (req, res) => {
   if (!isUuid(req.params.id)) return bad(res, 'ID inválido');
   const allowed = ['full_name','email','notes','is_blocked'];
@@ -1404,48 +1506,64 @@ async function sendEmail(to, subject, text, html) {
   return { id: j?.id || null };
 }
 
-// Plantilla base de emails (marca Turnify, sin emojis)
-function emailShell(innerHtml) {
-  return `<!doctype html><html><body style="margin:0;padding:0;background:#F1EFE5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
+// Plantilla base de emails (marca Bukeame, sin emojis)
+// innerHtml: contenido (filas <tr>). opts.preheader: texto de vista previa en el inbox.
+// opts.footerNote: línea final del pie (por defecto, la de cuenta).
+function emailShell(innerHtml, opts = {}) {
+  const preheader = opts.preheader || 'Bukeame — Tu turno, sin llamadas.';
+  const footerNote = opts.footerNote || 'Recibiste este correo porque creaste una cuenta en bukeame.com';
+  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light only"></head><body style="margin:0;padding:0;background:#F1EFE5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all;font-size:1px;line-height:1px;color:#F1EFE5">${preheader}</div>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F1EFE5;padding:32px 16px">
     <tr><td align="center">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border:1px solid #E1DCCD;border-radius:18px;overflow:hidden">
-        <tr><td style="padding:28px 28px 0 28px">
-          <div style="font-size:24px;font-weight:800;letter-spacing:-.02em;color:#17150F">Turn<span style="color:#0E8074">i</span>fy</div>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;background:#ffffff;border:1px solid #E1DCCD;border-radius:18px;overflow:hidden;box-shadow:0 1px 3px rgba(23,21,15,.06)">
+        <tr><td style="height:4px;background:#0E8074;line-height:4px;font-size:4px">&nbsp;</td></tr>
+        <tr><td style="padding:26px 30px 22px 30px;border-bottom:1px solid #EFEADC">
+          <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+            <td style="font-size:25px;font-weight:800;letter-spacing:-.02em;color:#17150F;line-height:1">Buk<span style="color:#0E8074">e</span>ame</td>
+            <td style="padding-left:12px"><span style="display:inline-block;height:14px;width:1px;background:#D8D2C0;vertical-align:middle"></span></td>
+            <td style="padding-left:12px;font-size:12px;color:#0A5B52;font-weight:600;letter-spacing:.01em;vertical-align:middle">Tu turno, sin llamadas</td>
+          </tr></table>
         </td></tr>
         ${innerHtml}
-        <tr><td style="padding:20px 28px 28px 28px;border-top:1px solid #E1DCCD">
-          <p style="margin:0;font-size:12px;color:#5E594B;line-height:1.5">Turnify — Tu turno, sin llamadas.<br>Recibiste este correo porque creaste una cuenta en turnifypr.com</p>
+        <tr><td style="padding:22px 30px 26px 30px;border-top:1px solid #EFEADC;background:#FBFAF5">
+          <p style="margin:0 0 4px 0;font-size:12px;color:#17150F;font-weight:700">Buk<span style="color:#0E8074">e</span>ame</p>
+          <p style="margin:0;font-size:12px;color:#7A7464;line-height:1.6">${footerNote}<br><a href="https://bukeame.com" style="color:#0A5B52;text-decoration:none">bukeame.com</a></p>
         </td></tr>
       </table>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px"><tr><td style="padding:14px 30px 0 30px;text-align:center"><p style="margin:0;font-size:11px;color:#A39C88;line-height:1.5">Bukeame, San Juan, Puerto Rico</p></td></tr></table>
     </td></tr>
   </table></body></html>`;
 }
 
 function emailWelcome(name) {
   const first = (name || '').trim().split(' ')[0] || 'Hola';
-  const subject = 'Bienvenido a Turnify';
-  const text = `Hola ${first},\n\nTu cuenta en Turnify ya está activa. El próximo paso es crear tu negocio para empezar a recibir citas.\n\nEntra aquí: https://turnifypr.com/panel.html\n\n— El equipo de Turnify`;
+  const subject = 'Bienvenido a Bukeame';
+  const text = `Hola ${first},\n\nTu cuenta en Bukeame ya está activa. El próximo paso es crear tu negocio para empezar a recibir citas.\n\nEntra aquí: https://bukeame.com/panel.html\n\n— El equipo de Bukeame`;
   const html = emailShell(`
-    <tr><td style="padding:20px 28px 0 28px">
-      <h1 style="margin:0 0 10px 0;font-size:21px;font-weight:800;color:#17150F">Hola ${first}, tu cuenta ya está activa</h1>
-      <p style="margin:0 0 18px 0;font-size:15px;color:#5E594B;line-height:1.6">El próximo paso es crear tu negocio. Configura tus servicios, tu horario y empieza a recibir citas sin llamadas ni mensajes de ida y vuelta.</p>
-      <a href="https://turnifypr.com/panel.html" style="display:inline-block;background:#0E8074;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:13px 22px;border-radius:12px">Crear mi negocio</a>
-    </td></tr>`);
+    <tr><td style="padding:28px 30px 30px 30px">
+      <h1 style="margin:0 0 12px 0;font-size:22px;font-weight:800;color:#17150F;line-height:1.3;letter-spacing:-.01em">Hola ${first}, tu cuenta ya está activa</h1>
+      <p style="margin:0 0 22px 0;font-size:15px;color:#5E594B;line-height:1.6">El próximo paso es crear tu negocio. Configura tus servicios, tu horario y empieza a recibir citas sin llamadas ni mensajes de ida y vuelta.</p>
+      <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="border-radius:12px;background:#0E8074">
+        <a href="https://bukeame.com/panel.html" style="display:inline-block;background:#0E8074;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:13px 26px;border-radius:12px">Crear mi negocio</a>
+      </td></tr></table>
+    </td></tr>`, { preheader: 'Tu cuenta en Bukeame ya está activa. Crea tu negocio para empezar a recibir citas.' });
   return { subject, text, html };
 }
 
 function emailReset(name, link) {
   const first = (name || '').trim().split(' ')[0] || 'Hola';
-  const subject = 'Restablece tu contraseña de Turnify';
-  const text = `Hola ${first},\n\nRecibimos una solicitud para restablecer tu contraseña. Abre este enlace (válido por 1 hora):\n\n${link}\n\nSi no fuiste tú, ignora este correo: tu contraseña sigue igual.\n\n— El equipo de Turnify`;
+  const subject = 'Restablece tu contraseña de Bukeame';
+  const text = `Hola ${first},\n\nRecibimos una solicitud para restablecer tu contraseña. Abre este enlace (válido por 1 hora):\n\n${link}\n\nSi no fuiste tú, ignora este correo: tu contraseña sigue igual.\n\n— El equipo de Bukeame`;
   const html = emailShell(`
-    <tr><td style="padding:20px 28px 0 28px">
-      <h1 style="margin:0 0 10px 0;font-size:21px;font-weight:800;color:#17150F">Restablece tu contraseña</h1>
-      <p style="margin:0 0 18px 0;font-size:15px;color:#5E594B;line-height:1.6">Recibimos una solicitud para cambiar la contraseña de tu cuenta. Este enlace es válido por 1 hora.</p>
-      <a href="${link}" style="display:inline-block;background:#0E8074;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:13px 22px;border-radius:12px">Crear nueva contraseña</a>
-      <p style="margin:18px 0 0 0;font-size:13px;color:#5E594B;line-height:1.6">Si no fuiste tú, ignora este correo. Tu contraseña sigue igual.</p>
-    </td></tr>`);
+    <tr><td style="padding:28px 30px 30px 30px">
+      <h1 style="margin:0 0 12px 0;font-size:22px;font-weight:800;color:#17150F;line-height:1.3;letter-spacing:-.01em">Hola ${first}, restablece tu contraseña</h1>
+      <p style="margin:0 0 22px 0;font-size:15px;color:#5E594B;line-height:1.6">Recibimos una solicitud para cambiar la contraseña de tu cuenta. Este enlace es válido por 1 hora.</p>
+      <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="border-radius:12px;background:#0E8074">
+        <a href="${link}" style="display:inline-block;background:#0E8074;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:13px 26px;border-radius:12px">Crear nueva contraseña</a>
+      </td></tr></table>
+      <p style="margin:22px 0 0 0;font-size:13px;color:#7A7464;line-height:1.6;padding-top:18px;border-top:1px solid #EFEADC">Si no fuiste tú, ignora este correo. Tu contraseña sigue igual.</p>
+    </td></tr>`, { preheader: 'Enlace para restablecer tu contraseña de Bukeame (válido por 1 hora).' });
   return { subject, text, html };
 }
 
@@ -1493,19 +1611,22 @@ function emailAppt(template, ctx) {
     code ? ['Código', code] : null,
     addr ? ['Lugar', addr] : null,
   ].filter(Boolean);
-  const rowsHtml = rowsArr.map(([k, v]) =>
-    `<tr><td style="padding:5px 0;font-size:13px;color:#5E594B;width:84px;vertical-align:top">${k}</td><td style="padding:5px 0;font-size:14px;font-weight:600;color:#17150F">${v}</td></tr>`
+  const rowsHtml = rowsArr.map(([k, v], i) =>
+    `<tr><td style="padding:9px 0;font-size:12px;color:#7A7464;width:76px;vertical-align:top;${i ? 'border-top:1px solid #EFEADC' : ''}">${k}</td><td style="padding:9px 0;font-size:14px;font-weight:600;color:#17150F;${i ? 'border-top:1px solid #EFEADC' : ''}">${v}</td></tr>`
   ).join('');
   const html = emailShell(`
-    <tr><td style="padding:20px 28px 0 28px">
-      <h1 style="margin:0 0 4px 0;font-size:21px;font-weight:800;color:#17150F">${title}</h1>
-      <p style="margin:0 0 16px 0;font-size:14px;color:#5E594B">${biz.name}</p>
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FDFCF8;border:1px solid #E1DCCD;border-radius:12px;margin-bottom:14px">
-        <tr><td style="padding:10px 14px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rowsHtml}</table></td></tr>
+    <tr><td style="padding:28px 30px 30px 30px">
+      <h1 style="margin:0 0 4px 0;font-size:22px;font-weight:800;color:#17150F;line-height:1.3;letter-spacing:-.01em">${title}</h1>
+      <p style="margin:0 0 20px 0;font-size:14px;color:#0A5B52;font-weight:600">${biz.name}</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FBFAF5;border:1px solid #E1DCCD;border-radius:14px;margin-bottom:18px">
+        <tr><td style="padding:6px 18px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rowsHtml}</table></td></tr>
       </table>
       ${intro ? `<p style="margin:0;font-size:14px;color:#5E594B;line-height:1.6">${intro}</p>` : ''}
-      ${extra ? `<p style="margin:14px 0 0 0;font-size:14px;color:#0A5B52;line-height:1.6;font-weight:600">${extra}</p>` : ''}
-    </td></tr>`);
+      ${extra ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;background:#FCF3E3;border:1px solid #F0D9AE;border-radius:12px"><tr><td style="padding:14px 16px;border-left:3px solid #EFA12F"><p style="margin:0;font-size:14px;color:#17150F;line-height:1.6;font-weight:600">${extra}</p></td></tr></table>` : ''}
+    </td></tr>`, {
+      preheader: `${title} — ${biz.name}${when ? ' · ' + when : ''}`,
+      footerNote: `Recibiste este correo de ${biz.name} a través de Bukeame. Si no esperabas esta cita, puedes ignorarlo.`,
+    });
   const text = buildMessage(template, ctx).replace(/\*/g, '');
   return { subject, text, html };
 }
@@ -1579,6 +1700,7 @@ setInterval(() => { dispatchMessages().catch(e => console.error('dispatch:', e.m
 // ============================================================================
 const sharedHelpers = {
   asyncH, bad, isStr, isUuid, isEmail, isPhone, normPhone, isDate, audit, notify,
+  confirmCode, bookingLimiter, codeLimiter, publicLimiter,
 };
 try {
   require('./module-revenue').mount(app, { db, authRequired, businessScope, h: sharedHelpers });
@@ -1588,6 +1710,7 @@ try {
   require('./module-admin').mount(app, { db, authRequired, h: sharedHelpers });
   require('./module-accounting').mount(app, { db, authRequired, businessScope, h: sharedHelpers });
   require('./module-account').mount(app, { db, authRequired, businessScope, h: sharedHelpers });
+  require('./module-payments').mount(app, { db, authRequired, businessScope, h: sharedHelpers });
 } catch (e) {
   console.error('⚠ Error montando módulos v1.1:', e.message);
 }
@@ -1597,7 +1720,7 @@ try {
 // ============================================================================
 app.get('/api/health', asyncH(async (_req, res) => {
   await db.query('SELECT 1');
-  res.json({ ok: true, service: 'turnify-api', ts: new Date().toISOString() });
+  res.json({ ok: true, service: 'bukeame-api', ts: new Date().toISOString() });
 }));
 
 app.use((req, res) => bad(res, 'Ruta no encontrada', 404));
@@ -1606,9 +1729,10 @@ app.use((err, _req, res, _next) => {
   if (err.code === '23P01') return bad(res, 'Ese turno acaba de ser tomado. Escoge otro.', 409);
   if (err.code === '23505') return bad(res, 'Registro duplicado', 409);
   if (err.type === 'entity.parse.failed') return bad(res, 'JSON inválido', 400);
-  console.error(NODE_ENV === 'production' ? err.message : err);
+  // Instrumentación: ruta + stack para ubicar errores 500 (ej. el enum payment_status).
+  console.error(`[${_req.method} ${_req.originalUrl}]`, err.stack || err.message);
   bad(res, 'Error interno. Intenta de nuevo.', 500);
 });
 
 app.listen(PORT, '127.0.0.1', () =>
-  console.log(`🟢 turnify-api en http://127.0.0.1:${PORT} (${NODE_ENV})`));
+  console.log(`🟢 bukeame-api en http://127.0.0.1:${PORT} (${NODE_ENV})`));

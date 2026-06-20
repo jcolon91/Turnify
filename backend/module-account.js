@@ -1,5 +1,5 @@
 // ============================================================================
-//  TURNIFY API — módulo: MI CUENTA (Account)
+//  BUKEAME API — módulo: MI CUENTA (Account)
 //  Mi plan (actual + superiores) · Borrado seguro de cuenta
 // ----------------------------------------------------------------------------
 //  Se ENCHUFA al server.js base:
@@ -116,7 +116,7 @@ module.exports.mount = function (app, ctx) {
       await client.query(
         `UPDATE payments SET client_id = NULL, external_ref = NULL
           WHERE business_id = $1`, [bizId]);
-      // platform_payments (mensualidades a Turnify): se conservan tal cual
+      // platform_payments (mensualidades a Bukeame): se conservan tal cual
 
       // ── 2. ANONIMIZAR/eliminar datos personales de CLIENTES del negocio ──
       // Conservamos la fila (para que las stats financieras cuadren) pero

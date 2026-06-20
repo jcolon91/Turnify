@@ -1,5 +1,5 @@
 // ============================================================================
-//  TURNIFY API — módulo B: FIDELIZACIÓN
+//  BUKEAME API — módulo B: FIDELIZACIÓN
 //  Lealtad · Te-toca · Lista de espera (oferta 30min) · Control manual barbero
 // ----------------------------------------------------------------------------
 //  Se ENCHUFA al server.js base:
@@ -12,12 +12,12 @@ const crypto = require('crypto');
 
 module.exports.mount = function (app, ctx) {
   const { db, authRequired, businessScope, h } = ctx;
-  const { asyncH, bad, isStr, isUuid, isDate, normPhone, isPhone, audit, notify } = h;
+  const { asyncH, bad, isStr, isUuid, isDate, normPhone, isPhone, audit, notify, confirmCode, bookingLimiter } = h;
 
   const ALIVE = ['pending_deposit', 'confirmed'];
 
   // ==========================================================================
-  //  PROGRAMA DE LEALTAD (lo paga el negocio; Turnify solo cuenta)
+  //  PROGRAMA DE LEALTAD (lo paga el negocio; Bukeame solo cuenta)
   // ==========================================================================
   app.get('/api/loyalty', authRequired, businessScope, asyncH(async (req, res) => {
     // requiere feature de plan (Studio+) o estar en trial premium
@@ -123,10 +123,10 @@ module.exports.mount = function (app, ctx) {
   //  LISTA DE ESPERA
   // ==========================================================================
   // pública: cliente entra a la lista (con o sin cita base protegida)
-  app.post('/api/public/:slug/waitlist', asyncH(async (req, res) => {
+  app.post('/api/public/:slug/waitlist', bookingLimiter, asyncH(async (req, res) => {
     const { service_id, staff_id, date_from, date_to, full_name, phone, held_code } = req.body || {};
     if (!isStr(full_name, 120)) return bad(res, 'Tu nombre es requerido');
-    if (!isPhone(phone)) return bad(res, 'Tu WhatsApp es requerido');
+    if (!isPhone(phone)) return bad(res, 'Tu WhatsApp debe ser un número válido de PR/US (10 dígitos)');
     if (!isDate(date_from) || !isDate(date_to)) return bad(res, 'Fechas inválidas');
     if (date_to < date_from) return bad(res, 'Rango de fechas inválido');
 
@@ -249,8 +249,7 @@ module.exports.mount = function (app, ctx) {
             WHERE business_id = $1 AND client_id = $2 AND offer_state = 'offered' AND id <> $3`,
           [req.business.id, wl.client_id, waitlist_id]);
 
-        const code = 'MAN-' + String(starts.getMonth() + 1).padStart(2, '0') +
-          String(starts.getDate()).padStart(2, '0') + '-' + crypto.randomInt(100, 999);
+        const code = confirmCode('MAN', starts);
         let appt;
         try {
           const r = await client.query(

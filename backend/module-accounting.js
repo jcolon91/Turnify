@@ -1,5 +1,5 @@
 // ============================================================================
-//  TURNIFY API — módulo: CONTABILIDAD (Accounting)
+//  BUKEAME API — módulo: CONTABILIDAD (Accounting)
 //  Ingresos (facturado + cobrado) · Desglose por servicio · Gastos · Export CSV
 // ----------------------------------------------------------------------------
 //  Se ENCHUFA al server.js base:
@@ -76,7 +76,7 @@ module.exports.mount = function (app, ctx) {
         WHERE business_id = $1 AND spent_on >= $2::date AND spent_on < $3::date`,
       [bid, from, to]);
 
-    // ── GASTO DE LA APP (mensualidad a Turnify) ──
+    // ── GASTO DE LA APP (mensualidad a Bukeame) ──
     const appCost = await db.query(
       `SELECT COALESCE(SUM(amount_cents - discount_cents),0)::bigint AS total
          FROM platform_payments
@@ -298,14 +298,14 @@ module.exports.mount = function (app, ctx) {
       for (const r of appPays.rows) {
         lines.push([
           r.paid_at ? new Date(r.paid_at).toISOString().slice(0,10) : '',
-          'app', 'Suscripción Turnify', '', money(r.net),
+          'app', 'Suscripción Bukeame', '', money(r.net),
         ].map(esc).join(','));
       }
       lines.push('');
     }
 
     const csv = '\uFEFF' + lines.join('\n');   // BOM para que Excel abra acentos bien
-    const fname = `turnify-contabilidad-${from}_a_${to}.csv`;
+    const fname = `bukeame-contabilidad-${from}_a_${to}.csv`;
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${fname}"`);
     await audit(req, 'accounting.export', 'business', bid, { from, to, type });

@@ -1,5 +1,5 @@
 -- ============================================================================
---  TURNIFY — Migración: múltiples servicios por cita (Opción A: cita combinada)
+--  BUKEAME — Migración: múltiples servicios por cita (Opción A: cita combinada)
 --  Idempotente. Correr con: sudo -u postgres psql -d turnify -f database/04-schema-multiservice.sql
 -- ----------------------------------------------------------------------------
 --  La cita sigue siendo UNA sola fila. Guardamos:

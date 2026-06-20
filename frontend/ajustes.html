@@ -6,40 +6,65 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
-:root{--paper:#F1EFE5;--card:#fff;--ink:#17150F;--ink2:#5E594B;--teal:#0E8074;--teal-ink:#0A5B52;--teal-soft:#E3EFE9;--line:#E1DCCD;
---display:"Bricolage Grotesque",sans-serif;--body:"Instrument Sans",sans-serif;--mono:"Spline Sans Mono",monospace}
+:root{
+  --bg:#F1EFE5;--bg2:#F7F4EA;--card:#FFFFFF;--card-soft:#EDE9DB;--border:#E1DCCD;
+  --text:#17150F;--muted:#5E594B;--muted2:#B3AD9C;--green:#0E8074;--green-ink:#FFFFFF;
+  --green-soft:#E3EFE9;--green-glow:rgba(14,128,116,.45);
+  --awning:repeating-linear-gradient(90deg,#0E8074 0 26px,#0A5B52 26px 28px,#F8F5EA 28px 54px,#E7E2D1 54px 56px);
+  /* legacy aliases mapeadas a las variables nuevas */
+  --paper:var(--bg);--ink:var(--text);--ink2:var(--muted);--teal:var(--green);--teal-ink:var(--green);--teal-soft:var(--green-soft);--line:var(--border);
+  --display:"Bricolage Grotesque",sans-serif;--body:"Instrument Sans",sans-serif;--mono:"Spline Sans Mono",monospace}
+html[data-theme="dark"]{
+  --bg:#0B1A13;--bg2:#0E2218;--card:#12251B;--card-soft:rgba(255,255,255,.05);--border:rgba(255,255,255,.1);
+  --text:#ECEAE0;--muted:#8AA197;--muted2:#5d6f66;--green:#36E27B;--green-ink:#08160F;
+  --green-soft:rgba(54,226,123,.12);--green-glow:rgba(54,226,123,.3);
+  --awning:repeating-linear-gradient(90deg,#36E27B 0 26px,#0d6b46 26px 28px,#0E2218 28px 54px,#10241A 54px 56px)}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:var(--body);color:var(--ink);background:var(--paper);-webkit-font-smoothing:antialiased}
+body{font-family:var(--body);color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased}
 a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
 input,select{font:inherit}
-.bootload{min-height:100vh;display:grid;place-items:center;color:var(--ink2);font-size:14px}
-.nav{background:var(--card);border-bottom:1px solid var(--line);padding:14px 18px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:50}
-.nav a.back{font-size:18px}.nav .logo{font-family:var(--display);font-weight:800;font-size:19px}.nav .logo i{font-style:normal;color:var(--teal)}
+.awning{height:12px;background:var(--awning)}
+.bootload{min-height:100vh;display:grid;place-items:center;color:var(--muted);font-size:14px}
+.nav{background:var(--card);border-bottom:1px solid var(--border);padding:14px 18px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:50}
+.nav a.back{font-size:18px}.nav .logo{font-family:var(--display);font-weight:800;font-size:19px}.nav .logo i{font-style:normal;color:var(--green)}
+.nav .spacer{flex:1}
+.theme-tg{display:inline-flex;background:var(--card-soft);border:1px solid var(--border);border-radius:11px;padding:3px}
+.theme-tg button{font:700 12.5px 'Instrument Sans',sans-serif;padding:6px 13px;border-radius:8px;cursor:pointer;border:0;background:transparent;color:var(--muted)}
+.theme-tg button.on{background:var(--green);color:var(--green-ink)}
 .wrap{max-width:560px;margin:0 auto;padding:24px 16px 60px}
 h1{font-family:var(--display);font-weight:800;font-size:26px;letter-spacing:-.02em;margin-bottom:4px}
-.sub{font-size:14px;color:var(--ink2);margin-bottom:22px}
-.card{background:var(--card);border:1.5px solid var(--line);border-radius:18px;padding:20px;margin-bottom:14px}
-.seclabel{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--ink2);margin-bottom:14px}
+.sub{font-size:14px;color:var(--muted);margin-bottom:22px}
+.card{background:var(--card);border:1.5px solid var(--border);border-radius:18px;padding:20px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.seclabel{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
 .field{margin-bottom:16px}
 .field:last-child{margin-bottom:0}
 .field label{display:block;font-weight:600;font-size:14px;margin-bottom:4px}
-.field .hint{font-size:12px;color:var(--ink2);margin-bottom:8px}
-.field input,.field select{width:100%;padding:12px 13px;border:1.5px solid var(--line);border-radius:12px;background:#FCFBF7}
-.field input:focus,.field select:focus{outline:none;border-color:var(--teal)}
-.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;font-weight:700;font-size:15px;padding:14px;border-radius:13px;cursor:pointer;background:var(--teal);color:#fff}
+.field .hint{font-size:12px;color:var(--muted);margin-bottom:8px}
+.field input,.field select{width:100%;padding:12px 13px;border:1.5px solid var(--border);border-radius:13px;background:var(--bg2);color:var(--text)}
+.field input:focus,.field select:focus{outline:none;border-color:var(--green)}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;font-weight:700;font-size:15px;padding:14px;border-radius:14px;cursor:pointer;background:var(--green);color:var(--green-ink)}
 .btn:disabled{opacity:.55}
-.alert{display:none;font-size:13px;font-weight:600;padding:12px 14px;border-radius:12px;margin-bottom:14px;line-height:1.5}
+.alert{display:none;font-size:13px;font-weight:600;padding:12px 14px;border-radius:13px;margin-bottom:14px;line-height:1.5}
 .alert.err{display:block;background:#FCE8E6;color:#A1281C;border:1px solid #F3C0BA}
-.alert.ok{display:block;background:var(--teal-soft);color:var(--teal-ink);border:1px solid #BFE0D5}
-.foot{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);padding:20px 0 40px}
+.alert.ok{display:block;background:var(--green-soft);color:var(--green);border:1px solid var(--border)}
+.foot{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:20px 0 40px}
 </style>
 </head>
 <body>
+<script>
+(function(){var t=localStorage.getItem('bukeame_theme')||'light';document.documentElement.setAttribute('data-theme',t);
+window.__setTheme=function(t){localStorage.setItem('bukeame_theme',t);document.documentElement.setAttribute('data-theme',t);
+  document.querySelectorAll('.theme-tg button').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-theme-set')===t);});};
+document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('[data-theme-set]').forEach(function(b){b.addEventListener('click',function(){window.__setTheme(b.getAttribute('data-theme-set'));});});window.__setTheme(localStorage.getItem('bukeame_theme')||'light');});})();
+</script>
 <div id="boot" class="bootload">Cargando…</div>
 <div id="app" style="display:none">
+<div class="awning"></div>
 <nav class="nav">
   <a href="panel.html" class="back">←</a>
   <span class="logo">Buk<i>é</i>ame</span>
+  <span class="spacer"></span>
+  <div class="theme-tg"><button type="button" data-theme-set="light">Claro</button><button type="button" data-theme-set="dark">Oscuro</button></div>
 </nav>
 <div class="wrap">
   <h1>Ajustes de reservas</h1>

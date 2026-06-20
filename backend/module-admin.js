@@ -1,5 +1,5 @@
 // ============================================================================
-//  TURNIFY · module-admin.js
+//  BUKEAME · module-admin.js
 //  Panel de administrador de plataforma (solo para el dueño: is_platform_admin)
 //  Se monta sobre server.js compartiendo helpers. Endpoints:
 //    GET /api/admin/overview     → métricas + listas para el tablero completo
@@ -9,7 +9,7 @@
 // ============================================================================
 
 function mount(app, { db, authRequired, h }) {
-  const { asyncH, bad, audit } = h;
+  const { asyncH, bad, audit, isUuid, notify } = h;
 
   // ── Middleware: exige que el usuario sea admin de plataforma ──────────────
   const adminRequired = asyncH(async (req, res, next) => {
@@ -284,6 +284,69 @@ function mount(app, { db, authRequired, h }) {
     if (!rows[0]) return bad(res, 'El negocio no tiene suscripción registrada', 404);
     await audit(req, 'admin.plan.change', 'business', req.params.id, { plan_code: planCode, months });
     res.json({ ok: true, business: biz.rows[0].name, subscription: rows[0] });
+  }));
+
+  // ── POST /api/admin/businesses/:id/addons ─────────────────────────────────
+  // Conceder o revocar un add-on a un negocio TRAS confirmar el pago manual.
+  // Body: { code, action: 'grant' | 'revoke' }   (cierra el bypass de monetización)
+  app.post('/api/admin/businesses/:id/addons', authRequired, adminRequired, asyncH(async (req, res) => {
+    if (!isUuid(req.params.id)) return bad(res, 'ID inválido');
+    const code = String(req.body?.code || '').trim();
+    const action = req.body?.action === 'revoke' ? 'revoke' : 'grant';
+    const cat = await db.query(`SELECT name, price_cents FROM addon_catalog WHERE code = $1`, [code]);
+    if (!cat.rows[0]) return bad(res, 'Add-on no existe', 404);
+    const biz = await db.query(`SELECT id FROM businesses WHERE id = $1 AND deleted_at IS NULL`, [req.params.id]);
+    if (!biz.rows[0]) return bad(res, 'Negocio no encontrado', 404);
+
+    let rows;
+    if (action === 'revoke') {
+      ({ rows } = await db.query(
+        `UPDATE addons SET status = 'cancelled', cancelled_at = now()
+          WHERE business_id = $1 AND code = $2 RETURNING code, status`,
+        [req.params.id, code]));
+    } else {
+      ({ rows } = await db.query(
+        `INSERT INTO addons (business_id, code, price_cents)
+         VALUES ($1,$2,$3)
+         ON CONFLICT (business_id, code)
+         DO UPDATE SET status = 'active', cancelled_at = NULL, price_cents = $3, activated_at = now()
+         RETURNING code, status, price_cents`,
+        [req.params.id, code, cat.rows[0].price_cents]));
+      await notify(req.params.id, 'system', 'Add-on activado',
+        `"${cat.rows[0].name}" ya está activo en tu cuenta. ¡Gracias!`, { code });
+    }
+    await audit(req, 'admin.addon.' + action, 'addon', req.params.id, { code });
+    res.json({ ok: true, action, addon: rows[0] || { code, status: 'cancelled' } });
+  }));
+
+  // ── POST /api/admin/businesses/:id/featured ───────────────────────────────
+  // Conceder destacado por N semanas TRAS confirmar el pago.
+  // Body: { weeks, municipality_id?, category_id? }
+  app.post('/api/admin/businesses/:id/featured', authRequired, adminRequired, asyncH(async (req, res) => {
+    if (!isUuid(req.params.id)) return bad(res, 'ID inválido');
+    const weeks = Number.isInteger(req.body?.weeks) ? req.body.weeks : 0;
+    if (weeks < 1 || weeks > 52) return bad(res, 'Semanas entre 1 y 52');
+    const biz = await db.query(
+      `SELECT id, municipality_id FROM businesses WHERE id = $1 AND deleted_at IS NULL`, [req.params.id]);
+    if (!biz.rows[0]) return bad(res, 'Negocio no encontrado', 404);
+
+    const muni = Number.isInteger(req.body?.municipality_id) ? req.body.municipality_id : biz.rows[0].municipality_id;
+    let catId = Number.isInteger(req.body?.category_id) ? req.body.category_id : null;
+    if (catId === null) {
+      const c = await db.query(
+        `SELECT category_id FROM business_categories WHERE business_id = $1 ORDER BY category_id LIMIT 1`,
+        [req.params.id]);
+      catId = c.rows[0]?.category_id || null;
+    }
+    const { rows } = await db.query(
+      `INSERT INTO featured_listings (business_id, municipality_id, category_id, ends_at)
+       VALUES ($1, $2, $3, now() + ($4 || ' weeks')::interval) RETURNING id, ends_at`,
+      [req.params.id, muni, catId, String(weeks)]);
+    await db.query(`UPDATE businesses SET is_featured = true WHERE id = $1`, [req.params.id]);
+    await notify(req.params.id, 'system', 'Destacado activado',
+      `Tu negocio aparece primero por ${weeks} semana(s). ¡Gracias!`, { weeks });
+    await audit(req, 'admin.featured.grant', 'featured', rows[0].id, { weeks });
+    res.json({ ok: true, featured: rows[0] });
   }));
 }
 
