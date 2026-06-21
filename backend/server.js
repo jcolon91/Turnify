@@ -67,6 +67,111 @@ const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', 1);             // detrás de Nginx
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+
+// ----------------------------------------------------------------------------
+// STRIPE CONNECT — WEBHOOK (cargo DIRECTO en la cuenta del negocio)
+// ----------------------------------------------------------------------------
+// DEBE registrarse ANTES de express.json para tener el body CRUDO (Stripe firma
+// los bytes exactos; cualquier reparse rompe la verificación de firma).
+// Gateado por STRIPE_WEBHOOK_SECRET. Sin SDK: firma verificada a mano con crypto.
+//
+// Verificación de firma (replica stripe.webhooks.constructEvent):
+//   1) header 'stripe-signature' = "t=<unix>,v1=<hex>[,v1=<hex>...]"
+//   2) signed_payload = `${t}.${rawBody}`  (rawBody = bytes crudos como string)
+//   3) esperado = HMAC-SHA256(signed_payload, STRIPE_WEBHOOK_SECRET) en hex
+//   4) comparar contra cada v1 con crypto.timingSafeEqual (anti timing-attack)
+//   5) anti-replay: rechazar si |now - t| > 5 min
+// Si la firma es válida → 200 {received:true} SIEMPRE (aunque el evento no aplique).
+// NOTA: asyncH (línea ~139) aún no está inicializado aquí (TDZ por ser `const`
+// declarado más abajo); por eso envolvemos el handler con un .catch(next) inline.
+app.post('/api/payments/stripe/webhook',
+  express.raw({ type: 'application/json' }),
+  (req, res, next) => Promise.resolve((async (req, res) => {
+    const secret = process.env.STRIPE_WEBHOOK_SECRET;
+    if (!secret) return res.status(503).json({ error: 'Webhook no configurado' });
+
+    // express.raw deja el body como Buffer; si no, no podemos verificar firma.
+    const raw = Buffer.isBuffer(req.body) ? req.body : null;
+    const sigHeader = req.get('stripe-signature') || '';
+    if (!raw || !sigHeader) return res.status(400).json({ error: 'Firma ausente' });
+
+    // Parse "t=...,v1=...,v1=..." → t (timestamp) y lista de firmas v1.
+    let t = null; const v1s = [];
+    for (const part of sigHeader.split(',')) {
+      const i = part.indexOf('=');
+      if (i < 0) continue;
+      const k = part.slice(0, i), val = part.slice(i + 1);
+      if (k === 't') t = val;
+      else if (k === 'v1') v1s.push(val);
+    }
+    if (!t || !/^\d+$/.test(t) || v1s.length === 0)
+      return res.status(400).json({ error: 'Firma inválida' });
+
+    // Anti-replay: la marca de tiempo no puede diferir más de 5 min del reloj actual.
+    const nowSec = Math.floor(Date.now() / 1000);
+    if (Math.abs(nowSec - Number(t)) > 300)
+      return res.status(400).json({ error: 'Firma expirada' });
+
+    // HMAC-SHA256 de `${t}.${rawBody}`; comparación constante contra cada v1.
+    const rawStr = raw.toString('utf8');
+    const expected = crypto.createHmac('sha256', secret)
+      .update(`${t}.${rawStr}`, 'utf8').digest('hex');
+    const expBuf = Buffer.from(expected, 'utf8');
+    let match = false;
+    for (const v1 of v1s) {
+      const got = Buffer.from(v1, 'utf8');
+      if (got.length === expBuf.length && crypto.timingSafeEqual(got, expBuf)) { match = true; break; }
+    }
+    if (!match) return res.status(400).json({ error: 'Firma no coincide' });
+
+    // Firma válida → parseamos el evento. A partir de aquí SIEMPRE respondemos 200
+    // (aunque el evento no aplique) para que Stripe no reintente en bucle.
+    let event;
+    try { event = JSON.parse(rawStr); }
+    catch { return res.status(400).json({ error: 'JSON inválido' }); }
+
+    const type = event && event.type;
+    const obj  = (event && event.data && event.data.object) || {};
+
+    if (type === 'checkout.session.completed' || type === 'payment_intent.succeeded') {
+      // confirmation_code viaja en metadata de la sesión y/o del payment_intent.
+      const md = obj.metadata || {};
+      const code = (md.confirmation_code || '').toString().trim().toUpperCase();
+      // En payment_intent.succeeded usamos su id; en checkout.session el payment_intent (o el id de sesión).
+      const extRef = obj.payment_intent || obj.id || null;
+
+      if (code) {
+        // Busca el depósito de ESTA cita por confirmation_code (cualquier negocio:
+        // el code es de alta entropía y único; el webhook es global de la plataforma).
+        const { rows } = await db.query(
+          `SELECT a.id, a.business_id, a.service_name, a.status,
+                  p.id AS payment_id, p.status AS pay_status
+             FROM appointments a
+             LEFT JOIN payments p ON p.appointment_id = a.id AND p.kind = 'deposit'
+            WHERE a.confirmation_code = $1
+            LIMIT 1`, [code]);
+        const a = rows[0];
+        // IDEMPOTENTE: si no existe, ya está pagado o ya está confirmado → no reprocesar.
+        if (a && a.pay_status !== 'paid' && a.status !== 'confirmed') {
+          if (a.payment_id)
+            await db.query(
+              `UPDATE payments SET status = 'paid', paid_at = now(), external_ref = $2
+                WHERE id = $1 AND status <> 'paid'`,
+              [a.payment_id, extRef]);
+          await db.query(
+            `UPDATE appointments SET status = 'confirmed'
+              WHERE id = $1 AND status = 'pending_deposit'`, [a.id]);
+          try {
+            await notify(a.business_id, 'payment', 'Pago con tarjeta recibido',
+              `${a.service_name} · ${extRef || code}`, { appointment_id: a.id });
+          } catch (e) { console.error('stripe webhook notify:', e.message); }
+        }
+      }
+    }
+    // Firma válida ⇒ 200 siempre (aplique o no el evento).
+    return res.json({ received: true });
+  })(req, res)).catch(next));
+
 app.use(express.json({ limit: '1mb' }));
 
 // --- Uploads (logos de negocios) ---
@@ -75,10 +180,12 @@ const LOGO_DIR   = path.join(UPLOAD_DIR, 'logos');
 const COVER_DIR  = path.join(UPLOAD_DIR, 'covers');
 const PORTFOLIO_DIR = path.join(UPLOAD_DIR, 'portfolio');
 const STAFF_DIR  = path.join(UPLOAD_DIR, 'staff');
+const PRODUCTS_DIR = path.join(UPLOAD_DIR, 'products');
 try { fs.mkdirSync(LOGO_DIR, { recursive: true }); } catch (e) { /* ya existe */ }
 try { fs.mkdirSync(COVER_DIR, { recursive: true }); } catch (e) { /* ya existe */ }
 try { fs.mkdirSync(STAFF_DIR, { recursive: true }); } catch (e) { /* ya existe */ }
 try { fs.mkdirSync(PORTFOLIO_DIR, { recursive: true }); } catch (e) { /* ya existe */ }
+try { fs.mkdirSync(PRODUCTS_DIR, { recursive: true }); } catch (e) { /* ya existe */ }
 
 // Borra un archivo de /uploads de forma SEGURA. Toma solo el basename y verifica
 // que el path resuelto quede DENTRO del dir permitido → neutraliza path traversal
@@ -750,8 +857,8 @@ app.delete('/api/businesses/me/cover', authRequired, businessScope, asyncH(async
 
 // ── PORTAFOLIO (galería del negocio) ─────────────────────────────────────────
 // Reusa la tabla existente gallery_photos (staff_id NULL = foto del negocio).
-// Máx 12 fotos por negocio. Imágenes ≈1200x800 webp 82% en /uploads/portfolio.
-const PORTFOLIO_MAX = 12;
+// Máx 8 fotos por negocio. Imágenes ≈1200x800 webp 82% en /uploads/portfolio.
+const PORTFOLIO_MAX = 8;
 
 // Subir una foto al portafolio
 app.post('/api/businesses/me/portfolio', authRequired, businessScope,
@@ -879,6 +986,54 @@ app.post('/api/blocks', authRequired, businessScope, asyncH(async (req, res) => 
   res.status(201).json({ block: rows[0] });
 }));
 
+// Crear varios bloqueos de DÍA COMPLETO de una vez (Bukéame)
+app.post('/api/blocks/batch', authRequired, businessScope, asyncH(async (req, res) => {
+  const { dates, staff_id, reason } = req.body || {};
+  if (!Array.isArray(dates) || dates.length < 1 || dates.length > 60) {
+    return bad(res, 'Debe enviar entre 1 y 60 fechas');
+  }
+  for (const d of dates) {
+    if (!isDate(d)) return bad(res, `Fecha inválida: ${d}`);
+  }
+  if (staff_id && !isUuid(staff_id)) return bad(res, 'Profesional inválido');
+  if (staff_id) {   // el profesional debe ser de ESTE negocio (aislamiento multi-tenant)
+    const ok = await db.query(`SELECT 1 FROM staff WHERE id = $1 AND business_id = $2 AND deleted_at IS NULL`, [staff_id, req.business.id]);
+    if (!ok.rows[0]) return bad(res, 'Profesional no encontrado', 404);
+  }
+
+  const sid = staff_id || null;
+  const cleanReason = (reason || '').slice(0, 120) || null;
+  const seen = new Set();
+  let created = 0;
+
+  for (const date of dates) {
+    if (seen.has(date)) continue;   // evita duplicados dentro del mismo request
+    seen.add(date);
+
+    // día completo: de 00:00 a 23:59:59 del día (hora de PR), igual que all_day
+    const startsAt = new Date(`${date}T00:00:00${TZ_OFFSET}`);
+    const endsAt   = new Date(`${date}T23:59:59${TZ_OFFSET}`);
+
+    // Omite si ya existe el bloqueo exacto del día (mismo negocio, staff y rango)
+    const dup = await db.query(
+      `SELECT 1 FROM time_blocks
+        WHERE business_id = $1
+          AND staff_id IS NOT DISTINCT FROM $2
+          AND starts_at = $3 AND ends_at = $4`,
+      [req.business.id, sid, startsAt, endsAt]);
+    if (dup.rows[0]) continue;
+
+    const { rows } = await db.query(
+      `INSERT INTO time_blocks (business_id, staff_id, starts_at, ends_at, reason)
+       VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+      [req.business.id, sid, startsAt, endsAt, cleanReason]);
+    await audit(req, 'block.create', 'time_block', rows[0].id);
+    created++;
+  }
+
+  res.status(201).json({ created });
+}));
+
 // Borrar un bloqueo
 app.delete('/api/blocks/:id', authRequired, businessScope, asyncH(async (req, res) => {
   if (!isUuid(req.params.id)) return bad(res, 'ID inválido');
@@ -988,6 +1143,70 @@ app.delete('/api/staff/:id/photo', authRequired, businessScope, asyncH(async (re
   safeUnlinkUpload(st.rows[0].avatar_url, STAFF_DIR);
   await db.query(`UPDATE staff SET avatar_url = NULL WHERE id = $1 AND business_id = $2`,
     [req.params.id, req.business.id]);
+  res.json({ ok: true });
+}));
+
+// ----------------------------------------------------------------------------
+// FOTOS DE PRODUCTOS (máx 3) — subida real con sharp (espeja portafolio/staff).
+// El módulo revenue maneja fotos por URL (POST /api/products/:id/photos); estas
+// rutas suben el archivo, lo procesan a webp y guardan la fila en product_photos.
+// ----------------------------------------------------------------------------
+const PRODUCT_PHOTO_MAX = 3;
+app.post('/api/products/:id/photo', authRequired, businessScope,
+  (req, res, next) => uploadLogo.single('photo')(req, res, (err) => {
+    if (err) return bad(res, err.message || 'Error al subir la foto');
+    next();
+  }),
+  asyncH(async (req, res) => {
+    if (!isUuid(req.params.id)) return bad(res, 'ID inválido');
+    if (!req.file) return bad(res, 'No se recibió ninguna imagen');
+    // El producto debe ser del negocio
+    const own = await db.query(
+      `SELECT 1 FROM products WHERE id = $1 AND business_id = $2`, [req.params.id, req.business.id]);
+    if (!own.rows[0]) return bad(res, 'Producto no encontrado', 404);
+    // Pre-chequeo barato (evita procesar si ya hay 3). El guard REAL contra carreras
+    // es el INSERT condicional de abajo.
+    const pre = await db.query(`SELECT count(*)::int n FROM product_photos WHERE product_id = $1`, [req.params.id]);
+    if (pre.rows[0].n >= PRODUCT_PHOTO_MAX)
+      return bad(res, 'Máximo 3 fotos por producto', 409);
+
+    const filename = `${req.params.id}-${crypto.randomUUID()}.webp`;
+    const filepath = path.join(PRODUCTS_DIR, filename);
+    try {
+      await sharp(req.file.buffer, { limitInputPixels: 24000000, failOn: 'error' })
+        .resize(800, 800, { fit: 'cover', position: 'centre' })
+        .webp({ quality: 82 })
+        .toFile(filepath);
+    } catch (e) {
+      return bad(res, 'La imagen no se pudo procesar. Prueba con otra.');
+    }
+    const url = `/uploads/products/${filename}`;
+    // INSERT condicional ATÓMICO: solo inserta si aún hay menos de 3 (anti-TOCTOU).
+    const { rows } = await db.query(
+      `INSERT INTO product_photos (product_id, url, sort_order)
+       SELECT $1, $2, COALESCE((SELECT MAX(sort_order) + 1 FROM product_photos WHERE product_id = $1), 0)
+        WHERE (SELECT count(*) FROM product_photos WHERE product_id = $1) < $3
+       RETURNING id, url, sort_order`,
+      [req.params.id, url, PRODUCT_PHOTO_MAX]);
+    if (!rows[0]) {                         // otra subida concurrente llenó el cupo
+      safeUnlinkUpload(url, PRODUCTS_DIR);  // borra el archivo recién escrito
+      return bad(res, 'Máximo 3 fotos por producto', 409);
+    }
+    await audit(req, 'product.photo.add', 'product', req.params.id, {});
+    res.status(201).json({ photo: rows[0] });
+  }));
+
+// Borrar una foto de un producto del negocio + su archivo
+app.delete('/api/products/:id/photo/:photoId', authRequired, businessScope, asyncH(async (req, res) => {
+  if (!isUuid(req.params.id) || !isUuid(req.params.photoId)) return bad(res, 'ID inválido');
+  const { rows } = await db.query(
+    `DELETE FROM product_photos ph USING products p
+      WHERE ph.id = $1 AND ph.product_id = p.id AND p.id = $2 AND p.business_id = $3
+      RETURNING ph.url`,
+    [req.params.photoId, req.params.id, req.business.id]);
+  if (!rows[0]) return bad(res, 'Foto no encontrada', 404);
+  safeUnlinkUpload(rows[0].url, PRODUCTS_DIR);
+  await audit(req, 'product.photo.delete', 'product', req.params.id, {});
   res.json({ ok: true });
 }));
 
@@ -1247,16 +1466,40 @@ app.get('/api/public/:slug', publicLimiter, asyncH(async (req, res) => {
       .catch(() => db.query(`SELECT provider, account_ref FROM payment_providers
                WHERE business_id = $1 AND is_enabled = true AND status = 'connected'`, [biz.id])
         .catch(() => ({ rows: [] }))),
-    // Productos activos del negocio con sus fotos (resiliente si las tablas aún no existen)
+    // Productos activos del negocio con sus fotos + reseñas resumidas (resiliente si
+    // las tablas aún no existen). first_photo = la 1ra por sort_order para la tarjeta;
+    // rating_avg (1 decimal) / rating_count salen de product_reviews (migración 12).
     db.query(`SELECT p.id, p.name, p.description, p.price_cents, p.stock, p.variants,
                      COALESCE(
                        (SELECT json_agg(pp.url ORDER BY pp.id)
                           FROM product_photos pp WHERE pp.product_id = p.id),
-                       '[]'::json) AS photos
+                       '[]'::json) AS photos,
+                     (SELECT pp.url FROM product_photos pp
+                        WHERE pp.product_id = p.id
+                        ORDER BY pp.sort_order, pp.id LIMIT 1) AS first_photo,
+                     COALESCE((SELECT count(*)::int FROM product_reviews r
+                        WHERE r.product_id = p.id), 0) AS rating_count,
+                     (SELECT round(avg(r.rating)::numeric, 1) FROM product_reviews r
+                        WHERE r.product_id = p.id) AS rating_avg
                 FROM products p
                WHERE p.business_id = $1 AND p.is_active = true
                ORDER BY p.name`, [biz.id])
-      .catch(() => ({ rows: [] })),
+      .catch(() =>
+        // Fallback si product_reviews aún no existe: trae productos sin el resumen,
+        // pero igual con first_photo (que sólo depende de product_photos).
+        db.query(`SELECT p.id, p.name, p.description, p.price_cents, p.stock, p.variants,
+                         COALESCE(
+                           (SELECT json_agg(pp.url ORDER BY pp.id)
+                              FROM product_photos pp WHERE pp.product_id = p.id),
+                           '[]'::json) AS photos,
+                         (SELECT pp.url FROM product_photos pp
+                            WHERE pp.product_id = p.id
+                            ORDER BY pp.sort_order, pp.id LIMIT 1) AS first_photo,
+                         0 AS rating_count, NULL AS rating_avg
+                    FROM products p
+                   WHERE p.business_id = $1 AND p.is_active = true
+                   ORDER BY p.name`, [biz.id])
+          .catch(() => ({ rows: [] }))),
     // Galería / portafolio del negocio (resiliente si la tabla aún no existe)
     db.query(`SELECT url, caption FROM gallery_photos
               WHERE business_id = $1 ORDER BY sort_order`, [biz.id])
@@ -1288,9 +1531,102 @@ app.get('/api/public/:slug', publicLimiter, asyncH(async (req, res) => {
     business: biz, services: services.rows, staff: staff.rows, hours: hours.rows, reviews: reviews.rows,
     payment_methods: payMethods.rows.map(r => r.provider),
     payment_config,
-    products: products.rows,
+    // rating_avg llega como string (numeric de pg) → number con 1 decimal, o null.
+    products: products.rows.map(p => ({
+      ...p,
+      rating_avg: p.rating_avg == null ? null : Number(p.rating_avg),
+      rating_count: Number(p.rating_count) || 0,
+    })),
     gallery: gallery.rows,
   });
+}));
+
+// ----------------------------------------------------------------------------
+// DETALLE PÚBLICO DE UN PRODUCTO + RESEÑAS
+// ----------------------------------------------------------------------------
+// GET: ficha del producto, hasta 3 fotos (por sort_order), reseñas (máx 50) y el
+// resumen de calificación. 404 si el producto no es del negocio o está inactivo.
+app.get('/api/public/:slug/products/:id', publicLimiter, asyncH(async (req, res) => {
+  if (!isUuid(req.params.id)) return bad(res, 'ID inválido');
+  const b = await db.query(
+    `SELECT id FROM businesses WHERE slug = $1 AND deleted_at IS NULL`, [req.params.slug]);
+  const biz = b.rows[0];
+  if (!biz) return bad(res, 'Negocio no encontrado', 404);
+
+  const prod = await db.query(
+    `SELECT id, name, description, price_cents, stock, variants
+       FROM products WHERE id = $1 AND business_id = $2 AND is_active = true`,
+    [req.params.id, biz.id]);
+  if (!prod.rows[0]) return bad(res, 'Producto no encontrado', 404);
+
+  const [photos, reviews, summary] = await Promise.all([
+    db.query(`SELECT url FROM product_photos WHERE product_id = $1
+              ORDER BY sort_order, id LIMIT 3`, [req.params.id]),
+    db.query(`SELECT reviewer_name, rating, comment, verified, created_at
+                FROM product_reviews WHERE product_id = $1
+               ORDER BY created_at DESC LIMIT 50`, [req.params.id]),
+    db.query(`SELECT count(*)::int AS rating_count,
+                     round(avg(rating)::numeric, 1) AS rating_avg
+                FROM product_reviews WHERE product_id = $1`, [req.params.id]),
+  ]);
+  const sum = summary.rows[0] || { rating_count: 0, rating_avg: null };
+  res.json({
+    product: prod.rows[0],
+    photos: photos.rows,
+    reviews: reviews.rows,
+    rating_avg: sum.rating_avg == null ? null : Number(sum.rating_avg),
+    rating_count: Number(sum.rating_count) || 0,
+  });
+}));
+
+// POST: dejar una reseña. SOLO quienes compraron el producto (orden pagada/cumplida
+// con su email y el product_id en items) pueden reseñar. 1 reseña por email/producto
+// (índice único parcial → 409). verified=true porque la compra está confirmada.
+app.post('/api/public/:slug/products/:id/review', bookingLimiter, asyncH(async (req, res) => {
+  if (!isUuid(req.params.id)) return bad(res, 'ID inválido');
+  const { name, email, rating, comment } = req.body || {};
+  if (!isStr(name, 120)) return bad(res, 'Tu nombre es requerido');
+  if (!isEmail(email)) return bad(res, 'Tu email es requerido');
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) return bad(res, 'Calificación entre 1 y 5');
+  if (comment != null && !isStr(comment, 1000)) return bad(res, 'Comentario inválido');
+
+  const b = await db.query(
+    `SELECT id FROM businesses WHERE slug = $1 AND deleted_at IS NULL`, [req.params.slug]);
+  const biz = b.rows[0];
+  if (!biz) return bad(res, 'Negocio no encontrado', 404);
+
+  // El producto debe ser del negocio y estar activo
+  const prod = await db.query(
+    `SELECT id FROM products WHERE id = $1 AND business_id = $2 AND is_active = true`,
+    [req.params.id, biz.id]);
+  if (!prod.rows[0]) return bad(res, 'Producto no encontrado', 404);
+
+  // VERIFICA compra: orden del negocio con buyer_email = email (citext, case-insensitive),
+  // status pagado/cumplido, e items que contengan este product_id. Tomamos la más reciente.
+  const ord = await db.query(
+    `SELECT id FROM product_orders
+      WHERE business_id = $1
+        AND buyer_email = $2
+        AND status IN ('paid','fulfilled')
+        AND items @> jsonb_build_array(jsonb_build_object('product_id', $3::text))
+      ORDER BY created_at DESC LIMIT 1`,
+    [biz.id, email, req.params.id]);
+  if (!ord.rows[0])
+    return bad(res, 'Solo quienes compraron este producto pueden reseñarlo.', 403);
+
+  try {
+    const { rows } = await db.query(
+      `INSERT INTO product_reviews
+          (product_id, business_id, order_id, reviewer_name, reviewer_email, rating, comment, verified)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,true)
+       RETURNING reviewer_name, rating, comment, verified, created_at`,
+      [req.params.id, biz.id, ord.rows[0].id, name.trim(), email, rating,
+       isStr(comment, 1000) ? comment.trim() : null]);
+    res.status(201).json({ review: rows[0] });
+  } catch (e) {
+    if (e.code === '23505') return bad(res, 'Ya dejaste una reseña de este producto.', 409);
+    throw e;
+  }
 }));
 
 // Disponibilidad: ?service_id=&date=YYYY-MM-DD[&staff_id=]
@@ -1575,13 +1911,106 @@ app.post('/api/public/:slug/appointments/:code/ath/confirm', codeLimiter, asyncH
 }));
 
 // ============================================================================
+//  RUTAS — CLIENTE (usuario sin negocio): sus citas en TODOS los negocios
+// ----------------------------------------------------------------------------
+// Un CLIENTE es un usuario (tabla users) que NO tiene negocio. Mismo login;
+// solo cambia a dónde se le redirige. Cruzamos la tabla clients (por-negocio)
+// con su identidad por user_id, email (citext) o phone (E.164) para encontrar
+// sus citas en cualquier negocio. Todo parametrizado.
+// ============================================================================
+
+// Cláusula de cruce reutilizable: la cita es del usuario si el cliente del
+// negocio comparte user_id, email o teléfono con el usuario autenticado.
+// $1 = req.user.id (uuid), $2 = req.user.email, $3 = req.user.phone (puede ser null).
+const CLIENT_MATCH =
+  `(c.user_id = $1 OR c.email = $2 OR ($3 IS NOT NULL AND c.phone = $3))`;
+
+// Las citas del usuario en TODOS los negocios.
+app.get('/api/me/appointments', authRequired, asyncH(async (req, res) => {
+  const { rows } = await db.query(
+    `SELECT a.confirmation_code, a.starts_at, a.status, a.service_name,
+            a.price_cents, a.deposit_cents,
+            st.display_name AS staff_name,
+            b.name AS business_name, b.slug, b.logo_url,
+            EXISTS (SELECT 1 FROM reviews r WHERE r.appointment_id = a.id) AS reviewed
+       FROM appointments a
+       JOIN clients c    ON c.id = a.client_id
+       JOIN businesses b ON b.id = a.business_id AND b.deleted_at IS NULL
+       LEFT JOIN staff st ON st.id = a.staff_id
+      WHERE ${CLIENT_MATCH}
+      ORDER BY a.starts_at DESC
+      LIMIT 200`,
+    [req.user.id, req.user.email, req.user.phone || null]);
+
+  const now = Date.now();
+  const upcoming = [], past = [];
+  for (const a of rows) {
+    const alive = ALIVE.includes(a.status);
+    if (alive && new Date(a.starts_at).getTime() >= now) upcoming.push(a);
+    else past.push(a);
+  }
+  // upcoming en orden cronológico ascendente (la más próxima primero);
+  // past ya viene DESC (la más reciente primero) por el ORDER BY.
+  upcoming.reverse();
+  res.json({ upcoming, past });
+}));
+
+// El usuario deja una reseña de una de SUS citas (1 por cita, appointment_id UNIQUE).
+app.post('/api/appointments/:code/review', authRequired, asyncH(async (req, res) => {
+  const rating = req.body?.rating;
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5)
+    return bad(res, 'La calificación debe ser un número del 1 al 5');
+  const comment = typeof req.body?.comment === 'string'
+    ? req.body.comment.trim().slice(0, 1000) || null
+    : null;
+
+  // Localiza la cita por código y verifica que sea del usuario (mismo cruce).
+  const { rows } = await db.query(
+    `SELECT a.id AS appointment_id, a.business_id, a.staff_id, a.client_id,
+            a.starts_at, a.status
+       FROM appointments a
+       JOIN clients c ON c.id = a.client_id
+      WHERE a.confirmation_code = $4 AND ${CLIENT_MATCH}`,
+    [req.user.id, req.user.email, req.user.phone || null, req.params.code.toUpperCase()]);
+  const a = rows[0];
+  if (!a) return bad(res, 'Cita no encontrada', 404);
+
+  // Solo se puede reseñar una cita que ya pasó o que está completada.
+  if (a.status !== 'completed' && new Date(a.starts_at).getTime() >= Date.now())
+    return bad(res, 'Solo puedes reseñar una cita que ya ocurrió', 409);
+
+  try {
+    await db.query(
+      `INSERT INTO reviews (business_id, staff_id, client_id, appointment_id, rating, comment)
+       VALUES ($1,$2,$3,$4,$5,$6)`,
+      [a.business_id, a.staff_id, a.client_id, a.appointment_id, rating, comment]);
+  } catch (e) {
+    if (e.code === '23505') return bad(res, 'Ya dejaste una reseña de esta cita.', 409);
+    throw e;
+  }
+  res.status(201).json({ ok: true });
+}));
+
+// ============================================================================
 //  RUTAS — AGENDA, KPIs, CLIENTES, PAGOS, NOTIFICACIONES, SUSCRIPCIÓN
 // ============================================================================
 app.get('/api/appointments', authRequired, businessScope, asyncH(async (req, res) => {
-  const date = isDate(req.query.date)
-    ? req.query.date
-    : new Date().toLocaleDateString('en-CA', { timeZone: 'America/Puerto_Rico' });
-  const { start, end } = dayBounds(date);
+  // Modo rango (semana/mes): ?from=YYYY-MM-DD&to=YYYY-MM-DD
+  // Modo día (comportamiento original): ?date=YYYY-MM-DD (o hoy si falta)
+  const rangeMode = isDate(req.query.from) && isDate(req.query.to);
+  let date = null, from = null, to = null, start, end;
+  if (rangeMode) {
+    from = req.query.from;
+    to   = req.query.to;
+    if (to < from) return bad(res, 'Rango inválido: to debe ser >= from');
+    start = dayBounds(from).start;
+    end   = dayBounds(to).end;
+  } else {
+    date = isDate(req.query.date)
+      ? req.query.date
+      : new Date().toLocaleDateString('en-CA', { timeZone: 'America/Puerto_Rico' });
+    ({ start, end } = dayBounds(date));
+  }
   const vals = [req.business.id, start, end];
   let extra = '';
   if (isUuid(req.query.staff_id)) { vals.push(req.query.staff_id); extra = ` AND a.staff_id = $${vals.length}`; }
@@ -1594,7 +2023,9 @@ app.get('/api/appointments', authRequired, businessScope, asyncH(async (req, res
        JOIN clients c ON c.id = a.client_id
        JOIN staff st ON st.id = a.staff_id
       WHERE a.business_id = $1 AND a.starts_at >= $2 AND a.starts_at <= $3 ${extra}
-      ORDER BY a.starts_at`, vals);
+      ORDER BY a.starts_at
+      LIMIT 500`, vals);
+  if (rangeMode) return res.json({ from, to, appointments: rows });
   res.json({ date, appointments: rows });
 }));
 
@@ -2106,24 +2537,11 @@ setInterval(() => { queueReminders().catch(e => console.error('reminders:', e.me
 setInterval(() => { dispatchMessages().catch(e => console.error('dispatch:', e.message)); }, 20_000);
 
 // ============================================================================
-//  MIGRACIÓN 11 (idempotente, al arranque)
-//  · payment_providers.config jsonb → lo PÚBLICO de cada método (modo ATH,
-//    publicToken ATH, handle PayPal, stripe_account_id). NUNCA secretos.
-//  · users: auth_provider / google_sub / apple_sub para login social, con
-//    índices únicos PARCIALES (no chocan con cuentas sin proveedor social).
-//    password_hash ya es nullable (registro social sin contraseña).
+//  ESQUEMA v11 (config jsonb en payment_providers + auth_provider/google_sub/
+//  apple_sub en users) → se aplica con `database/11-schema-pagos-login-social.sql`
+//  corrido como postgres. NO se auto-migra al arranque: el rol de la app
+//  (bukeame_user) no es dueño de las tablas ni tiene permisos DDL ("must be owner").
 // ============================================================================
-async function migrate11() {
-  await db.query(`ALTER TABLE payment_providers ADD COLUMN IF NOT EXISTS config jsonb NOT NULL DEFAULT '{}'::jsonb`);
-  await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_provider text`);
-  await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS google_sub text`);
-  await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS apple_sub text`);
-  await db.query(`ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL`).catch(() => {});
-  await db.query(`CREATE UNIQUE INDEX IF NOT EXISTS users_google_sub_uk ON users (google_sub) WHERE google_sub IS NOT NULL`);
-  await db.query(`CREATE UNIQUE INDEX IF NOT EXISTS users_apple_sub_uk  ON users (apple_sub)  WHERE apple_sub  IS NOT NULL`);
-}
-migrate11().then(() => console.log('  ✓ migración 11 aplicada (config jsonb + auth social)'))
-           .catch(e => console.error('⚠ migración 11:', e.message));
 
 // ============================================================================
 //  MÓDULOS v1.1 (revenue + fidelización)

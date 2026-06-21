@@ -54,6 +54,15 @@ h1{font-family:var(--display);font-weight:800;font-size:26px;letter-spacing:-.02
 .prod p{font-size:12.5px;color:var(--muted);margin-top:2px}
 .prod .price{font-family:var(--mono);font-weight:700;font-size:15px;color:var(--green)}
 .prod .del{color:#A1281C;font-size:12px;font-weight:600;margin-top:4px}
+.prod{flex-wrap:wrap}
+.photos{flex-basis:100%;display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px;padding-top:10px;border-top:1px solid var(--border)}
+.photos .thumb{position:relative;width:48px;height:48px;border-radius:10px;overflow:hidden;background:var(--green-soft);flex:none;border:1px solid var(--border)}
+.photos .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.photos .thumb .x{position:absolute;top:1px;right:1px;width:18px;height:18px;border-radius:999px;background:rgba(20,18,12,.72);color:#fff;font-size:12px;line-height:18px;text-align:center;font-weight:700;padding:0}
+.photos .addph{width:48px;height:48px;border-radius:10px;border:1.5px dashed var(--border);background:var(--bg2);color:var(--muted);font-size:11px;font-weight:700;display:grid;place-items:center;flex:none;line-height:1.1;text-align:center}
+.photos .addph:hover:not(:disabled){border-color:var(--green);color:var(--green)}
+.photos .addph:disabled{opacity:.5;cursor:default}
+.photos .phnote{font-size:11px;color:var(--muted)}
 .empty{text-align:center;color:var(--muted);font-size:14px;padding:40px 20px;line-height:1.6;background:var(--card);border:1.5px dashed var(--border);border-radius:16px}
 .locked{text-align:center;padding:36px 24px;background:linear-gradient(135deg,#11221E,#0A5B52);color:#FFF8EC;border-radius:20px}
 .locked .ic{font-size:40px;margin-bottom:12px}
@@ -124,6 +133,14 @@ async function api(method,path,body){
   let data={};try{data=await r.json();}catch(e){}
   return {status:r.status,ok:r.ok,data};
 }
+async function uploadPhoto(id,file){
+  const fd=new FormData();fd.append('photo',file);
+  // NO Content-Type: el navegador pone el boundary del multipart
+  const r=await fetch(API+'/products/'+id+'/photo',{method:'POST',headers:{'Authorization':'Bearer '+token},body:fd});
+  if(r.status===401){localStorage.clear();location.href='acceso.html';throw new Error('s');}
+  let data={};try{data=await r.json();}catch(e){}
+  return {status:r.status,ok:r.ok,data};
+}
 
 async function load(){
   const r=await api('GET','/products');
@@ -143,11 +160,44 @@ async function load(){
     return;
   }
   content.innerHTML=prods.map(function(p){
-    const photo=(p.photos&&p.photos[0])?'<img src="'+esc(p.photos[0].url)+'" alt="'+esc(p.name)+'" loading="lazy" decoding="async" width="60" height="60">':'📦';
-    return '<div class="prod"><div class="ph">'+photo+'</div><div class="grow"><h4>'+esc(p.name)+'</h4><p>'+(p.stock!=null?p.stock+' en inventario':'')+(p.description?(' · '+esc(p.description)):'')+'</p></div><div style="text-align:right"><div class="price">'+money(p.price_cents)+'</div><button class="del" data-id="'+esc(p.id)+'">Borrar</button></div></div>';
+    const photos=(p.photos||[]);
+    const cover=photos[0]?'<img src="'+esc(photos[0].url)+'" alt="'+esc(p.name)+'" loading="lazy" decoding="async" width="60" height="60">':'📦';
+    const thumbs=photos.map(function(ph){
+      return '<div class="thumb"><img src="'+esc(ph.url)+'" alt="" loading="lazy" decoding="async">'+
+        '<button class="x" data-pid="'+esc(p.id)+'" data-photoid="'+esc(ph.id)+'" title="Borrar foto">×</button></div>';
+    }).join('');
+    const full=photos.length>=3;
+    const addPh='<button class="addph" data-add="'+esc(p.id)+'"'+(full?' disabled':'')+'>+ Foto</button>';
+    const note=full?'<span class="phnote">Máx. 3 fotos</span>':'<span class="phnote">'+photos.length+'/3</span>';
+    return '<div class="prod"><div class="ph">'+cover+'</div><div class="grow"><h4>'+esc(p.name)+'</h4><p>'+(p.stock!=null?p.stock+' en inventario':'')+(p.description?(' · '+esc(p.description)):'')+'</p></div><div style="text-align:right"><div class="price">'+money(p.price_cents)+'</div><button class="del" data-id="'+esc(p.id)+'">Borrar</button></div>'+
+      '<div class="photos">'+thumbs+addPh+note+'</div></div>';
   }).join('');
   content.querySelectorAll('.del').forEach(function(b){
     b.onclick=async function(){ if(!confirm('¿Borrar este producto?'))return; const r=await api('DELETE','/products/'+b.dataset.id); if(r.ok)load(); };
+  });
+  // Subir foto
+  content.querySelectorAll('.addph').forEach(function(b){
+    b.onclick=function(){
+      if(b.disabled)return;
+      const inp=document.createElement('input');inp.type='file';inp.accept='image/*';
+      inp.onchange=async function(){
+        const file=inp.files&&inp.files[0];if(!file)return;
+        b.disabled=true;b.textContent='…';
+        const r=await uploadPhoto(b.dataset.add,file);
+        if(r.ok){load();}
+        else{b.disabled=false;b.textContent='+ Foto';alert((r.data&&r.data.error)||'No se pudo subir la foto.');}
+      };
+      inp.click();
+    };
+  });
+  // Borrar foto
+  content.querySelectorAll('.photos .x').forEach(function(b){
+    b.onclick=async function(){
+      if(!confirm('¿Borrar esta foto?'))return;
+      const r=await api('DELETE','/products/'+b.dataset.pid+'/photo/'+b.dataset.photoid);
+      if(r.ok)load();
+      else alert((r.data&&r.data.error)||'No se pudo borrar la foto.');
+    };
   });
 }
 

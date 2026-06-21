@@ -144,6 +144,51 @@ main{padding:22px 20px 90px;max-width:760px}
 .empty{text-align:center;color:var(--muted);font-size:13.5px;padding:30px 16px;background:var(--card);border:1px dashed var(--border);border-radius:14px;line-height:1.6}
 .pill{display:inline-block;font-family:var(--mono,monospace);font-size:10px;font-weight:600;letter-spacing:.04em;background:var(--card-soft);border:1px solid var(--border);color:var(--muted);padding:2px 8px;border-radius:20px;margin-left:5px;white-space:nowrap}
 .pill-red{background:var(--red-soft,#FCE8E6);border-color:#f3c0ba;color:var(--red,#A1281C)}
+/* ── Agenda Día/Semana/Mes ───────────────────────────────────────────────── */
+.agenda-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:2px 0 14px}
+.agview-tg{display:inline-flex;gap:2px;background:var(--card-soft);border:1px solid var(--border);border-radius:999px;padding:3px}
+.agview-tg button{font:700 11.5px 'Instrument Sans',sans-serif;padding:7px 14px;border-radius:999px;line-height:1;cursor:pointer;border:0;background:transparent;color:var(--muted)}
+.agview-tg button.on{background:var(--green);color:var(--green-ink)}
+.agnav{display:inline-flex;align-items:center;gap:6px}
+.agnav .navbtn{width:34px;height:34px;border-radius:10px;background:var(--card);border:1.5px solid var(--border);color:var(--text);font-weight:700;font-size:15px;display:grid;place-items:center;cursor:pointer;line-height:1}
+.agnav .navbtn:hover{border-color:var(--green)}
+.agnav .todaybtn{padding:0 13px;height:34px;border-radius:10px;background:var(--card);border:1.5px solid var(--border);color:var(--text);font-weight:700;font-size:12.5px;cursor:pointer}
+.agnav .todaybtn:hover{border-color:var(--green)}
+.agperiod{font-weight:700;font-size:13.5px;color:var(--text);min-width:120px;text-align:center;text-transform:capitalize}
+/* Semana */
+.wk-grid{display:grid;grid-template-columns:repeat(7,minmax(118px,1fr));gap:8px}
+.wk-col{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:8px 8px 10px;min-height:120px;display:flex;flex-direction:column;gap:6px}
+.wk-col.is-today{border-color:var(--green);box-shadow:0 0 0 1px var(--green) inset}
+.wk-head{display:flex;align-items:baseline;justify-content:space-between;gap:4px;padding:2px 2px 4px;border-bottom:1px solid var(--border)}
+.wk-dow{font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.wk-dnum{font-weight:800;font-size:15px;color:var(--text)}
+.wk-col.is-today .wk-dnum{color:var(--green)}
+.wk-card{background:var(--card-soft);border-left:3px solid var(--green);border-radius:9px;padding:6px 8px;cursor:default}
+.wk-card time{display:block;font-family:var(--mono);font-weight:700;font-size:10.5px;color:var(--text)}
+.wk-card b{display:block;font-size:11.5px;font-weight:700;line-height:1.25;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wk-card small{display:block;font-size:10.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wk-card.st-completed{opacity:.7;border-left-color:#15803D}
+.wk-card.st-no_show{opacity:.65;border-left-color:#C8472E}
+.wk-card.st-cancelled_business,.wk-card.st-cancelled_client{opacity:.55;border-left-color:#9A958A}
+.wk-empty{font-size:11px;color:var(--muted2);text-align:center;padding:8px 0}
+/* Mes */
+.mo-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.mo-dow{font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);text-align:center;padding:2px 0 4px}
+.mo-cell{background:var(--card);border:1px solid var(--border);border-radius:11px;min-height:74px;padding:7px 8px;cursor:pointer;display:flex;flex-direction:column;gap:4px;transition:border-color .12s}
+.mo-cell:hover{border-color:var(--green)}
+.mo-cell.is-other{opacity:.45}
+.mo-cell.is-today{border-color:var(--green);box-shadow:0 0 0 1px var(--green) inset}
+.mo-cell .mo-num{font-weight:700;font-size:13px;color:var(--text)}
+.mo-cell.is-today .mo-num{color:var(--green)}
+.mo-dots{display:flex;flex-wrap:wrap;gap:3px;margin-top:auto}
+.mo-dot{width:6px;height:6px;border-radius:99px;background:var(--green)}
+.mo-count{font-size:10.5px;font-weight:700;color:var(--muted);margin-top:auto}
+@media(max-width:640px){
+  .wk-grid{display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;padding-bottom:6px}
+  .wk-col{flex:0 0 78%;scroll-snap-align:start}
+  .mo-cell{min-height:58px;padding:5px 5px}
+  .agperiod{min-width:90px;font-size:12.5px}
+}
 .cli-row{display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer}
 .cli-row:hover{border-color:var(--green)}
 .cli-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:4px 0 16px}
@@ -167,6 +212,22 @@ main{padding:22px 20px 90px;max-width:760px}
 .slider::before{content:"";position:absolute;height:18px;width:18px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
 .switch input:checked+.slider{background:var(--green)}
 .switch input:checked+.slider::before{transform:translateX(18px)}
+/* ── Mini-calendario días libres (Bukéame) ── */
+.freecard{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:14px}
+.free-modes{display:inline-flex;gap:2px;background:var(--card-soft);border:1px solid var(--border);border-radius:999px;padding:3px;margin-bottom:14px}
+.free-modes button{border:0;background:transparent;color:var(--muted);font-weight:700;font-size:12.5px;padding:6px 14px;border-radius:999px;cursor:pointer}
+.free-modes button.on{background:var(--green);color:#fff}
+.cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.cal-head b{font-family:var(--display);font-weight:800;font-size:15px}
+.cal-nav{width:34px;height:34px;border-radius:10px;background:var(--card);border:1.5px solid var(--border);color:var(--text);font-weight:700;font-size:15px;display:grid;place-items:center;cursor:pointer;line-height:1}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.cal-dow{text-align:center;font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;padding-bottom:2px}
+.cal-cell{aspect-ratio:1;border:1.5px solid var(--border);border-radius:10px;background:var(--card);color:var(--text);font-weight:600;font-size:13.5px;display:grid;place-items:center;cursor:pointer;user-select:none;transition:border-color .1s,background .1s}
+.cal-cell.empty{border:0;background:transparent;cursor:default}
+.cal-cell.past{color:var(--muted);opacity:.4;cursor:not-allowed}
+.cal-cell.today{border-color:var(--green)}
+.cal-cell.sel{background:var(--green);border-color:var(--green);color:#fff}
+.cal-cell.inrange{background:var(--green-soft);border-color:var(--green)}
 .modal{display:none;position:fixed;inset:0;background:rgba(20,18,12,.5);z-index:100;align-items:center;justify-content:center;padding:18px}
 .modal.on{display:flex}
 .modal .box{background:var(--card);border-radius:18px;padding:22px;max-width:440px;width:100%;max-height:90vh;overflow-y:auto}
@@ -242,7 +303,19 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
         </div>
         <div id="notifPanel" style="display:none"></div>
         <div class="kpis" id="kpis"></div>
-        <div class="seclabel">Citas de hoy</div>
+        <div class="agenda-bar">
+          <div class="agview-tg" id="agViewTg">
+            <button type="button" data-agview="day">Día</button>
+            <button type="button" data-agview="week">Semana</button>
+            <button type="button" data-agview="month">Mes</button>
+          </div>
+          <div class="agnav">
+            <button type="button" class="navbtn" id="agPrev" title="Anterior">&#9664;</button>
+            <button type="button" class="todaybtn" id="agToday">Hoy</button>
+            <button type="button" class="navbtn" id="agNext" title="Siguiente">&#9654;</button>
+          </div>
+          <div class="agperiod" id="agPeriodLabel"></div>
+        </div>
         <div id="agendaList"></div>
       </section>
 
@@ -333,6 +406,42 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
 
         <div class="seclabel" style="margin-top:28px">Días libres y bloqueos</div>
         <p style="font-size:13px;color:var(--ink2);margin-bottom:12px">Marca días que no trabajas o bloquea horas específicas. Tus clientes no podrán reservar en esos momentos.</p>
+
+        <!-- Añadir días libres con selección múltiple (Bukéame) -->
+        <div class="freecard">
+          <div style="font-weight:700;font-size:14.5px;margin-bottom:4px">Añadir días libres</div>
+          <p style="font-size:12.5px;color:var(--ink2);margin-bottom:12px">Toca varios días para marcarlos libres, o usa un rango Desde / Hasta.</p>
+          <div class="alert" id="freeAlert"></div>
+
+          <div class="free-modes">
+            <button type="button" data-free-mode="multi" class="on">Días sueltos</button>
+            <button type="button" data-free-mode="range">Rango</button>
+          </div>
+
+          <div id="freeRangeRow" style="display:none;gap:10px;margin-bottom:14px" class="row2">
+            <div class="field"><label>Desde</label><input id="freeFrom" type="date"></div>
+            <div class="field"><label>Hasta</label><input id="freeTo" type="date"></div>
+          </div>
+
+          <div class="cal-head">
+            <button type="button" class="cal-nav" id="freePrev" aria-label="Mes anterior">◀</button>
+            <b id="freeMonthLbl"></b>
+            <button type="button" class="cal-nav" id="freeNext" aria-label="Mes siguiente">▶</button>
+          </div>
+          <div class="cal-grid" id="freeCal"></div>
+
+          <div class="field" id="freeStaffField" style="margin-top:14px;display:none">
+            <label>Profesional (opcional)</label>
+            <select id="freeStaff"><option value="">Todo el negocio</option></select>
+          </div>
+          <div class="field" style="margin-top:10px">
+            <label>Motivo (opcional)</label>
+            <input id="freeReason" placeholder="Vacaciones, feriado…" maxlength="120">
+          </div>
+
+          <button class="btn btn-teal btn-sm" id="freeSaveBtn" style="width:100%;margin-top:8px" disabled>Marcar libres (0 días)</button>
+        </div>
+
         <button class="btn btn-ghost btn-sm" id="addBlockBtn" style="margin-bottom:14px">+ Añadir día libre o bloqueo</button>
         <div id="blocksList"></div>
       </section>
@@ -419,6 +528,10 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
               <button class="btn btn-ghost" id="logoRemoveBtn" style="padding:10px 16px;font-size:13px;display:none;margin-left:8px">Quitar</button>
               <p style="font-size:12px;color:var(--ink2);margin-top:8px">JPG, PNG o WEBP · Cuadrado 800×800 · Máx 5MB · <b>Desde plan Pro</b></p>
             </div>
+          </div>
+          <div id="logoBgPicker" style="margin-top:16px;border-top:1.5px solid var(--line);padding-top:14px">
+            <div style="font-size:12px;color:var(--ink2);margin-bottom:8px;font-weight:600">¿Sin logo? Elige un fondo. Mostraremos la inicial de tu negocio sobre él.</div>
+            <div id="logoBgGallery" style="display:flex;gap:10px;flex-wrap:wrap"></div>
           </div>
         </div>
 
@@ -526,6 +639,7 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
           <p style="font-size:13px;color:var(--ink2);margin-bottom:6px">Activa funciones extra sin cambiar de plan.</p>
           <div class="alert" id="addonAlert"></div>
           <div id="addonList"><p style="color:var(--ink2);font-size:13px">Cargando…</p></div>
+          <div id="addonTotal" style="display:none;margin-top:14px;padding:12px 14px;background:var(--green-soft);border:1px solid var(--green-border,var(--border));border-radius:12px;font-size:13.5px;color:var(--ink);line-height:1.5"></div>
         </div>
 
         <!-- Destacar mi negocio -->
@@ -773,6 +887,10 @@ document.getElementById('logout').onclick = doLogout;
 document.getElementById('logout2').onclick = doLogout;
 
 let BIZ = null;
+let PLAN_PRICE_CENTS = 0;
+let PLAN_NAME = 'Tu plan';
+const ADDON_HIDDEN = ['sms','custom_domain'];   // no se usan aún: no mostrar
+const ADDON_STORE = ['store_10','store_25'];    // tiendas: avisar si se activan ambas
 
 // ── Días libres / bloqueos ─────────────────────────────────────────────────
 async function loadBlocks(){
@@ -803,6 +921,159 @@ async function loadBlocks(){
     };
   });
 }
+// ── Añadir días libres (selección múltiple + rango) ────────────────────────
+var freeMode = 'multi';           // 'multi' | 'range'
+var freeView = new Date();        // mes mostrado en el calendario
+var freeSel = new Set();          // fechas sueltas seleccionadas (YYYY-MM-DD)
+var freeStaffLoaded = false;
+var FREE_DOW = ['Do','Lu','Ma','Mi','Ju','Vi','Sa'];
+var FREE_MONTHS = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+
+function freeToday(){ return new Date().toLocaleDateString('en-CA',{timeZone:'America/Puerto_Rico'}); }
+function freeYmd(y,m,d){ return String(y)+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0'); }
+
+// Devuelve el array de fechas a marcar según el modo actual
+function freeDates(){
+  if(freeMode === 'range'){
+    var a = document.getElementById('freeFrom').value;
+    var b = document.getElementById('freeTo').value;
+    if(!a || !b || b < a) return [];
+    var out = [], cur = new Date(a+'T12:00:00'), end = new Date(b+'T12:00:00');
+    while(cur <= end && out.length < 60){
+      out.push(cur.toLocaleDateString('en-CA'));
+      cur.setDate(cur.getDate()+1);
+    }
+    return out;
+  }
+  return Array.from(freeSel).sort();
+}
+
+function freeRefreshBtn(){
+  var n = freeDates().length;
+  var btn = document.getElementById('freeSaveBtn');
+  btn.textContent = 'Marcar libres ('+n+(n===1?' día':' días')+')';
+  btn.disabled = n < 1;
+}
+
+function freeRenderCal(){
+  var grid = document.getElementById('freeCal');
+  var y = freeView.getFullYear(), m = freeView.getMonth();
+  document.getElementById('freeMonthLbl').textContent = FREE_MONTHS[m]+' '+y;
+  var first = new Date(y,m,1).getDay();
+  var days = new Date(y,m+1,0).getDate();
+  var today = freeToday();
+  var rangeSet = new Set(freeMode==='range' ? freeDates() : []);
+  var html = '';
+  for(var i=0;i<7;i++){ html += '<div class="cal-dow">'+FREE_DOW[i]+'</div>'; }
+  for(var b=0;b<first;b++){ html += '<div class="cal-cell empty"></div>'; }
+  for(var d=1;d<=days;d++){
+    var ymd = freeYmd(y,m,d);
+    var cls = 'cal-cell';
+    if(ymd < today){ cls += ' past'; }
+    else {
+      if(ymd === today) cls += ' today';
+      if(freeMode==='multi' && freeSel.has(ymd)) cls += ' sel';
+      if(freeMode==='range' && rangeSet.has(ymd)) cls += ' inrange';
+    }
+    html += '<div class="'+cls+'" data-ymd="'+ymd+'">'+d+'</div>';
+  }
+  grid.innerHTML = html;
+  grid.querySelectorAll('.cal-cell[data-ymd]').forEach(function(cell){
+    if(cell.classList.contains('past')) return;
+    cell.onclick = function(){
+      var ymd = cell.dataset.ymd;
+      if(freeMode==='multi'){
+        if(freeSel.has(ymd)) freeSel.delete(ymd); else freeSel.add(ymd);
+        freeRenderCal();
+      } else {
+        // en modo rango, tocar un día rellena Desde y luego Hasta
+        var fromEl = document.getElementById('freeFrom'), toEl = document.getElementById('freeTo');
+        if(!fromEl.value || (toEl.value && fromEl.value)){ fromEl.value = ymd; toEl.value = ''; }
+        else if(ymd < fromEl.value){ fromEl.value = ymd; }
+        else { toEl.value = ymd; }
+        freeRenderCal();
+      }
+      freeRefreshBtn();
+    };
+  });
+}
+
+async function freeLoadStaff(){
+  if(freeStaffLoaded) return;
+  var r = await api('GET','/staff');
+  var staff = (r.ok && r.data.staff) ? r.data.staff : [];
+  var sel = document.getElementById('freeStaff');
+  var field = document.getElementById('freeStaffField');
+  if(staff.length){
+    sel.innerHTML = '<option value="">Todo el negocio</option>' + staff.map(function(s){
+      return '<option value="'+esc(s.id)+'">'+esc(s.display_name||'Profesional')+'</option>';
+    }).join('');
+    field.style.display = 'block';
+  } else {
+    field.style.display = 'none';
+  }
+  freeStaffLoaded = true;
+}
+
+function freeInit(){
+  freeView = new Date();
+  freeSel.clear();
+  freeMode = 'multi';
+  document.querySelectorAll('[data-free-mode]').forEach(function(b){ b.classList.toggle('on', b.dataset.freeMode==='multi'); });
+  document.getElementById('freeRangeRow').style.display = 'none';
+  var t = freeToday();
+  document.getElementById('freeFrom').value = ''; document.getElementById('freeFrom').min = t;
+  document.getElementById('freeTo').value = ''; document.getElementById('freeTo').min = t;
+  document.getElementById('freeReason').value = '';
+  clearAlert('freeAlert');
+  freeLoadStaff();
+  freeRenderCal();
+  freeRefreshBtn();
+}
+
+document.querySelectorAll('[data-free-mode]').forEach(function(btn){
+  btn.onclick = function(){
+    freeMode = btn.dataset.freeMode;
+    document.querySelectorAll('[data-free-mode]').forEach(function(b){ b.classList.toggle('on', b===btn); });
+    document.getElementById('freeRangeRow').style.display = (freeMode==='range') ? 'flex' : 'none';
+    clearAlert('freeAlert');
+    freeRenderCal();
+    freeRefreshBtn();
+  };
+});
+document.getElementById('freePrev').onclick = function(){ freeView.setMonth(freeView.getMonth()-1); freeRenderCal(); };
+document.getElementById('freeNext').onclick = function(){ freeView.setMonth(freeView.getMonth()+1); freeRenderCal(); };
+document.getElementById('freeFrom').onchange = function(){ freeRenderCal(); freeRefreshBtn(); };
+document.getElementById('freeTo').onchange = function(){ freeRenderCal(); freeRefreshBtn(); };
+
+document.getElementById('freeSaveBtn').onclick = async function(){
+  clearAlert('freeAlert');
+  var dates = freeDates();
+  if(dates.length < 1){ showAlert('freeAlert','Selecciona al menos un día.',false); return; }
+  if(dates.length > 60){ showAlert('freeAlert','Máximo 60 días por vez.',false); return; }
+  var body = { dates: dates };
+  var staffId = document.getElementById('freeStaff').value;
+  if(staffId) body.staff_id = staffId;
+  var reason = document.getElementById('freeReason').value.trim();
+  if(reason) body.reason = reason;
+  var btn = this; btn.disabled = true; btn.textContent = '…';
+  var r = await api('POST','/blocks/batch', body);
+  if(r.ok){
+    var n = (r.data && typeof r.data.created === 'number') ? r.data.created : dates.length;
+    showAlert('freeAlert', n+(n===1?' día marcado libre.':' días marcados libres.'), true);
+    freeSel.clear();
+    document.getElementById('freeFrom').value = '';
+    document.getElementById('freeTo').value = '';
+    document.getElementById('freeReason').value = '';
+    freeRenderCal();
+    freeRefreshBtn();
+    loadBlocks();
+  } else {
+    showAlert('freeAlert', (r.data && r.data.error) || 'No se pudo guardar.', false);
+    freeRefreshBtn();
+  }
+};
+
 const blockModal = document.getElementById('blockModal');
 document.getElementById('addBlockBtn').onclick = function(){
   clearAlert('blockAlert');
@@ -1023,7 +1294,10 @@ async function boot(){
     if(sp.get('stripe')==='ok'){
       history.replaceState(null,'',location.pathname);
       switchView('pagos');
-      setTimeout(function(){ showAlert('payAlert','Stripe conectado. Ya puedes cobrar con tarjeta.', true); }, 300);
+      setTimeout(function(){
+        showAlert('payAlert','Stripe conectado. Ya puedes cobrar con tarjeta.', true);
+        try { loadPayments(); } catch(e){ console.error('loadPayments', e); }
+      }, 300);
     }
   } catch(e){ console.error('stripeReturn', e); }
 }
@@ -1087,17 +1361,57 @@ function fillBusiness(data){
   // ── Logo del negocio (premium: Pro+) ──
   (function(){
     var isFree = (b.plan_code || 'free') === 'free';
+    // Fondos predeterminados elegantes (verdes/tierra de la marca, combinan con banners/marquesina)
+    var LOGO_BGS = [
+      { id:'teal',  grad:'linear-gradient(135deg,#0E8074,#0A5B52)' },
+      { id:'forest',grad:'linear-gradient(135deg,#11221E,#0d6b46)' },
+      { id:'earth', grad:'linear-gradient(135deg,#7A5C3E,#3E2C1C)' },
+      { id:'sage',  grad:'linear-gradient(135deg,#9FE8D5,#0E8074)' },
+      { id:'sand',  grad:'linear-gradient(135deg,#E7E2D1,#B98F5A)' }
+    ];
+    // theme actual del negocio (reusamos el mismo campo que el banner)
+    var logoTheme = {};
+    try { logoTheme = (typeof b.theme==='string') ? JSON.parse(b.theme) : (b.theme||{}); } catch(e){ logoTheme = {}; }
+    var savedBg = logoTheme.logo_bg || localStorage.getItem('bukeame_logo_bg') || LOGO_BGS[0].id;
+    function bgGrad(id){ var f = LOGO_BGS.find(function(x){ return x.id===id; }); return (f||LOGO_BGS[0]).grad; }
+    var initial = esc((b.name||'?').trim().charAt(0).toUpperCase() || '?');
     function renderLogo(url){
       var prev = document.getElementById('logoPreview');
       var rm = document.getElementById('logoRemoveBtn');
+      var picker = document.getElementById('logoBgPicker');
       if(url){
         prev.innerHTML = '<img src="'+url+'" alt="logo" width="84" height="84" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover">';
         if(rm) rm.style.display = isFree ? 'none' : 'inline-flex';
+        if(picker) picker.style.display = 'none';
       } else {
-        prev.innerHTML = '<span style="font-size:11px;color:var(--ink2);text-align:center;padding:6px">Sin logo</span>';
+        prev.innerHTML = '<span style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;'+
+          'background:'+bgGrad(savedBg)+';color:#fff;font-family:var(--display,sans-serif);font-weight:800;font-size:38px">'+initial+'</span>';
         if(rm) rm.style.display = 'none';
+        if(picker) picker.style.display = 'block';
       }
     }
+    // Galería de fondos
+    (function(){
+      var gal = document.getElementById('logoBgGallery');
+      if(!gal) return;
+      gal.innerHTML = LOGO_BGS.map(function(f){
+        var sel = (f.id===savedBg);
+        return '<button type="button" class="logo-bg-sw" data-id="'+f.id+'" title="Fondo '+f.id+'" '+
+          'style="width:40px;height:40px;border-radius:10px;cursor:pointer;padding:0;'+
+          'background:'+f.grad+';border:2.5px solid '+(sel?'var(--teal)':'transparent')+';box-shadow:0 0 0 1px var(--line)"></button>';
+      }).join('');
+      gal.querySelectorAll('.logo-bg-sw').forEach(function(sw){
+        sw.onclick = async function(){
+          savedBg = sw.dataset.id;
+          localStorage.setItem('bukeame_logo_bg', savedBg);
+          logoTheme.logo_bg = savedBg;
+          gal.querySelectorAll('.logo-bg-sw').forEach(function(x){ x.style.borderColor='transparent'; });
+          sw.style.borderColor='var(--teal)';
+          renderLogo(null);
+          try { await api('PATCH','/businesses/me',{ theme: logoTheme }); } catch(e){}
+        };
+      });
+    })();
     renderLogo(b.logo_url || null);
     var fileInput = document.getElementById('logoFile');
     var uploadBtn = document.getElementById('logoUploadBtn');
@@ -1180,6 +1494,8 @@ function fillBusiness(data){
       sw.onclick = async function(){
         var id = sw.dataset.id;
         theme.banner = id;
+        // conservar la elección de fondo del logo si existe
+        var lb = localStorage.getItem('bukeame_logo_bg'); if(lb) theme.logo_bg = lb;
         currentCover = null;   // elegir patrón quita la imagen
         // guardar theme
         var r = await api('PATCH','/businesses/me',{ theme: theme, cover_url: null });
@@ -1285,6 +1601,27 @@ function fillBusiness(data){
   renderHours(data.hours || []);
 }
 
+// ════════════════════════ AGENDA: Día / Semana / Mes ════════════════════════
+const PR_TZ = 'America/Puerto_Rico';
+const AGVIEW_KEY = 'bukeame_agenda_view';
+// Fecha local "YYYY-MM-DD" en zona horaria de Puerto Rico.
+function prToday(){ return new Date().toLocaleDateString('en-CA',{timeZone:PR_TZ}); }
+// Parsea "YYYY-MM-DD" a Date a mediodía local del navegador (estable para aritmética de días).
+function ymdToDate(s){ const p=String(s).split('-'); return new Date(+p[0], +p[1]-1, +p[2], 12, 0, 0); }
+function dateToYmd(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function addDays(s,n){ const d=ymdToDate(s); d.setDate(d.getDate()+n); return dateToYmd(d); }
+function addMonths(s,n){ const d=ymdToDate(s); d.setMonth(d.getMonth()+n); return dateToYmd(d); }
+// Lunes de la semana que contiene a "s" (semana Lun–Dom).
+function weekStart(s){ const d=ymdToDate(s); const dow=d.getDay(); const diff=(dow===0?-6:1-dow); d.setDate(d.getDate()+diff); return dateToYmd(d); }
+const DOW_ES = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+const MONTH_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+function hourLabel(iso){ try{ return new Date(iso).toLocaleTimeString('es-PR',{timeZone:PR_TZ,hour:'numeric',minute:'2-digit',hour12:true}); }catch(e){ return ''; } }
+// Día local PR (YYYY-MM-DD) a partir del starts_at ISO de una cita.
+function apptDay(iso){ try{ return new Date(iso).toLocaleDateString('en-CA',{timeZone:PR_TZ}); }catch(e){ return ''; } }
+
+let AG_VIEW = (function(){ const v=localStorage.getItem(AGVIEW_KEY); return (v==='week'||v==='month')?v:'day'; })();
+let AG_ANCHOR = prToday();   // fecha de referencia del período visible
+
 async function loadDashboard(){
   const dash = await api('GET','/dashboard/today');
   if(dash.ok){
@@ -1296,14 +1633,56 @@ async function loadDashboard(){
       '<div class="kpi"><small>WhatsApp enviados</small><b>'+(d.whatsapp_enviados||0)+'</b></div>'+
       '<div class="kpi"><small>No-shows</small><b>'+(d.no_shows||0)+'</b></div>';
   }
-  const today = new Date().toLocaleDateString('en-CA',{timeZone:'America/Puerto_Rico'});
-  const appts = await api('GET','/appointments?date='+today);
-  const list = document.getElementById('agendaList');
-  const items = (appts.ok && appts.data.appointments) ? appts.data.appointments : [];
-  if(items.length === 0){
-    list.innerHTML = '<div class="empty">No hay citas para hoy.<br>Cuando alguien reserve, aparecerá aquí.</div>';
+  await renderAgenda();
+}
+
+// Calcula el rango [from,to] (YYYY-MM-DD) que se pide al backend según la vista.
+function agendaRange(){
+  if(AG_VIEW==='day') return { from:AG_ANCHOR, to:AG_ANCHOR };
+  if(AG_VIEW==='week'){ const ws=weekStart(AG_ANCHOR); return { from:ws, to:addDays(ws,6) }; }
+  // month: rejilla completa Lun–Dom que cubre el mes del anchor
+  const first = AG_ANCHOR.slice(0,8)+'01';
+  const gridStart = weekStart(first);
+  const lastDay = addDays(addMonths(first,1),-1);
+  const gridEnd = addDays(weekStart(lastDay),6);
+  return { from:gridStart, to:gridEnd };
+}
+
+function setAgPeriodLabel(){
+  const el = document.getElementById('agPeriodLabel'); if(!el) return;
+  if(AG_VIEW==='day'){
+    const d = ymdToDate(AG_ANCHOR);
+    el.textContent = DOW_ES[(d.getDay()===0?6:d.getDay()-1)]+' '+d.getDate()+' '+MONTH_ES[d.getMonth()];
+  }else if(AG_VIEW==='week'){
+    const ws=ymdToDate(weekStart(AG_ANCHOR)), we=ymdToDate(addDays(weekStart(AG_ANCHOR),6));
+    const sameMonth = ws.getMonth()===we.getMonth();
+    el.textContent = ws.getDate()+(sameMonth?'':' '+MONTH_ES[ws.getMonth()].slice(0,3))+'–'+we.getDate()+' '+MONTH_ES[we.getMonth()];
   }else{
-    list.innerHTML = items.map(function(a){
+    const d = ymdToDate(AG_ANCHOR.slice(0,8)+'01');
+    el.textContent = MONTH_ES[d.getMonth()]+' '+d.getFullYear();
+  }
+}
+
+async function renderAgenda(){
+  // reflejar vista activa en el segmented control
+  document.querySelectorAll('#agViewTg button').forEach(function(b){ b.classList.toggle('on', b.dataset.agview===AG_VIEW); });
+  setAgPeriodLabel();
+  const list = document.getElementById('agendaList');
+  const r = agendaRange();
+  const resp = await api('GET','/appointments?from='+r.from+'&to='+r.to);
+  const items = (resp.ok && resp.data.appointments) ? resp.data.appointments : [];
+  if(AG_VIEW==='day') renderDayList(list, items);
+  else if(AG_VIEW==='week') renderWeek(list, items, r);
+  else renderMonth(list, items, r);
+}
+
+function renderDayList(list, items){
+  if(items.length === 0){
+    const isToday = AG_ANCHOR===prToday();
+    list.innerHTML = '<div class="empty">No hay citas para '+(isToday?'hoy':'este día')+'.<br>Cuando alguien reserve, aparecerá aquí.</div>';
+    return;
+  }
+  list.innerHTML = items.map(function(a){
       const t = new Date(a.starts_at).toLocaleTimeString('es-PR',{hour:'numeric',minute:'2-digit'});
       const st = a.status||'confirmed';
       // etiqueta de estado
@@ -1342,8 +1721,94 @@ async function loadDashboard(){
         else { alert(r.data.error||'No se pudo actualizar.'); btn.disabled=false; }
       };
     });
-  }
 }
+
+// Agrupa las citas por día local PR (clave YYYY-MM-DD).
+function groupByDay(items){
+  const m = {};
+  items.forEach(function(a){ const k=apptDay(a.starts_at); if(!k)return; (m[k]=m[k]||[]).push(a); });
+  return m;
+}
+
+function renderWeek(list, items, range){
+  const byDay = groupByDay(items);
+  const ws = weekStart(AG_ANCHOR);
+  const today = prToday();
+  let h = '<div class="wk-grid">';
+  for(let i=0;i<7;i++){
+    const day = addDays(ws,i);
+    const d = ymdToDate(day);
+    const appts = (byDay[day]||[]);
+    h += '<div class="wk-col'+(day===today?' is-today':'')+'" data-day="'+esc(day)+'">'+
+      '<div class="wk-head"><span class="wk-dow">'+DOW_ES[i]+'</span><span class="wk-dnum">'+d.getDate()+'</span></div>';
+    if(appts.length){
+      h += appts.map(function(a){
+        const st = a.status||'confirmed';
+        const who = a.client_name || a.service_name || 'Cita';
+        const svc = a.service_name || '';
+        const sub = (a.staff_name? esc(a.staff_name)+(svc?' · ':''):'')+esc(svc);
+        return '<div class="wk-card st-'+st+'"><time>'+esc(hourLabel(a.starts_at))+'</time><b>'+esc(who)+'</b>'+(sub?'<small>'+sub+'</small>':'')+'</div>';
+      }).join('');
+    }else{
+      h += '<div class="wk-empty">—</div>';
+    }
+    h += '</div>';
+  }
+  h += '</div>';
+  list.innerHTML = h;
+  // tocar un día → ir a vista Día de ese día
+  list.querySelectorAll('.wk-col').forEach(function(col){
+    col.style.cursor='pointer';
+    col.onclick=function(){ AG_ANCHOR=col.dataset.day; setAgView('day'); };
+  });
+}
+
+function renderMonth(list, items, range){
+  const byDay = groupByDay(items);
+  const today = prToday();
+  const curMonth = AG_ANCHOR.slice(0,7);   // YYYY-MM del mes mostrado
+  let h = '<div class="mo-grid">';
+  for(let i=0;i<7;i++){ h += '<div class="mo-dow">'+DOW_ES[i]+'</div>'; }
+  let day = range.from;
+  while(day <= range.to){
+    const d = ymdToDate(day);
+    const n = (byDay[day]||[]).length;
+    const other = day.slice(0,7)!==curMonth;
+    let dots='';
+    if(n>0){
+      const k=Math.min(n,4);
+      let ds=''; for(let j=0;j<k;j++){ ds+='<span class="mo-dot"></span>'; }
+      dots = '<div class="mo-dots">'+ds+'</div>'+(n>4?'<span class="mo-count">'+n+'</span>':'');
+    }
+    h += '<div class="mo-cell'+(other?' is-other':'')+(day===today?' is-today':'')+'" data-day="'+esc(day)+'">'+
+      '<span class="mo-num">'+d.getDate()+'</span>'+dots+'</div>';
+    day = addDays(day,1);
+  }
+  h += '</div>';
+  list.innerHTML = h;
+  list.querySelectorAll('.mo-cell').forEach(function(cell){
+    cell.onclick=function(){ AG_ANCHOR=cell.dataset.day; setAgView('day'); };
+  });
+}
+
+function setAgView(v){
+  AG_VIEW = v;
+  localStorage.setItem(AGVIEW_KEY, v);
+  renderAgenda();
+}
+function agNav(dir){
+  if(AG_VIEW==='day') AG_ANCHOR = addDays(AG_ANCHOR, dir);
+  else if(AG_VIEW==='week') AG_ANCHOR = addDays(AG_ANCHOR, dir*7);
+  else AG_ANCHOR = addMonths(AG_ANCHOR, dir);
+  renderAgenda();
+}
+(function wireAgenda(){
+  document.querySelectorAll('#agViewTg button').forEach(function(b){ b.onclick=function(){ setAgView(b.dataset.agview); }; });
+  const prev=document.getElementById('agPrev'), next=document.getElementById('agNext'), tdy=document.getElementById('agToday');
+  if(prev) prev.onclick=function(){ agNav(-1); };
+  if(next) next.onclick=function(){ agNav(1); };
+  if(tdy) tdy.onclick=function(){ AG_ANCHOR=prToday(); renderAgenda(); };
+})();
 
 async function loadServices(){
   const r = await api('GET','/services');
@@ -1541,7 +2006,7 @@ function switchView(v){
   if(v==='equipo') loadStaff();
   if(v==='clientes') loadClients();
   if(v==='lealtad') loadLoyalty();
-  if(v==='horario') loadBlocks();
+  if(v==='horario'){ loadBlocks(); freeInit(); }
   if(v==='contabilidad') loadAccounting();
   if(v==='pagos') loadPayments();
   if(v==='negocio'){ initLocMap(); loadPortfolio(); }
@@ -1785,9 +2250,15 @@ function payCard(p, ath){
             '<button class="btn btn-teal btn-sm pay-conn" data-p="paypal">Conectar</button>'+
           '</div>';
   } else if(p.provider==='stripe'){
-    act = '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end;max-width:340px">'+
-            '<input type="text" id="stripeInput" placeholder="Tu Payment Link de Stripe (https://buy.stripe.com/…)" autocomplete="off" style="padding:9px 12px;border:1.5px solid var(--line);border-radius:10px;font-size:13px;max-width:240px">'+
-            '<button class="btn btn-teal btn-sm pay-conn" data-p="stripe">Conectar</button>'+
+    act = '<div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;width:100%;max-width:340px">'+
+            '<button class="btn btn-teal btn-sm pay-stripe">Conectar con Stripe</button>'+
+            '<div id="stripeFallback" style="display:none;width:100%">'+
+              '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end">'+
+                '<input type="text" id="stripeInput" placeholder="Tu Payment Link de Stripe (https://buy.stripe.com/…)" autocomplete="off" style="padding:9px 12px;border:1.5px solid var(--line);border-radius:10px;font-size:13px;max-width:240px">'+
+                '<button class="btn btn-ghost btn-sm pay-conn" data-p="stripe">Conectar</button>'+
+              '</div>'+
+              '<p style="font-size:11.5px;color:var(--ink2);margin:6px 0 0;line-height:1.55;text-align:right">Stripe automático estará disponible pronto. Mientras tanto, pega tu Payment Link.</p>'+
+            '</div>'+
           '</div>';
   } else if(p.provider==='cash'){
     act = '<button class="btn btn-teal btn-sm pay-conn" data-p="cash">Activar</button>';
@@ -1836,12 +2307,21 @@ function wirePayments(){
     if(r.ok){ showAlert('payAlert','Listo, método conectado.', true); loadPayments(); }
     else { showAlert('payAlert', r.data.error||'No se pudo conectar.', false); b.disabled=false; }
   };});
-  // Stripe Connect: pedir la URL OAuth y redirigir
+  // Stripe Connect: pedir la URL OAuth y redirigir. Si la plataforma no está
+  // configurada (409), mostramos el Payment Link de fallback con su nota.
   document.querySelectorAll('.pay-stripe').forEach(function(b){ b.onclick = async function(){
     b.disabled=true;
     const r = await api('GET','/payments/stripe/connect');
-    if(r.ok && r.data && r.data.url){ location.href = r.data.url; }
-    else { showAlert('payAlert', (r.data&&r.data.error)||'No se pudo iniciar la conexión con Stripe.', false); b.disabled=false; }
+    if(r.ok && r.data && r.data.url){ location.href = r.data.url; return; }
+    if(r.status===409){
+      const fb = document.getElementById('stripeFallback');
+      if(fb) fb.style.display = 'block';
+      b.style.display = 'none';
+      b.disabled=false;
+      return;
+    }
+    showAlert('payAlert', (r.data&&r.data.error)||'No se pudo iniciar la conexión con Stripe.', false);
+    b.disabled=false;
   };});
   document.querySelectorAll('.pay-disc').forEach(function(b){ b.onclick = async function(){
     const r = await api('POST','/payments/providers/'+b.dataset.p+'/disconnect');
@@ -1912,6 +2392,8 @@ async function loadAccount(){
 
   // ── Plan actual ──
   const cur = d.plans.find(function(p){ return p.is_current; }) || {};
+  PLAN_PRICE_CENTS = cur.price_monthly_cents || 0;
+  PLAN_NAME = cur.name || d.current_name || 'Tu plan';
   let usageHtml = '';
   if(d.usage.max_appts_month){
     const pct = Math.min(100, Math.round((d.usage.appts_this_month / d.usage.max_appts_month)*100));
@@ -1972,12 +2454,28 @@ async function loadAccount(){
 }
 
 // ── Add-ons ────────────────────────────────────────────────────────────────
+function addonMonthlyCents(a){
+  // solo suman al mensual los add-ons facturados por mes
+  return (a.billing==='monthly' && a.price_cents) ? a.price_cents : 0;
+}
+function renderAddonTotal(addons){
+  const box = document.getElementById('addonTotal');
+  if(!box) return;
+  const active = addons.filter(function(a){ return a.is_active; });
+  const addonsCents = active.reduce(function(s,a){ return s + addonMonthlyCents(a); }, 0);
+  const totalCents = PLAN_PRICE_CENTS + addonsCents;
+  box.style.display = 'block';
+  box.innerHTML =
+    '<b>Tu mensual: '+money(totalCents)+'</b>'+
+    ' <span style="color:var(--ink2)">(plan '+money(PLAN_PRICE_CENTS)+' + add-ons '+money(addonsCents)+')</span>';
+}
 async function loadAddons(){
   const wrap = document.getElementById('addonList');
   const r = await api('GET','/account/addons');
   const addons = (r.ok && Array.isArray(r.data)) ? r.data : (r.ok && r.data.addons ? r.data.addons : []);
-  // 'featured' tiene su propia tarjeta; aquí mostramos los demás como toggles
-  const rows = addons.filter(function(a){ return a.code !== 'featured'; });
+  // 'featured' tiene su propia tarjeta; 'sms' y 'custom_domain' no se usan aún → ocultos
+  const rows = addons.filter(function(a){ return a.code !== 'featured' && ADDON_HIDDEN.indexOf(a.code) === -1; });
+  renderAddonTotal(rows);
   if(rows.length === 0){ wrap.innerHTML = '<p style="font-size:13px;color:var(--ink2)">No hay add-ons disponibles.</p>'; return; }
   wrap.innerHTML = rows.map(function(a){
     const price = a.price_cents ? (money(a.price_cents)+(a.billing==='monthly'?'/mes':'')) : 'Gratis';
@@ -1991,10 +2489,30 @@ async function loadAddons(){
       clearAlert('addonAlert');
       const code = tg.dataset.code;
       const turningOn = tg.checked;
+      // Tienda 10 + Tienda 25 a la vez: permitido pero avisado
+      if(turningOn && ADDON_STORE.indexOf(code) !== -1){
+        const otherStore = ADDON_STORE.find(function(c){ return c !== code; });
+        const otherActive = rows.some(function(a){ return a.code === otherStore && a.is_active; });
+        if(otherActive && !confirm('Tener Tienda 10 y Tienda 25 a la vez = 35 productos y se cobran AMBOS. ¿Activar de todas formas?')){
+          tg.checked = false;
+          return;
+        }
+      }
       tg.disabled = true;
       const rr = await api('POST','/addons/'+code+'/'+(turningOn?'activate':'cancel'));
       tg.disabled = false;
-      if(rr.ok){ loadAddons(); return; }
+      if(rr.ok){
+        // aviso del impacto en la factura
+        const a = rows.find(function(x){ return x.code === code; }) || {};
+        const cents = addonMonthlyCents(a);
+        if(turningOn){
+          showAlert('addonAlert','Add-on activado.'+(cents?' Se suma '+money(cents)+'/mes a tu factura.':''), true);
+        } else {
+          showAlert('addonAlert','Add-on desactivado.'+(cents?' Se resta '+money(cents)+'/mes de tu factura.':''), true);
+        }
+        loadAddons();
+        return;
+      }
       if(turningOn && rr.status===402 && rr.data && rr.data.pending){
         tg.checked = false;
         showAlert('addonAlert','Activación pendiente (se activa con Stripe).', false);

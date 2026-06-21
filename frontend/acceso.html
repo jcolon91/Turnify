@@ -48,6 +48,10 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer;border:0
 .logo{font-family:var(--display);font-weight:800;font-size:28px;text-align:center;letter-spacing:-.02em;margin-bottom:4px}
 .logo i{font-style:normal;color:var(--green)}
 .tag{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink2);text-align:center;margin-bottom:22px}
+.rolerow{display:flex;justify-content:center;margin-bottom:20px}
+.rolemin{display:inline-flex;background:var(--card-soft);border:1px solid var(--border);border-radius:99px;padding:3px}
+.rolemin button{font:700 12.5px var(--body);padding:7px 20px;border-radius:99px;background:none;color:var(--muted);transition:background .16s ease,color .16s ease}
+.rolemin button.on{background:var(--green);color:var(--green-ink)}
 .card{background:var(--card);border:1px solid var(--border);border-radius:22px;padding:24px;box-shadow:0 22px 44px -24px rgba(23,21,15,.25)}
 html[data-theme="dark"] .card{box-shadow:0 22px 44px -24px rgba(0,0,0,.6)}
 .tabs{display:flex;background:var(--card-soft);border:1px solid var(--border);border-radius:99px;padding:3px;margin-bottom:20px}
@@ -70,6 +74,9 @@ html[data-theme="dark"] .tabs button.on{background:var(--green);color:var(--gree
 .foot{text-align:center;font-size:12px;color:var(--ink2);margin-top:16px;line-height:1.7}
 .foot a{color:var(--green);font-weight:700}
 .secline{display:flex;justify-content:center;gap:14px;font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);margin-top:18px}
+.explore{display:flex;align-items:center;gap:12px;background:var(--card-soft);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-top:16px}
+.explore span{flex:1;font-size:12.5px;color:var(--ink2);line-height:1.4}
+.explore a{font-size:12.5px;font-weight:700;color:var(--green);white-space:nowrap}
 .ic-svg{flex:none}.field .ic-svg{margin-right:.55em}
 .alert{display:none;font-size:13px;font-weight:600;padding:11px 13px;border-radius:12px;margin-bottom:14px;line-height:1.45}
 .alert.err{display:block;background:#FCE8E6;color:#A1281C;border:1px solid #F3C0BA}
@@ -102,6 +109,12 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
   <div class="box">
     <div class="logo">Buk<i>é</i>ame</div>
     <div class="tag">Tu turno, sin llamadas</div>
+
+    <!-- Rol (minimalista): solo decide a dónde entrar. Por defecto, Cliente. -->
+    <div class="rolerow"><div class="rolemin" id="roleSeg">
+      <button type="button" data-role="cliente">Cliente</button>
+      <button type="button" data-role="negocio">Negocio</button>
+    </div></div>
 
     <div class="card">
       <!-- LOGIN SOCIAL -->
@@ -142,10 +155,24 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
     </div>
 
     <div class="secline"><span><svg class="ic-svg" viewBox="0 0 24 24" width="1.05em" height="1.05em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.18em;display:inline-block;flex:none"><rect x="4.5" y="10.5" width="15" height="10" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg> Cifrado TLS</span><span>2FA disponible</span><span>Sesiones de 30 días</span></div>
+    <div class="explore"><span>¿Buscas una cita? No necesitas cuenta.</span><a href="buscar.html">Explorar →</a></div>
   </div>
 </div>
 
 <script>
+// ── Selector de ROL (Cliente / Negocio) ───────────────────────────────────
+// El rol NO cambia el login/registro; solo cambia a dónde redirigimos después.
+// Se persiste en localStorage para recordar la elección entre visitas.
+let bukRole = localStorage.getItem('bukeame_role');
+if(bukRole !== 'negocio' && bukRole !== 'cliente') bukRole = 'cliente';
+function setRole(r){
+  bukRole = (r === 'negocio') ? 'negocio' : 'cliente';
+  localStorage.setItem('bukeame_role', bukRole);
+  document.querySelectorAll('#roleSeg button').forEach(b=>b.classList.toggle('on', b.dataset.role===bukRole));
+}
+document.querySelectorAll('#roleSeg button').forEach(b=>{ b.onclick=()=>setRole(b.dataset.role); });
+setRole(bukRole);
+
 // ── Tabs (entrar / crear cuenta) ──────────────────────────────────────────
 document.querySelectorAll('.tabs button').forEach(b=>{
   b.onclick=()=>{
@@ -160,6 +187,8 @@ document.querySelectorAll('.tabs button').forEach(b=>{
   if(!ref) return;
   const input = document.getElementById('regRef');
   if(input) input.value = ref.trim().toUpperCase();
+  // Un código de referido lo trae un negocio → preseleccionamos rol "negocio".
+  setRole('negocio');
   const tab = document.querySelector('.tabs button[data-p="crear"]');
   if(tab) tab.click();
 })();
@@ -185,15 +214,20 @@ async function apiPost(path, body){
   return data;
 }
 
-// Guarda la sesión y redirige según si es admin o dueño de negocio
+// Guarda la sesión y redirige según el ROL elegido.
+//   • Admin de plataforma → siempre admin.html (manda sobre el rol).
+//   • Rol "negocio"       → panel.html (allí crea/gestiona su negocio).
+//   • Rol "cliente"       → cliente.html (sus citas y reseñas).
 function saveSessionAndGo(data){
   localStorage.setItem('bukeame_token', data.access_token);
   localStorage.setItem('bukeame_refresh', data.refresh_token);
   localStorage.setItem('bukeame_user', JSON.stringify(data.user));
   if(data.user && data.user.is_platform_admin){
     location.href = 'admin.html';
-  } else {
+  } else if(bukRole === 'negocio'){
     location.href = 'panel.html';
+  } else {
+    location.href = 'cliente.html';
   }
 }
 

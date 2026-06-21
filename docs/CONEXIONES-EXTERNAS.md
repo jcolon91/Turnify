@@ -19,7 +19,7 @@ para activar cada integración de Bukéame. Las llaves del servidor van en
 | **PayPal**         | ✅ Sí         | Cada **negocio** (su PayPal.me)     | Panel del negocio (no en `.env`)         | Gratis           |
 | **Google login**   | ⚙️ Necesita setup | **Tú** (dueño plataforma)       | `GOOGLE_CLIENT_ID` en `.env`             | Gratis           |
 | **Apple login**    | ⚙️ Necesita setup | **Tú** (Apple Developer)        | `APPLE_CLIENT_ID` en `.env`              | $99/año          |
-| **Stripe Connect** | ⚙️ Necesita setup | **Tú** + cada negocio conecta   | `STRIPE_*` en `.env`                      | Gratis (Stripe cobra % por transacción) |
+| **Stripe Connect (auto)** | ⚙️ Necesita setup | **Tú** (setup único) + negocio conecta con OAuth | `STRIPE_*` en `.env`            | Gratis; Bukéame NO cobra comisión (Stripe cobra % por transacción) |
 
 **Resumen:** ATH Móvil y PayPal ya cobran hoy sin que tú toques nada. Google login,
 Apple login y Stripe Connect requieren que consigas llaves y las pegues en `.env`.
@@ -116,33 +116,64 @@ añadirá entonces (variables tipo `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVA
 
 ---
 
-## 5) Stripe Connect — ⚙️ necesita setup (gratis de configurar)
+## 5) Stripe Connect (AUTOMÁTICO) — ⚙️ necesita setup (gratis de configurar)
 
-Permite que **cada negocio conecte SU propia cuenta Stripe** (OAuth Standard). El
-dinero va **directo al negocio**; Bukéame no lo custodia. Tú configuras la app de
-Connect una vez; cada negocio luego pulsa "Conectar con Stripe".
+Stripe Connect es el cobro **automático** de Bukéame: el negocio conecta SU propia
+cuenta Stripe con **OAuth (pocos clics)** y, de ahí en adelante, cobra con tarjeta
+sin tocar nada más. Es un **cargo directo**: el dinero va **100% al negocio**;
+**Bukéame NO cobra comisión** y NO custodia el dinero. (Stripe sí cobra su comisión
+de procesamiento por transacción, y eso lo paga el negocio.)
 
-**Pasos (en <https://dashboard.stripe.com/>):**
-1. Crea tu cuenta **Stripe** (gratis).
-2. Activa **Connect** y elige tipo **Standard**:
+Tú, dueño de la plataforma, haces un **setup ÚNICO** (una sola vez, para todo
+Bukéame). Después, cada negocio se conecta solo con OAuth desde su panel.
+
+### Setup ÚNICO de plataforma (lo haces tú una vez, en <https://dashboard.stripe.com/>)
+
+1. **Crea la cuenta Stripe de la plataforma** (la cuenta de Bukéame, gratis) y
+   **activa Connect** eligiendo tipo **Standard**:
    **Settings → Connect** (o <https://dashboard.stripe.com/connect>).
-3. En la configuración de Connect, copia el **client_id** (empieza con `ca_...`).
-4. Copia tu **Secret key** (empieza con `sk_live_...` en producción) desde
-   **Developers → API keys**.
-5. En el dashboard de Connect, configura el **Redirect URI**:
+
+2. **Copia el Secret key** desde **Developers → API keys**
+   (empieza con `sk_live_...` en live, `sk_test_...` en test) →
+   pégalo en **`STRIPE_SECRET_KEY`** en `.env`.
+
+3. **En Connect settings**, copia el **client_id** (empieza con `ca_...`) →
+   pégalo en **`STRIPE_CONNECT_CLIENT_ID`** en `.env`. En esa misma pantalla,
+   **registra el Redirect URI**:
    `https://bukeame.com/api/payments/stripe/callback`
+
+4. **Crea un endpoint de webhook** en Stripe
+   (**Developers → Webhooks → Add endpoint**) apuntando a:
+   `https://bukeame.com/api/payments/stripe/webhook`
+   - Suscribe los eventos **`checkout.session.completed`** y
+     **`payment_intent.succeeded`**.
+   - **IMPORTANTE:** marca que escuche **eventos de "Connected accounts"**
+     (la casilla "Listen to events on Connected accounts"), porque los pagos
+     ocurren en las cuentas conectadas de los negocios, no en la de la plataforma.
+   - Copia el **Signing secret** del endpoint (empieza con `whsec_...`) →
+     pégalo en **`STRIPE_WEBHOOK_SECRET`** en `.env`.
+
+5. **Recuerda probar en modo TEST de Stripe antes de pasar a live.** Usa las llaves
+   `sk_test_...` / `ca_...` de test y tarjetas de prueba; cuando todo funcione,
+   cambia a las llaves live.
+
+### Lo que hace cada negocio (no es setup tuyo)
+
+Pulsa **"Conectar con Stripe"** en su panel, autoriza con OAuth (pocos clics) y
+listo. A partir de ahí cobra con tarjeta y el dinero le llega **directo**.
 
 **En `.env`:**
 ```
 STRIPE_SECRET_KEY=sk_live_...
 STRIPE_CONNECT_CLIENT_ID=ca_...
+STRIPE_WEBHOOK_SECRET=whsec_...
 ```
 
 Si faltan estas variables, el botón **"Conectar con Stripe"** queda deshabilitado
 (el API responde 503). Bukéame no toca el dinero: cada negocio conecta su cuenta.
 
-**Costo:** configurar Connect es gratis; Stripe cobra su comisión por transacción
-(la paga el negocio, no Bukéame).
+**Costo:** configurar Connect es gratis; **Bukéame no cobra comisión**. Stripe cobra
+su comisión de procesamiento por transacción (la paga el negocio, no Bukéame).
 
 ---
 

@@ -52,6 +52,23 @@ input,select,textarea{font:inherit}
 .hero-inner{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center}
 .hero-logo{width:128px;height:128px;border-radius:50%;background:var(--card);border:4px solid rgba(255,255,255,.9);box-shadow:0 8px 28px rgba(0,0,0,.3);display:grid;place-items:center;overflow:hidden;font-family:var(--display);font-weight:800;font-size:48px;color:var(--teal)}
 .hero-logo img{width:100%;height:100%;object-fit:cover}
+/* Avatar sin logo: inicial sobre degradado elegante de marca (verde/tierra + brillo mango) */
+.hero-logo.no-logo{
+  color:#fff;
+  background:
+    radial-gradient(120% 120% at 28% 22%,rgba(239,161,47,.55) 0%,rgba(239,161,47,0) 46%),
+    radial-gradient(130% 130% at 78% 86%,rgba(8,40,33,.55) 0%,rgba(8,40,33,0) 55%),
+    linear-gradient(140deg,#13A38F 0%,#0E8074 42%,#0A5B52 100%);
+  text-shadow:0 2px 10px rgba(0,0,0,.28);
+  box-shadow:0 8px 28px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.35),inset 0 -10px 24px rgba(8,40,33,.35)}
+html[data-theme="dark"] .hero-logo.no-logo{
+  border-color:rgba(255,255,255,.7);
+  background:
+    radial-gradient(120% 120% at 28% 22%,rgba(239,161,47,.45) 0%,rgba(239,161,47,0) 46%),
+    radial-gradient(130% 130% at 78% 86%,rgba(0,0,0,.45) 0%,rgba(0,0,0,0) 55%),
+    linear-gradient(140deg,#36E27B 0%,#15A968 44%,#0A6B49 100%);
+  text-shadow:0 2px 10px rgba(0,0,0,.45);
+  box-shadow:0 8px 28px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.4),inset 0 -10px 24px rgba(0,0,0,.4)}
 .hero h1{font-family:var(--display);font-weight:800;font-size:32px;color:#fff;margin-top:18px;text-shadow:0 2px 12px rgba(0,0,0,.4);letter-spacing:-.02em}
 .hero .loc{font-size:14px;color:rgba(255,255,255,.92);margin-top:6px;text-shadow:0 1px 6px rgba(0,0,0,.4)}
 .hero .rating{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;font-weight:700;color:#fff;margin-top:10px;background:rgba(255,255,255,.18);padding:5px 13px;border-radius:99px;backdrop-filter:blur(6px)}
@@ -275,6 +292,55 @@ html[data-theme="dark"] .alert.err{background:rgba(255,90,70,.14);color:#FFB3A8;
 .seg{display:flex;gap:8px;margin-bottom:14px}
 .seg button{flex:1;padding:11px;border:1px solid var(--border);border-radius:12px;background:var(--card);font-weight:600;font-size:13.5px;color:var(--text)}
 .seg button.on{border-color:var(--green);background:var(--green);color:var(--green-ink)}
+
+/* ───────── DETALLE DE PRODUCTO (estilo Amazon) ───────── */
+.prod-card{cursor:pointer;transition:.15s}
+.prod-card:active{transform:scale(.99)}
+.pd-loading{text-align:center;color:var(--muted);font-size:13.5px;padding:40px 20px}
+/* Carrusel de fotos */
+.pd-gallery{position:relative;width:100%;aspect-ratio:1/1;border-radius:16px;overflow:hidden;background:var(--card-soft);border:1px solid var(--border)}
+.pd-track{display:flex;width:100%;height:100%;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.pd-track::-webkit-scrollbar{display:none}
+.pd-slide{flex:0 0 100%;width:100%;height:100%;scroll-snap-align:center;display:grid;place-items:center}
+.pd-slide img{width:100%;height:100%;object-fit:cover}
+.pd-slide .pd-noimg{display:grid;place-items:center;width:100%;height:100%;color:var(--muted2);font-family:var(--display);font-weight:800;font-size:64px;background:var(--green-soft)}
+.pd-dots{display:flex;gap:6px;justify-content:center;margin-top:10px}
+.pd-dot{width:7px;height:7px;border-radius:99px;background:var(--border);transition:.2s}
+.pd-dot.on{background:var(--green);width:18px}
+/* Cabecera del detalle */
+.pd-name{font-family:var(--display);font-weight:800;font-size:22px;line-height:1.2;margin-top:18px}
+.pd-rate{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13.5px;color:var(--muted)}
+.pd-rate .stars{color:var(--mango);font-size:15px;letter-spacing:1px}
+.pd-rate a{color:var(--green);font-weight:600;cursor:pointer}
+.pd-price{font-family:var(--display);font-weight:800;font-size:26px;color:var(--text);margin-top:12px}
+.pd-stock{font-size:12.5px;font-weight:600;margin-top:4px}
+.pd-stock.ok{color:var(--green)}
+.pd-stock.out{color:var(--muted2)}
+.pd-desc{font-size:14px;line-height:1.65;color:var(--muted);margin-top:14px;white-space:pre-line}
+.pd-sectitle{font-family:var(--display);font-weight:800;font-size:17px;margin:24px 0 12px}
+.pd-var-label{display:block;font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:18px 0 6px}
+.pd-add{margin-top:18px}
+/* Reseñas */
+.pd-avg{display:flex;align-items:center;gap:14px;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:14px}
+.pd-avg .num{font-family:var(--display);font-weight:800;font-size:34px;line-height:1;color:var(--text)}
+.pd-avg .meta{flex:1;min-width:0}
+.pd-avg .meta .stars{color:var(--mango);font-size:16px;letter-spacing:1px}
+.pd-avg .meta .cnt{font-size:12.5px;color:var(--muted);margin-top:3px}
+.pd-review{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px}
+.pd-review .top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:5px}
+.pd-review .who{font-weight:700;font-size:14px}
+.pd-review .stars{color:var(--mango);font-size:13px;letter-spacing:1px}
+.pd-review .txt{font-size:13.5px;color:var(--muted);line-height:1.55}
+.pd-review .meta{display:flex;align-items:center;gap:8px;margin-top:7px;flex-wrap:wrap}
+.pd-review .date{font-size:11.5px;color:var(--muted2);font-family:var(--mono)}
+.pd-verified{display:inline-flex;align-items:center;gap:4px;background:var(--green-soft);color:var(--green);border-radius:99px;padding:3px 9px;font-family:var(--mono);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+.pd-verified svg{width:11px;height:11px;stroke:currentColor;stroke-width:2.5;fill:none}
+.pd-noreviews{text-align:center;color:var(--muted);font-size:13.5px;padding:22px;background:var(--card);border:1px dashed var(--border);border-radius:14px;line-height:1.6}
+/* Selector de estrellas del formulario */
+.starpick{display:inline-flex;gap:4px;direction:rtl}
+.starpick input{position:absolute;opacity:0;width:0;height:0}
+.starpick label{font-size:30px;line-height:1;color:var(--border);cursor:pointer;transition:color .12s}
+.starpick label:hover,.starpick label:hover ~ label,.starpick input:checked ~ label{color:var(--mango)}
 /* ───────── PORTAFOLIO (galería) ───────── */
 .gal-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
 @media(min-width:480px){.gal-grid{grid-template-columns:repeat(3,1fr)}}
@@ -545,6 +611,14 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
   </div>
 </div>
 
+<!-- SHEET: DETALLE DE PRODUCTO (estilo Amazon) -->
+<div class="sheet" id="prodSheet">
+  <div class="sheet-head"><button class="x" id="closeProd">&times;</button><b id="prodSheetTitle">Producto</b></div>
+  <div class="sheet-body" id="prodSheetBody">
+    <div class="pd-loading">Cargando…</div>
+  </div>
+</div>
+
 <!-- SHEET: GIFT CARD -->
 <div class="sheet" id="giftSheet">
   <div class="sheet-head"><button class="x" id="closeGift">&times;</button><b>Regala una gift card</b></div>
@@ -616,7 +690,7 @@ const DOW = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
 const DOW_FULL = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
 const MON = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 
-const state = { biz:null, services:[], staff:[], hours:[], reviews:[], products:[], gallery:[], cart:[], fulfillment:'pickup', service:null, selectedServices:[], staffId:null, date:null, slot:null, payment_methods:[], payment_config:{} };
+const state = { biz:null, services:[], staff:[], hours:[], reviews:[], products:[], gallery:[], cart:[], fulfillment:'pickup', service:null, selectedServices:[], staffId:null, date:null, slot:null, payment_methods:[], payment_config:{}, pdId:null, pdData:null };
 
 // Iconos SVG profesionales (líneas limpias, sin emojis)
 const ICONS = {
@@ -692,8 +766,8 @@ function renderProfile(){
   // Logo
   const logo = document.getElementById('bizLogo');
   const initial = (b.name||'?').charAt(0).toUpperCase();
-  if(b.logo_url){ logo.innerHTML = '<img src="'+esc(b.logo_url)+'" alt="" width="128" height="128" decoding="async">'; }
-  else { logo.textContent = initial; }
+  if(b.logo_url){ logo.classList.remove('no-logo'); logo.innerHTML = '<img src="'+esc(b.logo_url)+'" alt="" width="128" height="128" decoding="async">'; }
+  else { logo.classList.add('no-logo'); logo.textContent = initial; }
   // Rating
   if(b.rating_count>0){
     const el = document.getElementById('bizRating');
@@ -1117,8 +1191,9 @@ document.getElementById('confirmBtn').onclick = async function(){
 
 // ═══════════ DEPÓSITO / COBRO (métodos del negocio, dinero directo al negocio) ═══════════
 // Usa state.payment_config del payload de /api/public/:slug:
-//   { ath:{mode,public_token,phone}, paypal:{handle}, stripe:{connected} }
-// El dinero va DIRECTO al negocio. Bukéame nunca custodia secretos ni el privateToken de ATH.
+//   { ath:{mode,public_token,phone}, paypal:{handle}, stripe:{connected,stripe_can_charge,payment_link} }
+// El dinero va DIRECTO al negocio (Stripe Connect = cargo directo en su cuenta; Bukéame NO cobra
+// comisión, solo membresías). Bukéame nunca custodia secretos ni el privateToken de ATH.
 
 function showOkStep(appt){
   var when = new Date(state.startIso);
@@ -1192,14 +1267,25 @@ function renderPayStep(appt, depCents){
     host.appendChild(pp);
   }
 
-  // ── Stripe (tarjeta): abre el Payment Link del negocio (el cliente paga directo) ──
-  if(stripe && stripe.payment_link){
+  // ── Stripe (tarjeta): cargo DIRECTO en la cuenta del negocio (el dinero va 100% al negocio) ──
+  // Preferido: Stripe Connect Checkout (stripe_can_charge / connected). El backend crea la
+  // Checkout Session con 'Stripe-Account: <acct_id>' y devuelve { url }. El cliente redirige ahí.
+  // Compatibilidad: si solo hay payment_link (modo viejo), se abre el link en pestaña nueva.
+  var stripeCanCharge = !!(stripe && (stripe.stripe_can_charge || stripe.connected));
+  if(stripeCanCharge && code){
     hasAny = true;
-    var sb = document.createElement('div');
-    sb.className='paybtn';
-    sb.innerHTML = '<span class="pmico">'+ICONS.card+'</span><span class="pmtxt">Pagar con tarjeta<small>Tarjeta · Apple Pay · Google Pay</small></span>';
-    sb.onclick = function(){ window.open(stripe.payment_link, '_blank', 'noopener'); };
+    var sb = document.createElement('button');
+    sb.className='paybtn'; sb.type='button';
+    sb.innerHTML = '<span class="pmico">'+ICONS.card+'</span><span class="pmtxt">Pagar con tarjeta<small>Tarjeta · Apple Pay · Google Pay · Klarna</small></span>';
+    sb.onclick = function(){ startStripeCheckout(code, sb); };
     host.appendChild(sb);
+  } else if(stripe && stripe.payment_link){
+    hasAny = true;
+    var sbl = document.createElement('button');
+    sbl.className='paybtn'; sbl.type='button';
+    sbl.innerHTML = '<span class="pmico">'+ICONS.card+'</span><span class="pmtxt">Pagar con tarjeta<small>Tarjeta · Apple Pay · Google Pay</small></span>';
+    sbl.onclick = function(){ window.open(stripe.payment_link, '_blank', 'noopener'); };
+    host.appendChild(sbl);
   }
 
   // ── Saltar el depósito (la cita ya quedó reservada) ──
@@ -1227,6 +1313,21 @@ async function submitAthConfirm(code, reference, btnEl){
     if(btnEl){ btnEl.disabled=false; btnEl.textContent='Confirmar depósito →'; }
     showAlert('payAlert', (res.data && res.data.error) || 'No pudimos confirmar el pago. Intenta de nuevo.');
   }
+}
+
+// POST /api/public/:slug/appointments/:code/stripe/checkout → { url }
+// Cargo DIRECTO en la cuenta del negocio (Stripe Connect). El backend crea la Checkout
+// Session con 'Stripe-Account: <acct_id>'; aquí solo redirigimos a la URL devuelta.
+async function startStripeCheckout(code, btnEl){
+  clearAlert('payAlert');
+  if(btnEl){ btnEl.disabled=true; btnEl.style.opacity='0.6'; }
+  var res = await api('POST', '/public/'+encodeURIComponent(SLUG)+'/appointments/'+encodeURIComponent(code)+'/stripe/checkout');
+  if(res.ok && res.data && res.data.url){
+    window.location.href = res.data.url;
+    return;
+  }
+  if(btnEl){ btnEl.disabled=false; btnEl.style.opacity=''; }
+  showAlert('payAlert', (res.data && res.data.error) || 'No pudimos iniciar el pago con tarjeta. Usa otro método o paga el depósito más tarde.');
 }
 
 // Carga el botón oficial de ATH Móvil (athmovil-javascript-api).
@@ -1300,18 +1401,188 @@ function renderShop(){
     var action = soldOut
       ? '<span class="soldout">Agotado</span>'
       : '<button class="addbtn" data-add="'+esc(p.id)+'">Añadir</button>';
-    return '<div class="prod-card">'+
+    return '<div class="prod-card" data-prod="'+esc(p.id)+'">'+
       '<div class="ph">'+img+'</div>'+
       '<div class="body"><h4>'+esc(p.name)+'</h4>'+desc+varSel+
       '<div class="prow"><span class="pprice">'+money(p.price_cents)+'</span>'+action+'</div></div></div>';
   }).join('');
   grid.querySelectorAll('[data-add]').forEach(function(btn){
-    btn.onclick = function(){
+    btn.onclick = function(ev){
+      ev.stopPropagation();
       var id = btn.getAttribute('data-add');
       var selEl = grid.querySelector('[data-var="'+id+'"]');
       addToCart(id, selEl ? selEl.value : null);
     };
   });
+  // El <select> de variante no debe abrir el detalle
+  grid.querySelectorAll('.pvar').forEach(function(sel){
+    sel.onclick = function(ev){ ev.stopPropagation(); };
+  });
+  // Tocar la tarjeta abre el detalle estilo Amazon
+  grid.querySelectorAll('.prod-card').forEach(function(card){
+    card.onclick = function(){ openProductDetail(card.getAttribute('data-prod')); };
+  });
+}
+
+// ───────── DETALLE DE PRODUCTO (estilo Amazon) ─────────
+function starStr(n){ n=Math.max(0,Math.min(5,Math.round(n||0))); return '★★★★★'.slice(0,n)+'☆☆☆☆☆'.slice(0,5-n); }
+function fmtReviewDate(iso){
+  try{ return new Date(iso).toLocaleDateString('es-PR',{day:'numeric',month:'short',year:'numeric'}); }
+  catch(e){ return ''; }
+}
+
+document.getElementById('closeProd').onclick = function(){ closeSheet('prodSheet'); };
+
+async function openProductDetail(id){
+  if(!id) return;
+  state.pdId = id;
+  document.getElementById('prodSheetTitle').textContent = 'Producto';
+  document.getElementById('prodSheetBody').innerHTML = '<div class="pd-loading">Cargando…</div>';
+  openSheet('prodSheet');
+  var res = await api('GET','/public/'+encodeURIComponent(SLUG)+'/products/'+encodeURIComponent(id));
+  if(!res.ok || !res.data || !res.data.product){
+    document.getElementById('prodSheetBody').innerHTML =
+      '<div class="pd-noreviews">'+(res.status===404?'Este producto ya no está disponible.':'No se pudo cargar el producto. Intenta de nuevo.')+'</div>';
+    return;
+  }
+  state.pdData = res.data;
+  renderProductDetail(res.data);
+}
+
+function renderProductDetail(data){
+  var p = data.product || {};
+  var photos = Array.isArray(data.photos) ? data.photos : [];
+  var reviews = Array.isArray(data.reviews) ? data.reviews : [];
+  var ratingAvg = data.rating_avg;
+  var ratingCount = data.rating_count || 0;
+  var vars = parseVariants(p.variants);
+  var soldOut = (p.stock!=null && Number(p.stock)<=0);
+  document.getElementById('prodSheetTitle').textContent = p.name || 'Producto';
+
+  // ── Carrusel de fotos (hasta 3) ──
+  var slides;
+  if(photos.length){
+    slides = photos.slice(0,3).map(function(ph){
+      var url = (ph && ph.url) ? ph.url : ph;
+      return '<div class="pd-slide"><img src="'+esc(url)+'" alt="'+esc(p.name)+'" loading="lazy" decoding="async"></div>';
+    }).join('');
+  } else {
+    slides = '<div class="pd-slide"><div class="pd-noimg">'+esc((p.name||'?').charAt(0).toUpperCase())+'</div></div>';
+  }
+  var nSlides = photos.length>1 ? Math.min(photos.length,3) : 0;
+  var dots = nSlides>1 ? '<div class="pd-dots" id="pdDots">'+Array.from({length:nSlides}).map(function(_,i){ return '<span class="pd-dot'+(i===0?' on':'')+'"></span>'; }).join('')+'</div>' : '';
+
+  // ── Cabecera ──
+  var rateLine = ratingCount>0
+    ? '<div class="pd-rate"><span class="stars">'+starStr(ratingAvg)+'</span><span>'+Number(ratingAvg).toFixed(1)+'</span><a id="pdToReviews">'+ratingCount+' reseña'+(ratingCount>1?'s':'')+'</a></div>'
+    : '<div class="pd-rate"><span class="stars">'+starStr(0)+'</span><span>Sin reseñas todavía</span></div>';
+  var stockLine = soldOut
+    ? '<div class="pd-stock out">Agotado</div>'
+    : (p.stock!=null && Number(p.stock)<=5 ? '<div class="pd-stock ok">Quedan pocas unidades ('+Number(p.stock)+')</div>' : '<div class="pd-stock ok">Disponible</div>');
+  var descBlock = p.description ? '<div class="pd-desc">'+esc(p.description)+'</div>' : '';
+  var varBlock = vars.length
+    ? '<label class="pd-var-label">Variante</label><select class="pvar" id="pdVar" style="width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:12px;background:var(--card);color:var(--text);font-size:14px">'+vars.map(function(v){ return '<option value="'+esc(v)+'">'+esc(v)+'</option>'; }).join('')+'</select>'
+    : '';
+  var addBlock = soldOut
+    ? '<button class="btn" id="pdAdd" disabled style="margin-top:18px;background:var(--card-soft);color:var(--muted2)">Agotado</button>'
+    : '<button class="btn btn-teal pd-add" id="pdAdd">Añadir al carrito</button>';
+
+  // ── Reseñas ──
+  var avgBlock = ratingCount>0
+    ? '<div class="pd-avg"><div class="num">'+Number(ratingAvg).toFixed(1)+'</div><div class="meta"><div class="stars">'+starStr(ratingAvg)+'</div><div class="cnt">'+ratingCount+' reseña'+(ratingCount>1?'s':'')+'</div></div></div>'
+    : '';
+  var verifiedBadge = '<span class="pd-verified"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Compra confirmada</span>';
+  var reviewsBlock = reviews.length
+    ? reviews.map(function(r){
+        var meta = '<div class="meta">'+(r.verified?verifiedBadge:'')+'<span class="date">'+esc(fmtReviewDate(r.created_at))+'</span></div>';
+        return '<div class="pd-review"><div class="top"><span class="who">'+esc(r.reviewer_name||'Cliente')+'</span><span class="stars">'+starStr(r.rating)+'</span></div>'+
+          (r.comment?'<div class="txt">'+esc(r.comment)+'</div>':'')+meta+'</div>';
+      }).join('')
+    : '<div class="pd-noreviews">Aún no hay reseñas de este producto.<br>Si lo compraste, ¡sé el primero en opinar!</div>';
+
+  // ── Formulario "Deja tu reseña" ──
+  var formBlock =
+    '<div class="pd-sectitle">Deja tu reseña</div>'+
+    '<div class="alert" id="pdReviewAlert"></div>'+
+    '<div class="field"><label>Tu nombre *</label><input id="pdrName" placeholder="Tu nombre completo"></div>'+
+    '<div class="field"><label>Tu email * (el que usaste al comprar)</label><input id="pdrEmail" type="email" placeholder="tu@correo.com"></div>'+
+    '<div class="field"><label>Tu calificación *</label><div class="starpick" id="pdrStars">'+
+      [5,4,3,2,1].map(function(v){ return '<input type="radio" name="pdrRating" id="pdr'+v+'" value="'+v+'"><label for="pdr'+v+'" title="'+v+'">★</label>'; }).join('')+
+    '</div></div>'+
+    '<div class="field"><label>Comentario (opcional)</label><textarea id="pdrComment" rows="3" placeholder="¿Qué te pareció el producto?"></textarea></div>'+
+    '<button class="btn btn-teal" id="pdrSubmit">Enviar reseña →</button>'+
+    '<p style="font-size:12px;color:var(--muted);text-align:center;margin-top:10px">Solo quienes compraron este producto pueden reseñarlo.</p>';
+
+  document.getElementById('prodSheetBody').innerHTML =
+    '<div class="pd-gallery"><div class="pd-track" id="pdTrack">'+slides+'</div></div>'+dots+
+    '<h2 class="pd-name">'+esc(p.name)+'</h2>'+
+    rateLine+
+    '<div class="pd-price">'+money(p.price_cents)+'</div>'+
+    stockLine+
+    descBlock+
+    varBlock+
+    addBlock+
+    '<div class="pd-sectitle" id="pdReviewsAnchor">Reseñas</div>'+
+    avgBlock+
+    reviewsBlock+
+    formBlock;
+
+  document.getElementById('prodSheetBody').scrollTop = 0;
+
+  // ── Carrusel: actualizar dots al desplazar ──
+  if(nSlides>1){
+    var track = document.getElementById('pdTrack');
+    var dotsEl = document.getElementById('pdDots');
+    track.onscroll = function(){
+      var idx = Math.round(track.scrollLeft / track.clientWidth);
+      dotsEl.querySelectorAll('.pd-dot').forEach(function(d,i){ d.classList.toggle('on', i===idx); });
+    };
+  }
+
+  // ── Ir a reseñas desde el rating de la cabecera ──
+  var toRev = document.getElementById('pdToReviews');
+  if(toRev){ toRev.onclick = function(){ document.getElementById('pdReviewsAnchor').scrollIntoView({behavior:'smooth'}); }; }
+
+  // ── Añadir al carrito (reusa el carrito existente) ──
+  var addBtn = document.getElementById('pdAdd');
+  if(addBtn && !soldOut){
+    addBtn.onclick = function(){
+      var sel = document.getElementById('pdVar');
+      addToCart(p.id, sel ? sel.value : null);
+      addBtn.textContent = 'Añadido ✓';
+      setTimeout(function(){ if(addBtn) addBtn.textContent = 'Añadir al carrito'; }, 1400);
+    };
+  }
+
+  // ── Enviar reseña ──
+  document.getElementById('pdrSubmit').onclick = function(){ submitProductReview(p.id, this); };
+}
+
+async function submitProductReview(productId, btnEl){
+  clearAlert('pdReviewAlert');
+  var name = (document.getElementById('pdrName').value||'').trim();
+  var email = (document.getElementById('pdrEmail').value||'').trim();
+  var ratingEl = document.querySelector('input[name="pdrRating"]:checked');
+  var rating = ratingEl ? parseInt(ratingEl.value,10) : 0;
+  var comment = (document.getElementById('pdrComment').value||'').trim();
+  if(!name){ showAlert('pdReviewAlert','Escribe tu nombre.'); return; }
+  if(!/.+@.+\..+/.test(email)){ showAlert('pdReviewAlert','Escribe el email que usaste al comprar.'); return; }
+  if(!(rating>=1 && rating<=5)){ showAlert('pdReviewAlert','Elige una calificación de 1 a 5 estrellas.'); return; }
+  var body = { name:name, email:email, rating:rating };
+  if(comment) body.comment = comment;
+  btnEl.disabled = true; btnEl.textContent = 'Enviando…';
+  var res = await api('POST','/public/'+encodeURIComponent(SLUG)+'/products/'+encodeURIComponent(productId)+'/review', body);
+  btnEl.disabled = false; btnEl.textContent = 'Enviar reseña →';
+  if(res.ok){
+    var ok = document.getElementById('pdReviewAlert');
+    ok.textContent = (res.data && res.data.message) || '¡Gracias por tu reseña!';
+    ok.className = 'alert ok';
+    // Refrescar el detalle para mostrar la nueva reseña
+    setTimeout(function(){ openProductDetail(productId); }, 900);
+  } else {
+    // 403 (no compró), 409 (ya reseñó), u otro → mostrar mensaje del backend
+    showAlert('pdReviewAlert', (res.data && (res.data.error || res.data.message)) || 'No se pudo enviar tu reseña. Intenta de nuevo.');
+  }
 }
 
 function findProduct(id){ return state.products.find(function(p){ return String(p.id)===String(id); }); }

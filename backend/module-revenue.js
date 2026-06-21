@@ -14,7 +14,7 @@ const crypto = require('crypto');
 
 module.exports.mount = function (app, ctx) {
   const { db, authRequired, businessScope, h } = ctx;
-  const { asyncH, bad, isStr, isUuid, isEmail, isPhone, normPhone, audit, notify, bookingLimiter } = h;
+  const { asyncH, bad, isStr, isUuid, isEmail, isPhone, normPhone, audit, notify, bookingLimiter, publicLimiter } = h;
 
   // ---- helpers locales ----
   const cents = v => Number.isInteger(v) && v >= 0 && v <= 100000000; // ≤ $1M
@@ -43,14 +43,14 @@ module.exports.mount = function (app, ctx) {
     return !!rows[0];
   }
 
-  // límite de productos según add-on (store_10 → 10, store_25 → 25, ninguno → 0)
+  // límite de productos según add-ons (suma los tiers activos:
+  // store_10 → +10, store_25 → +25; ambos → 35; ninguno → 0)
   async function productLimit(businessId) {
     const { rows } = await db.query(
       `SELECT code FROM addons WHERE business_id = $1 AND status = 'active'
          AND code IN ('store_10','store_25')`, [businessId]);
-    if (rows.some(r => r.code === 'store_25')) return 25;
-    if (rows.some(r => r.code === 'store_10')) return 10;
-    return 0;
+    return (rows.some(r => r.code === 'store_10') ? 10 : 0)
+         + (rows.some(r => r.code === 'store_25') ? 25 : 0);
   }
 
   // ==========================================================================
@@ -339,6 +339,10 @@ module.exports.mount = function (app, ctx) {
     } catch (e) { await client.query('ROLLBACK'); throw e; }
     finally { client.release(); }
   }));
+
+  // NOTA: el detalle público del producto y la reseña gateada por compra
+  // (GET/POST /api/public/:slug/products/:id[/review]) viven en server.js, que
+  // registra esas rutas ANTES de montar este módulo. No se redefinen aquí.
 
   app.get('/api/orders', authRequired, businessScope, asyncH(async (req, res) => {
     const { rows } = await db.query(

@@ -19,14 +19,14 @@ const crypto = require('crypto');
 
 module.exports.mount = function (app, ctx) {
   const { db, authRequired, businessScope, h } = ctx;
-  const { asyncH, bad, isStr, isPhone, normPhone, audit } = h;
+  const { asyncH, bad, isStr, isPhone, normPhone, audit, codeLimiter } = h;
 
   const JWT_SECRET = process.env.JWT_SECRET || '';
   const APP_URL    = (process.env.APP_URL || 'https://bukeame.com').replace(/\/+$/, '');
 
   // Catálogo de proveedores. external=true → requiere onboarding con cuenta externa.
   const PROVIDERS = {
-    stripe:    { name: 'Tarjetas · Apple Pay · Google Pay · Klarna', external: true },
+    stripe:    { name: 'Stripe · Tarjetas · Klarna', external: true },
     paypal:    { name: 'PayPal',     external: true },
     ath_movil: { name: 'ATH Móvil',  external: false },
     cash:      { name: 'Efectivo',   external: false },
@@ -99,6 +99,8 @@ module.exports.mount = function (app, ctx) {
     if (provider === 'stripe')  return {
       stripe_payment_link: cfg.stripe_payment_link || null,   // público: es para compartir
       stripe_connected: !!(cfg.stripe_payment_link || cfg.stripe_account_id),
+      // ¿Podemos crear un Checkout con cargo DIRECTO? (cuenta conectada + llave de plataforma)
+      stripe_can_charge: !!(cfg.stripe_account_id && process.env.STRIPE_SECRET_KEY),
     };
     return {};
   };
@@ -323,6 +325,85 @@ module.exports.mount = function (app, ctx) {
       [businessId, { provider: 'stripe' }]).catch(() => {});
 
     return redirect('stripe=ok');
+  }));
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  STRIPE CHECKOUT — cargo DIRECTO en la cuenta del negocio (Connect)
+  //  El dinero va 100% al negocio (Stripe-Account: acct_...); Bukéame NO cobra
+  //  comisión sobre la cita. Sin SDK: fetch a api.stripe.com (form-urlencoded).
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // ── POST /api/public/:slug/appointments/:code/stripe/checkout ──────────────
+  // Público (codeLimiter). Crea una Checkout Session con cargo DIRECTO sobre la
+  // cuenta conectada del negocio y devuelve { url } para redirigir al cliente.
+  app.post('/api/public/:slug/appointments/:code/stripe/checkout', codeLimiter, asyncH(async (req, res) => {
+    if (!process.env.STRIPE_SECRET_KEY)
+      return bad(res, 'Pagos con tarjeta no disponibles ahora mismo.', 409);
+
+    // La cita debe pertenecer al negocio del slug (aislamiento multi-tenant).
+    // Traemos el depósito (kind='deposit') y el stripe_account_id del negocio.
+    const { rows } = await db.query(
+      `SELECT a.id, a.business_id, a.service_name, a.status, a.deposit_cents,
+              p.id AS payment_id, p.status AS pay_status, p.amount_cents AS pay_amount,
+              pp.config AS stripe_config
+         FROM appointments a
+         JOIN businesses b ON b.id = a.business_id AND b.slug = $1 AND b.deleted_at IS NULL
+         LEFT JOIN payments p ON p.appointment_id = a.id AND p.kind = 'deposit'
+         LEFT JOIN payment_providers pp ON pp.business_id = a.business_id AND pp.provider = 'stripe'
+        WHERE a.confirmation_code = $2`, [req.params.slug, req.params.code.toUpperCase()]);
+    const a = rows[0];
+    if (!a) return bad(res, 'Cita no encontrada', 404);
+
+    // Idempotencia suave: si el depósito ya está pagado, no recreamos la sesión.
+    if (a.pay_status === 'paid' || a.status === 'confirmed')
+      return bad(res, 'Esta cita ya está pagada.', 409);
+
+    const acct = a.stripe_config && a.stripe_config.stripe_account_id;
+    if (!acct) return bad(res, 'El negocio no tiene Stripe conectado para cobrar.', 409);
+
+    // Monto del depósito en centavos: el del payment si existe, si no el de la cita.
+    const amount = Number.isInteger(a.pay_amount) ? a.pay_amount
+      : (Number.isInteger(a.deposit_cents) ? a.deposit_cents : 0);
+    if (!(amount > 0)) return bad(res, 'Esta cita no requiere depósito.', 409);
+
+    const code = req.params.code.toUpperCase();
+    const serviceName = (a.service_name || 'Servicio').slice(0, 120);
+
+    // Body form-urlencoded de la Checkout Session (cargo DIRECTO con Stripe-Account).
+    const body = new URLSearchParams();
+    body.set('mode', 'payment');
+    body.set('line_items[0][price_data][currency]', 'usd');
+    body.set('line_items[0][price_data][unit_amount]', String(amount));
+    body.set('line_items[0][price_data][product_data][name]', `Depósito · ${serviceName}`);
+    body.set('line_items[0][quantity]', '1');
+    body.set('success_url', `${APP_URL}/cita.html?code=${encodeURIComponent(code)}&pago=ok`);
+    body.set('cancel_url', `${APP_URL}/cita.html?code=${encodeURIComponent(code)}`);
+    body.set('metadata[confirmation_code]', code);
+    body.set('metadata[kind]', 'deposit');
+    body.set('payment_intent_data[metadata][confirmation_code]', code);
+
+    let session;
+    try {
+      const r = await fetch('https://api.stripe.com/v1/checkout/sessions', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + process.env.STRIPE_SECRET_KEY,
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Stripe-Account': acct,   // ← cargo DIRECTO en la cuenta del negocio
+        },
+        body: body.toString(),
+      });
+      session = await r.json();
+      if (!r.ok || !session || !session.url) {
+        console.error('stripe checkout:', session && session.error ? session.error.message : r.status);
+        return bad(res, 'No se pudo iniciar el pago con tarjeta. Intenta de nuevo.', 502);
+      }
+    } catch (e) {
+      console.error('stripe checkout fetch:', e.message);
+      return bad(res, 'No se pudo iniciar el pago con tarjeta. Intenta de nuevo.', 502);
+    }
+
+    return res.json({ url: session.url });
   }));
 
   // NOTA: la confirmación pública de ATH Móvil

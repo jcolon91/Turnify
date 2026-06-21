@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mis citas — Bukéame</title>
+<meta name="robots" content="noindex,nofollow">
+<meta name="description" content="Tu panel de citas en Bukéame: revisa tus próximas reservas, consulta tu historial, cancela o reagenda y deja reseñas a los negocios que visitaste.">
+<meta name="theme-color" content="#0E8074">
+<link rel="canonical" href="https://bukeame.com/cliente.html">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230E8074'/%3E%3Ctext x='16' y='23' font-family='Arial,sans-serif' font-size='20' font-weight='700' fill='%23fff' text-anchor='middle'%3EB%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F1EFE5;--bg2:#F7F4EA;--card:#FFFFFF;--card-soft:#EDE9DB;--border:#E1DCCD;
+  --text:#17150F;--muted:#5E594B;--muted2:#B3AD9C;--green:#0E8074;--green-ink:#FFFFFF;
+  --green-soft:#E3EFE9;--green-glow:rgba(14,128,116,.45);
+  --awning:repeating-linear-gradient(90deg,#0E8074 0 26px,#0A5B52 26px 28px,#F8F5EA 28px 54px,#E7E2D1 54px 56px);
+  --display:"Bricolage Grotesque",sans-serif;--body:"Instrument Sans",sans-serif;--mono:"Spline Sans Mono",monospace;
+  --star:#EFA12F}
+html[data-theme="dark"]{
+  --bg:#0B1A13;--bg2:#0E2218;--card:#12251B;--card-soft:rgba(255,255,255,.05);--border:rgba(255,255,255,.1);
+  --text:#ECEAE0;--muted:#8AA197;--muted2:#5d6f66;--green:#36E27B;--green-ink:#08160F;
+  --green-soft:rgba(54,226,123,.12);--green-glow:rgba(54,226,123,.3);
+  --awning:repeating-linear-gradient(90deg,#36E27B 0 26px,#0d6b46 26px 28px,#0E2218 28px 54px,#10241A 54px 56px);
+  --star:#EFB85C}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--body);color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+input,textarea{font:inherit}
+.bootload{min-height:100vh;display:grid;place-items:center;color:var(--muted);font-size:14px}
+.nav{background:var(--card);border-bottom:1px solid var(--border);padding:14px 18px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:50}
+.nav .logo{font-family:var(--display);font-weight:800;font-size:19px}.nav .logo i{font-style:normal;color:var(--green)}
+.nav .spacer{flex:1}
+.nav .explore{font-size:13px;font-weight:600;color:var(--green);padding:7px 12px;border-radius:10px;border:1.5px solid var(--border);transition:background .15s,border-color .15s}
+.nav .explore:hover{border-color:var(--green);background:var(--green-soft)}
+.nav .out{font-size:13px;font-weight:600;color:var(--muted);padding:7px 10px;border-radius:10px;transition:color .15s,background .15s}
+.nav .out:hover{color:#C0392B;background:rgba(192,57,43,.08)}
+.theme-tg{display:inline-flex;gap:2px;background:var(--card-soft);border:1px solid var(--border);border-radius:999px;padding:3px}
+.theme-tg button{font:700 11.5px 'Instrument Sans',sans-serif;padding:6px 12px;border-radius:999px;line-height:1;cursor:pointer;border:0;background:transparent;color:var(--muted)}
+.theme-tg button.on{background:var(--green);color:var(--green-ink)}
+.wrap{max-width:600px;margin:0 auto;padding:24px 16px 60px}
+h1{font-family:var(--display);font-weight:800;font-size:27px;letter-spacing:-.025em;margin-bottom:5px}
+.sub{font-size:13px;color:var(--muted);margin-bottom:22px}
+.tabs{display:inline-flex;gap:3px;background:var(--card-soft);border:1px solid var(--border);border-radius:999px;padding:4px;margin-bottom:20px}
+.tabs button{font-weight:700;font-size:13.5px;padding:9px 18px;border-radius:999px;line-height:1;color:var(--muted);transition:background .15s,color .15s}
+.tabs button.on{background:var(--green);color:var(--green-ink)}
+.tabs button .cnt{font-family:var(--mono);font-size:11px;opacity:.8;margin-left:5px}
+/* cita card */
+.appt{background:var(--card);border:1.5px solid var(--border);border-radius:18px;padding:16px;margin-bottom:12px;box-shadow:0 1px 2px rgba(0,0,0,.04);transition:border-color .15s,box-shadow .15s}
+.appt:hover{border-color:var(--green);box-shadow:0 4px 14px var(--green-glow)}
+.appt .head{display:flex;gap:12px;align-items:center}
+.appt .logo{width:46px;height:46px;border-radius:13px;flex:none;object-fit:cover;background:var(--green-soft);color:var(--green);display:grid;place-items:center;font-family:var(--display);font-weight:800;font-size:20px;overflow:hidden;border:1px solid var(--border)}
+.appt .logo img{width:100%;height:100%;object-fit:cover}
+.appt .htxt{flex:1;min-width:0}
+.appt .biz{font-family:var(--display);font-weight:800;font-size:17px;letter-spacing:-.01em;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.appt .svc{font-size:12.5px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.appt .meta{display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:13px;padding-top:13px;border-top:1px solid var(--border);font-size:13px}
+.appt .meta .lbl{font-family:var(--mono);font-size:9.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted2);display:block;margin-bottom:2px}
+.appt .meta .when{font-weight:600}
+.appt .meta .code{font-family:var(--mono);font-weight:700;letter-spacing:.06em;color:var(--green)}
+.appt .meta .gw{flex:1;min-width:120px}
+.statebadge{display:inline-block;font-size:11.5px;font-weight:700;padding:3px 11px;border-radius:99px;white-space:nowrap}
+.statebadge.confirmed{background:var(--green-soft);color:var(--green)}
+.statebadge.pending_deposit{background:#FBEFD8;color:#8a5a13}
+html[data-theme="dark"] .statebadge.pending_deposit{background:rgba(239,161,47,.18);color:#EFB85C}
+.statebadge.cancelled_client,.statebadge.cancelled_business{background:var(--card-soft);color:var(--muted)}
+.statebadge.completed{background:#E5F6EC;color:#15803D}
+html[data-theme="dark"] .statebadge.completed{background:rgba(54,226,123,.14);color:var(--green)}
+.statebadge.no_show{background:#FBE3DC;color:#A33A24}
+html[data-theme="dark"] .statebadge.no_show{background:rgba(163,58,36,.22);color:#E8A595}
+.appt .actions{display:flex;gap:9px;margin-top:14px}
+.btn{display:flex;align-items:center;justify-content:center;gap:7px;flex:1;font-weight:700;font-size:13.5px;padding:11px;border-radius:12px;transition:transform .1s,box-shadow .12s,opacity .12s}
+.btn:active{transform:translateY(1px)}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.btn-teal{background:var(--green);color:var(--green-ink);box-shadow:0 6px 16px -9px var(--green-glow)}
+.btn-soft{background:var(--bg2);border:1.5px solid var(--border);color:var(--text)}
+.btn-danger{background:var(--card);border:1.5px solid #E8B5A8;color:#A33A24}
+html[data-theme="dark"] .btn-danger{border-color:rgba(163,58,36,.4);color:#E8A595;background:transparent}
+.reviewed{display:flex;align-items:center;gap:6px;margin-top:13px;padding-top:13px;border-top:1px solid var(--border);font-size:12.5px;font-weight:600;color:var(--green)}
+.reviewed .stars{color:var(--star);letter-spacing:1px}
+.appt .alert{display:none;font-size:12.5px;font-weight:600;padding:10px 12px;border-radius:11px;margin-top:12px;line-height:1.45}
+.appt .alert.err{display:block;background:#FCE8E6;color:#A1281C;border:1px solid #F3C0BA}
+html[data-theme="dark"] .appt .alert.err{background:rgba(161,40,28,.16);color:#E8A595;border-color:rgba(161,40,28,.4)}
+.appt .alert.ok{display:block;background:var(--green-soft);color:var(--green);border:1px solid var(--border)}
+/* review form */
+.rvform{margin-top:13px;padding-top:14px;border-top:1px solid var(--border)}
+.rvform .rvlbl{font-family:var(--mono);font-size:9.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.stars-pick{display:flex;gap:4px;margin-bottom:13px}
+.stars-pick button{font-size:30px;line-height:1;color:var(--border);transition:color .1s,transform .1s;padding:0 1px}
+.stars-pick button:hover{transform:scale(1.12)}
+.stars-pick button.lit{color:var(--star)}
+.rvform textarea{width:100%;min-height:74px;resize:vertical;padding:12px;border:1.5px solid var(--border);border-radius:12px;background:var(--bg2);color:var(--text);font-size:14px;line-height:1.45;transition:border-color .12s,box-shadow .12s}
+.rvform textarea:focus{outline:none;border-color:var(--green);box-shadow:0 0 0 3px var(--green-soft)}
+.rvform .rvbtns{display:flex;gap:9px;margin-top:11px}
+.empty{text-align:center;color:var(--muted);font-size:14px;padding:46px 26px;line-height:1.6;background:var(--card);border:1.5px dashed var(--border);border-radius:20px}
+.empty .ic{font-size:34px;display:block;margin-bottom:10px}
+.empty a{display:inline-block;margin-top:16px;background:var(--green);color:var(--green-ink);font-weight:700;font-size:14px;padding:12px 22px;border-radius:13px;box-shadow:0 6px 16px -9px var(--green-glow)}
+.foot{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:20px 0 40px}
+</style>
+</head>
+<body>
+<script>
+(function(){var t=localStorage.getItem('bukeame_theme')||'dark';document.documentElement.setAttribute('data-theme',t);
+window.__setTheme=function(t){localStorage.setItem('bukeame_theme',t);document.documentElement.setAttribute('data-theme',t);
+  document.querySelectorAll('.theme-tg button').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-theme-set')===t);});};
+document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('[data-theme-set]').forEach(function(b){b.addEventListener('click',function(){window.__setTheme(b.getAttribute('data-theme-set'));});});window.__setTheme(localStorage.getItem('bukeame_theme')||'dark');});})();
+</script>
+<div id="boot" class="bootload">Cargando…</div>
+<div id="app" style="display:none">
+<nav class="nav">
+  <span class="logo">Buk<i>é</i>ame</span>
+  <span class="spacer"></span>
+  <a href="buscar.html" class="explore">Explorar negocios</a>
+  <div class="theme-tg"><button type="button" data-theme-set="light">Claro</button><button type="button" data-theme-set="dark">Oscuro</button></div>
+  <button type="button" class="out" id="logoutBtn">Salir</button>
+</nav>
+<div style="height:12px;background:var(--awning)"></div>
+<div class="wrap">
+  <h1 id="hello">Hola</h1>
+  <p class="sub">Tus citas en todos los negocios de Bukéame.</p>
+  <div class="tabs">
+    <button type="button" id="tabUp" class="on" data-tab="up">Próximas<span class="cnt" id="cntUp"></span></button>
+    <button type="button" id="tabPast" data-tab="past">Pasadas<span class="cnt" id="cntPast"></span></button>
+  </div>
+  <div id="content"></div>
+  <a href="panel.html" style="display:flex;align-items:center;gap:14px;margin-top:26px;background:var(--card-soft);border:1px solid var(--border);border-radius:16px;padding:16px 18px">
+    <span style="flex:1"><b style="font-family:var(--display);font-size:15px;color:var(--text);display:block;margin-bottom:2px">¿Tienes un negocio?</b><span style="font-size:12.5px;color:var(--muted);line-height:1.5">Conviértete en profesional y administra tu agenda, equipo y pagos. Puedes hacerlo cuando quieras.</span></span>
+    <span style="font-weight:800;color:var(--green);font-size:18px;flex:none">→</span>
+  </a>
+</div>
+</div>
+<div class="foot">Hecho con Bukéame · bukeame.com</div>
+
+<script>
+const API='/api';
+const token=localStorage.getItem('bukeame_token');
+if(!token){ location.href='acceso.html'; }
+
+function esc(s){return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function money(c){ return '$'+((c||0)/100).toFixed(2); }
+const STATE_LABELS={confirmed:'Confirmada',pending_deposit:'Falta depósito',cancelled_client:'Cancelada',cancelled_business:'Cancelada por el negocio',completed:'Completada',no_show:'No asististe'};
+
+const fmtDate=new Intl.DateTimeFormat('es-PR',{weekday:'short',day:'numeric',month:'short',timeZone:'America/Puerto_Rico'});
+const fmtTime=new Intl.DateTimeFormat('es-PR',{hour:'numeric',minute:'2-digit',timeZone:'America/Puerto_Rico'});
+function whenLabel(iso){
+  try{ const d=new Date(iso); return fmtDate.format(d)+' · '+fmtTime.format(d); }
+  catch(e){ return ''; }
+}
+
+async function api(method,path,body){
+  const opts={method,headers:{'Authorization':'Bearer '+token}};
+  if(body!==undefined){opts.headers['Content-Type']='application/json';opts.body=JSON.stringify(body);}
+  let r;
+  try{ r=await fetch(API+path,opts); }
+  catch(e){ return {status:0,ok:false,data:{}}; }
+  if(r.status===401){localStorage.clear();location.href='acceso.html';throw new Error('unauth');}
+  let data={};try{data=await r.json();}catch(e){}
+  return {status:r.status,ok:r.ok,data};
+}
+
+let DATA={upcoming:[],past:[]};
+let TAB='up';
+
+function initial(name){ const s=(name||'').trim(); return s?s.charAt(0).toUpperCase():'B'; }
+
+function logoHtml(a){
+  if(a.logo_url){ return '<span class="logo"><img src="'+esc(a.logo_url)+'" alt="" loading="lazy"></span>'; }
+  return '<span class="logo">'+esc(initial(a.business_name))+'</span>';
+}
+
+function metaHtml(a){
+  const st=a.status||'confirmed';
+  const label=STATE_LABELS[st]||esc(st);
+  return '<div class="meta">'+
+    '<div class="gw"><span class="lbl">Cuándo</span><span class="when">'+esc(whenLabel(a.starts_at))+'</span></div>'+
+    '<div><span class="lbl">Estado</span><span class="statebadge '+esc(st)+'">'+esc(label)+'</span></div>'+
+    '<div><span class="lbl">Código</span><span class="code">'+esc(a.confirmation_code||'—')+'</span></div>'+
+    '</div>';
+}
+
+function cardShell(a,inner){
+  const svc=(a.service_name?esc(a.service_name):'Servicio')+(a.staff_name?(' · '+esc(a.staff_name)):'');
+  return '<div class="appt" data-code="'+esc(a.confirmation_code||'')+'">'+
+    '<div class="head">'+logoHtml(a)+
+      '<div class="htxt"><div class="biz">'+esc(a.business_name||'Negocio')+'</div>'+
+      '<div class="svc">'+svc+'</div></div></div>'+
+    metaHtml(a)+inner+'</div>';
+}
+
+function upcomingCard(a){
+  const slug=a.slug?('negocio.html?slug='+encodeURIComponent(a.slug)):'buscar.html';
+  const inner='<div class="alert" data-role="alert"></div>'+
+    '<div class="actions">'+
+      '<a class="btn btn-soft" href="'+esc(slug)+'">Reagendar</a>'+
+      '<button type="button" class="btn btn-danger" data-act="cancel">Cancelar</button>'+
+    '</div>';
+  return cardShell(a,inner);
+}
+
+function pastCard(a){
+  let inner;
+  if(a.reviewed){
+    inner='<div class="reviewed"><span class="stars">★★★★★</span> Reseñada</div>';
+  }else{
+    inner='<div class="alert" data-role="alert"></div>'+
+      '<div class="actions"><button type="button" class="btn btn-teal" data-act="review">Dejar reseña</button></div>'+
+      '<div class="rvform" data-role="rvform" style="display:none">'+
+        '<div class="rvlbl">Tu calificación</div>'+
+        '<div class="stars-pick" data-role="stars">'+
+          [1,2,3,4,5].map(function(n){return '<button type="button" data-star="'+n+'">★</button>';}).join('')+
+        '</div>'+
+        '<textarea data-role="comment" placeholder="¿Cómo fue tu experiencia? (opcional)" maxlength="600"></textarea>'+
+        '<div class="rvbtns">'+
+          '<button type="button" class="btn btn-soft" data-act="rvcancel">Cancelar</button>'+
+          '<button type="button" class="btn btn-teal" data-act="rvsend">Enviar reseña</button>'+
+        '</div>'+
+      '</div>';
+  }
+  return cardShell(a,inner);
+}
+
+function setAlert(card,msg,ok){
+  const el=card.querySelector('[data-role="alert"]');
+  if(!el)return;
+  el.textContent=msg;
+  el.className='alert '+(ok?'ok':'err');
+}
+
+function render(){
+  document.getElementById('cntUp').textContent=DATA.upcoming.length?('('+DATA.upcoming.length+')'):'';
+  document.getElementById('cntPast').textContent=DATA.past.length?('('+DATA.past.length+')'):'';
+  document.getElementById('tabUp').classList.toggle('on',TAB==='up');
+  document.getElementById('tabPast').classList.toggle('on',TAB==='past');
+  const list=TAB==='up'?DATA.upcoming:DATA.past;
+  const content=document.getElementById('content');
+  if(!list.length){
+    content.innerHTML=TAB==='up'
+      ? '<div class="empty"><span class="ic">📅</span>No tienes citas próximas.<br>Encuentra un negocio y reserva tu espacio.<br><a href="buscar.html">Explorar negocios</a></div>'
+      : '<div class="empty"><span class="ic">🗂️</span>Todavía no tienes citas pasadas.<br>Aquí verás tu historial cuando completes una cita.</div>';
+    return;
+  }
+  content.innerHTML=list.map(TAB==='up'?upcomingCard:pastCard).join('');
+  wire();
+}
+
+function wire(){
+  document.querySelectorAll('.appt').forEach(function(card){
+    const code=card.getAttribute('data-code');
+    const cancelBtn=card.querySelector('[data-act="cancel"]');
+    if(cancelBtn) cancelBtn.onclick=function(){ doCancel(card,code,cancelBtn); };
+    const reviewBtn=card.querySelector('[data-act="review"]');
+    if(reviewBtn) reviewBtn.onclick=function(){
+      card.querySelector('[data-role="rvform"]').style.display='block';
+      reviewBtn.parentElement.style.display='none';
+    };
+    const rvCancel=card.querySelector('[data-act="rvcancel"]');
+    if(rvCancel) rvCancel.onclick=function(){
+      card.querySelector('[data-role="rvform"]').style.display='none';
+      const ab=card.querySelector('[data-act="review"]');
+      if(ab) ab.parentElement.style.display='flex';
+    };
+    const stars=card.querySelector('[data-role="stars"]');
+    if(stars){
+      let rating=0;
+      stars.querySelectorAll('button').forEach(function(b){
+        b.onclick=function(){
+          rating=+b.getAttribute('data-star');
+          card._rating=rating;
+          stars.querySelectorAll('button').forEach(function(x){
+            x.classList.toggle('lit', +x.getAttribute('data-star')<=rating);
+          });
+        };
+      });
+    }
+    const rvSend=card.querySelector('[data-act="rvsend"]');
+    if(rvSend) rvSend.onclick=function(){ doReview(card,code,rvSend); };
+  });
+}
+
+async function doCancel(card,code,btn){
+  if(!confirm('¿Seguro que quieres cancelar tu cita?')) return;
+  btn.disabled=true; btn.textContent='Cancelando…';
+  const r=await api('POST','/public/appointments/'+encodeURIComponent(code)+'/cancel',{});
+  btn.disabled=false; btn.textContent='Cancelar';
+  if(!r.ok){ setAlert(card,(r.data&&r.data.error)||'No se pudo cancelar.',false); return; }
+  setAlert(card,'Tu cita fue cancelada.',true);
+  setTimeout(load,900);
+}
+
+async function doReview(card,code,btn){
+  const rating=card._rating||0;
+  if(rating<1||rating>5){ setAlert(card,'Elige una calificación de 1 a 5 estrellas.',false); return; }
+  const comment=(card.querySelector('[data-role="comment"]').value||'').trim();
+  btn.disabled=true; btn.textContent='Enviando…';
+  const body={rating:rating}; if(comment) body.comment=comment;
+  const r=await api('POST','/appointments/'+encodeURIComponent(code)+'/review',body);
+  btn.disabled=false; btn.textContent='Enviar reseña';
+  if(!r.ok){ setAlert(card,(r.data&&r.data.error)||'No se pudo enviar la reseña.',false); return; }
+  setAlert(card,'¡Gracias por tu reseña!',true);
+  setTimeout(load,900);
+}
+
+async function load(){
+  const r=await api('GET','/me/appointments');
+  document.getElementById('boot').style.display='none';
+  document.getElementById('app').style.display='block';
+  if(!r.ok){
+    DATA={upcoming:[],past:[]};
+  }else{
+    DATA={
+      upcoming:Array.isArray(r.data.upcoming)?r.data.upcoming:[],
+      past:Array.isArray(r.data.past)?r.data.past:[]
+    };
+  }
+  render();
+}
+
+document.getElementById('tabUp').onclick=function(){ TAB='up'; render(); };
+document.getElementById('tabPast').onclick=function(){ TAB='past'; render(); };
+document.getElementById('logoutBtn').onclick=function(){ localStorage.removeItem('bukeame_token'); location.href='acceso.html'; };
+
+// saludo con el nombre del usuario
+(async function greet(){
+  try{
+    const r=await api('GET','/auth/me');
+    if(r.ok&&r.data){
+      const u=r.data.user||r.data;
+      const name=(u.full_name||'').trim().split(/\s+/)[0]||'';
+      document.getElementById('hello').textContent=name?('Hola, '+name):'Hola';
+    }
+  }catch(e){}
+})();
+
+load();
+</script>
+</body>
+</html>
