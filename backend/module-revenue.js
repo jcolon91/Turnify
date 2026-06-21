@@ -20,11 +20,11 @@ module.exports.mount = function (app, ctx) {
   const cents = v => Number.isInteger(v) && v >= 0 && v <= 100000000; // ≤ $1M
   const posInt = v => Number.isInteger(v) && v > 0;
 
-  // SEGURIDAD (monetización): por defecto NO se concede una función paga sin confirmar
-  // el pago. Mientras el cobro es manual (ATH), el admin la concede tras recibir el
-  // dinero vía POST /api/admin/businesses/:id/addons (y .../featured).
-  // Si quieres volver al auto-activado sin cobro, pon SELF_SERVE_PAID=true en el .env.
-  const SELF_SERVE_PAID = process.env.SELF_SERVE_PAID === 'true';
+  // SEGURIDAD (monetización): NINGUNA función paga se concede sin pago confirmado —
+  // ni planes, ni add-ons, ni destacado. El cobro es manual (ATH/transferencia) y la
+  // función se concede SOLO cuando el admin confirma el dinero recibido vía
+  // POST /api/admin/businesses/:id/addons (y .../featured). NO hay flag para saltarlo:
+  // "si no pagas, no lo tienes". (El antiguo SELF_SERVE_PAID quedó deprecado.)
 
   // genera código legible para gift cards: <PREFIJO>-GIFT-XXXX (sin caracteres ambiguos)
   function giftCode(slug) {
@@ -81,23 +81,13 @@ module.exports.mount = function (app, ctx) {
 
     const price = cat.rows[0].price_cents;
 
-    // SEGURIDAD: sin pago confirmado NO se concede la función paga. Registramos la
-    // solicitud; el admin la activa al recibir el dinero (POST /api/admin/businesses/:id/addons).
-    if (!SELF_SERVE_PAID) {
-      await audit(req, 'addon.request', 'addon', null, { code, price_cents: price });
-      await notify(req.business.id, 'system', 'Solicitud de add-on recibida',
-        `Pediste activar "${cat.rows[0].name}". Te lo activamos al confirmar el pago.`, { code });
-      return bad(res, `Para activar "${cat.rows[0].name}" ($${(price / 100).toFixed(2)}) confirma el pago. Te lo activamos enseguida.`, 402);
-    }
-
-    const { rows } = await db.query(
-      `INSERT INTO addons (business_id, code, price_cents)
-       VALUES ($1,$2,$3)
-       ON CONFLICT (business_id, code)
-       DO UPDATE SET status = 'active', cancelled_at = NULL, price_cents = $3, activated_at = now()
-       RETURNING code, status, price_cents`, [req.business.id, code, price]);
-    await audit(req, 'addon.activate', 'addon', null, { code });
-    res.status(201).json({ addon: rows[0] });
+    // SEGURIDAD: el add-on NO se activa sin pago confirmado. Registramos la solicitud y
+    // notificamos; el admin lo activa al recibir el dinero (POST /api/admin/businesses/:id/addons).
+    // SIEMPRE 402 → "si no pagas, no lo tienes". La activación real la hace SOLO el admin.
+    await audit(req, 'addon.request', 'addon', null, { code, price_cents: price });
+    await notify(req.business.id, 'system', 'Solicitud de add-on recibida',
+      `Pediste activar "${cat.rows[0].name}". Te lo activamos al confirmar el pago.`, { code });
+    return bad(res, `Para activar "${cat.rows[0].name}" ($${(price / 100).toFixed(2)}) confirma el pago. Te lo activamos enseguida.`, 402);
   }));
 
   app.post('/api/addons/:code/cancel', authRequired, businessScope, asyncH(async (req, res) => {
@@ -114,23 +104,51 @@ module.exports.mount = function (app, ctx) {
   //  PRODUCTOS (tienda) — máx 4 fotos por producto (también forzado en DB)
   // ==========================================================================
   app.get('/api/products', authRequired, businessScope, asyncH(async (req, res) => {
+    // El SELECT hace p.* → incluye automáticamente category, tagline y features
+    // (jsonb, nunca NULL por el DEFAULT '[]') tras la migración 13. Sumamos por
+    // producto: fotos, resumen de calificación (rating_avg 1 decimal / rating_count)
+    // y reseñas recientes (hasta 20) desde product_reviews (migración 12).
     const { rows } = await db.query(
       `SELECT p.*, COALESCE(
            (SELECT json_agg(json_build_object('id',ph.id,'url',ph.url,'sort_order',ph.sort_order)
                             ORDER BY ph.sort_order)
-              FROM product_photos ph WHERE ph.product_id = p.id), '[]') AS photos
+              FROM product_photos ph WHERE ph.product_id = p.id), '[]') AS photos,
+           (SELECT round(avg(r.rating)::numeric, 1) FROM product_reviews r
+              WHERE r.product_id = p.id) AS rating_avg,
+           COALESCE((SELECT count(*)::int FROM product_reviews r
+              WHERE r.product_id = p.id), 0) AS rating_count,
+           COALESCE(
+             (SELECT json_agg(rv ORDER BY rv.created_at DESC)
+                FROM (SELECT reviewer_name, rating, comment, verified, created_at
+                        FROM product_reviews r WHERE r.product_id = p.id
+                       ORDER BY created_at DESC LIMIT 20) rv), '[]') AS reviews
          FROM products p
         WHERE p.business_id = $1 AND p.is_active
         ORDER BY p.sort_order, p.created_at`, [req.business.id]);
+    // slug del negocio (para que el dueño arme enlaces/preview de la tienda)
+    const bz = await db.query(`SELECT slug FROM businesses WHERE id = $1`, [req.business.id]);
     const limit = await productLimit(req.business.id);
-    res.json({ products: rows, limit, used: rows.length });
+    // rating_avg llega como string (numeric de pg) → number con 1 decimal, o null.
+    const products = rows.map(p => ({
+      ...p,
+      rating_avg: p.rating_avg == null ? null : Number(p.rating_avg),
+      rating_count: Number(p.rating_count) || 0,
+    }));
+    res.json({ slug: bz.rows[0]?.slug || null, limit, used: products.length, products });
   }));
 
   app.post('/api/products', authRequired, businessScope, asyncH(async (req, res) => {
-    const { name, description, price_cents, stock, variants, is_featured, photos } = req.body || {};
+    const { name, description, price_cents, stock, variants, is_featured, photos, category, tagline, features } = req.body || {};
     if (!isStr(name, 120)) return bad(res, 'Nombre del producto requerido');
     if (!cents(price_cents)) return bad(res, 'Precio inválido');
     if (stock != null && (!Number.isInteger(stock) || stock < 0)) return bad(res, 'Inventario inválido');
+
+    // Campos de presentación (tienda enriquecida). category/tagline → null si vacíos.
+    const catVal = isStr(category, 60) ? category.trim() || null : null;
+    const tagVal = isStr(tagline, 120) ? tagline.trim() || null : null;
+    // features: arreglo de strings (<=120 c/u), máx 8; se guarda como JSON en jsonb.
+    const featArr = Array.isArray(features)
+      ? features.filter(f => isStr(f, 120)).slice(0, 8) : [];
 
     const limit = await productLimit(req.business.id);
     if (limit === 0)
@@ -158,10 +176,11 @@ module.exports.mount = function (app, ctx) {
     try {
       await client.query('BEGIN');
       const { rows } = await client.query(
-        `INSERT INTO products (business_id, name, description, price_cents, stock, variants, is_featured)
-         VALUES ($1,$2,$3,$4,$5,$6,COALESCE($7,false)) RETURNING *`,
+        `INSERT INTO products (business_id, name, description, price_cents, stock, variants, is_featured, category, tagline, features)
+         VALUES ($1,$2,$3,$4,$5,$6,COALESCE($7,false),$8,$9,$10) RETURNING *`,
         [req.business.id, name.trim(), description || null, price_cents,
-         Number.isInteger(stock) ? stock : null, JSON.stringify(vArr), is_featured]);
+         Number.isInteger(stock) ? stock : null, JSON.stringify(vArr), is_featured,
+         catVal, tagVal, JSON.stringify(featArr)]);
       const prod = rows[0];
       for (let i = 0; i < photoArr.length; i++)
         await client.query(
@@ -179,7 +198,7 @@ module.exports.mount = function (app, ctx) {
 
   app.patch('/api/products/:id', authRequired, businessScope, asyncH(async (req, res) => {
     if (!isUuid(req.params.id)) return bad(res, 'ID inválido');
-    const allowed = ['name', 'description', 'price_cents', 'stock', 'is_active', 'is_featured', 'sort_order'];
+    const allowed = ['name', 'description', 'price_cents', 'stock', 'is_active', 'is_featured', 'sort_order', 'category', 'tagline'];
     const sets = [], vals = [];
     for (const k of allowed) if (k in (req.body || {})) {
       if (k === 'price_cents' && !cents(req.body[k])) return bad(res, 'Precio inválido');
@@ -190,6 +209,10 @@ module.exports.mount = function (app, ctx) {
         .filter(v => isStr(v?.name, 40) && Array.isArray(v?.options))
         .map(v => ({ name: v.name.trim(), options: v.options.slice(0, 20).filter(o => isStr(o, 40)) }));
       vals.push(JSON.stringify(vArr)); sets.push(`variants = $${vals.length}`);
+    }
+    if (Array.isArray(req.body?.features)) {
+      const fArr = req.body.features.filter(f => isStr(f, 120)).slice(0, 8);
+      vals.push(JSON.stringify(fArr)); sets.push(`features = $${vals.length}`);
     }
     if (!sets.length) return bad(res, 'Nada que actualizar');
     vals.push(req.params.id, req.business.id);
@@ -498,37 +521,16 @@ module.exports.mount = function (app, ctx) {
     if (!Number.isInteger(weeks) || weeks < 1 || weeks > 12) return bad(res, 'Entre 1 y 12 semanas');
     if (!req.business.municipality_id) return bad(res, 'Configura el municipio de tu negocio primero');
 
-    // categoría principal del negocio
-    const cat = await db.query(
-      `SELECT category_id FROM business_categories WHERE business_id = $1 ORDER BY category_id LIMIT 1`,
-      [req.business.id]);
     const price = await db.query(`SELECT price_cents FROM addon_catalog WHERE code = 'featured'`);
     const total = price.rows[0].price_cents * weeks;
-    const ends = new Date(Date.now() + weeks * 7 * 864e5);
 
-    // SEGURIDAD: el destacado afecta a TODO el marketplace (sales primero). Sin pago
-    // confirmado NO se concede; el admin lo activa al cobrar (POST /api/admin/businesses/:id/featured).
-    if (!SELF_SERVE_PAID) {
-      await audit(req, 'featured.request', 'featured', null, { weeks, total });
-      await notify(req.business.id, 'system', 'Solicitud de destacado recibida',
-        `Pediste ${weeks} semana(s) de destacado. Te lo activamos al confirmar el pago.`, { weeks });
-      return bad(res, `Para destacar tu negocio ${weeks} semana(s) ($${(total / 100).toFixed(2)}) confirma el pago. Te lo activamos enseguida.`, 402);
-    }
-
-    // registramos el destacado como pendiente de pago (el cobro real lo hace Stripe en otra fase)
-    const { rows } = await db.query(
-      `INSERT INTO featured_listings (business_id, municipality_id, category_id, ends_at)
-       VALUES ($1,$2,$3,$4) RETURNING id, ends_at`,
-      [req.business.id, req.business.municipality_id, cat.rows[0]?.category_id || null, ends]);
-    // marcar negocio como featured mientras esté vigente
-    await db.query(`UPDATE businesses SET is_featured = true WHERE id = $1`, [req.business.id]);
-    await audit(req, 'featured.purchase', 'featured', rows[0].id, { weeks, total });
-
-    res.status(201).json({
-      featured: rows[0],
-      total_cents: total,
-      note: 'Aparecerás primero en tu pueblo y categoría durante el período.',
-    });
+    // SEGURIDAD: el destacado afecta a TODO el marketplace. NO se concede sin pago
+    // confirmado; el admin lo activa al cobrar (POST /api/admin/businesses/:id/featured).
+    // SIEMPRE 402 → "si no pagas, no lo tienes".
+    await audit(req, 'featured.request', 'featured', null, { weeks, total });
+    await notify(req.business.id, 'system', 'Solicitud de destacado recibida',
+      `Pediste ${weeks} semana(s) de destacado. Te lo activamos al confirmar el pago.`, { weeks });
+    return bad(res, `Para destacar tu negocio ${weeks} semana(s) ($${(total / 100).toFixed(2)}) confirma el pago. Te lo activamos enseguida.`, 402);
   }));
 
   console.log('  ✓ módulo revenue montado (productos, gift cards, add-ons, destacados)');

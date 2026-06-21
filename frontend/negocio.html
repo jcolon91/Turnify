@@ -247,7 +247,7 @@ html[data-theme="dark"] .alert.err{background:rgba(255,90,70,.14);color:#FFB3A8;
 .prod-card .ph .noimg{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted2)}
 .prod-card .body{padding:12px;display:flex;flex-direction:column;gap:6px;flex:1}
 .prod-card h4{font-size:14.5px;font-weight:700;line-height:1.3}
-.prod-card .pdesc{font-size:12px;color:var(--muted);line-height:1.4}
+.prod-card .pdesc{font-size:12px;color:var(--muted);line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .prod-card .prow{margin-top:auto;display:flex;align-items:center;justify-content:space-between;gap:8px;padding-top:6px}
 .prod-card .pprice{font-family:var(--display);font-weight:800;font-size:16px;color:var(--text)}
 .prod-card .soldout{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted2)}
@@ -307,19 +307,39 @@ html[data-theme="dark"] .alert.err{background:rgba(255,90,70,.14);color:#FFB3A8;
 .pd-dots{display:flex;gap:6px;justify-content:center;margin-top:10px}
 .pd-dot{width:7px;height:7px;border-radius:99px;background:var(--border);transition:.2s}
 .pd-dot.on{background:var(--green);width:18px}
+/* Tira de miniaturas */
+.pd-thumbs{display:flex;gap:8px;margin-top:10px}
+.pd-thumb{flex:0 0 auto;width:58px;height:58px;border-radius:11px;overflow:hidden;border:2px solid var(--border);background:var(--card-soft);cursor:pointer;padding:0;display:grid;place-items:center;transition:border-color .15s}
+.pd-thumb img{width:100%;height:100%;object-fit:cover}
+.pd-thumb.on{border-color:var(--green)}
+.pd-thumb .pd-thumb-ini{font-family:var(--display);font-weight:800;font-size:22px;color:var(--green);background:var(--green-soft);width:100%;height:100%;display:grid;place-items:center}
 /* Cabecera del detalle */
 .pd-name{font-family:var(--display);font-weight:800;font-size:22px;line-height:1.2;margin-top:18px}
+.pd-tagline{font-size:13.5px;color:var(--muted);line-height:1.45;margin-top:5px}
 .pd-rate{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13.5px;color:var(--muted)}
 .pd-rate .stars{color:var(--mango);font-size:15px;letter-spacing:1px}
 .pd-rate a{color:var(--green);font-weight:600;cursor:pointer}
-.pd-price{font-family:var(--display);font-weight:800;font-size:26px;color:var(--text);margin-top:12px}
-.pd-stock{font-size:12.5px;font-weight:600;margin-top:4px}
-.pd-stock.ok{color:var(--green)}
-.pd-stock.out{color:var(--muted2)}
+.pd-price{font-family:var(--mono);font-weight:700;font-size:26px;color:var(--green);margin-top:12px}
+.pd-stock{display:inline-flex;align-items:center;font-size:12px;font-weight:700;margin-top:10px;padding:5px 11px;border-radius:99px;font-family:var(--mono);letter-spacing:.02em}
+.pd-stock.ok{color:var(--green);background:var(--green-soft)}
+.pd-stock.out{color:#e88a8a;background:rgba(232,138,138,.12)}
 .pd-desc{font-size:14px;line-height:1.65;color:var(--muted);margin-top:14px;white-space:pre-line}
+.pd-features{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-direction:column;gap:9px}
+.pd-features li{display:flex;align-items:flex-start;gap:9px;font-size:13.5px;line-height:1.5;color:var(--text)}
+.pd-features li svg{flex:0 0 auto;width:16px;height:16px;margin-top:2px;stroke:var(--green);stroke-width:2.6;fill:none}
 .pd-sectitle{font-family:var(--display);font-weight:800;font-size:17px;margin:24px 0 12px}
 .pd-var-label{display:block;font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:18px 0 6px}
 .pd-add{margin-top:18px}
+/* Botonera del detalle */
+.pd-actions{display:flex;flex-direction:column;gap:10px;margin-top:18px}
+.pd-buynow{background:transparent;border:1.5px solid var(--green);color:var(--green);font-weight:700}
+.pd-buynow:disabled{border-color:var(--border);color:var(--muted2);background:var(--card-soft)}
+.pd-pay{font-size:11.5px;color:var(--muted);text-align:center;margin-top:10px;font-family:var(--mono);letter-spacing:.01em}
+/* Layout 2 columnas en pantallas anchas */
+@media(min-width:720px){
+  .pd-cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:28px;align-items:start}
+  .pd-cols .pd-left{position:sticky;top:0}
+}
 /* Reseñas */
 .pd-avg{display:flex;align-items:center;gap:14px;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:14px}
 .pd-avg .num{font-family:var(--display);font-weight:800;font-size:34px;line-height:1;color:var(--text)}
@@ -1397,13 +1417,13 @@ function renderShop(){
     var vars = parseVariants(p.variants);
     var soldOut = (p.stock!=null && Number(p.stock)<=0);
     var varSel = vars.length ? '<select class="pvar" data-var="'+esc(p.id)+'">'+vars.map(function(v){ return '<option value="'+esc(v)+'">'+esc(v)+'</option>'; }).join('')+'</select>' : '';
-    var desc = p.description ? '<div class="pdesc">'+esc(p.description)+'</div>' : '';
+    var subtitle = p.tagline ? '<div class="pdesc">'+esc(p.tagline)+'</div>' : (p.description ? '<div class="pdesc">'+esc(p.description)+'</div>' : '');
     var action = soldOut
       ? '<span class="soldout">Agotado</span>'
       : '<button class="addbtn" data-add="'+esc(p.id)+'">Añadir</button>';
     return '<div class="prod-card" data-prod="'+esc(p.id)+'">'+
       '<div class="ph">'+img+'</div>'+
-      '<div class="body"><h4>'+esc(p.name)+'</h4>'+desc+varSel+
+      '<div class="body"><h4>'+esc(p.name)+'</h4>'+subtitle+varSel+
       '<div class="prow"><span class="pprice">'+money(p.price_cents)+'</span>'+action+'</div></div></div>';
   }).join('');
   grid.querySelectorAll('[data-add]').forEach(function(btn){
@@ -1469,27 +1489,51 @@ function renderProductDetail(data){
   } else {
     slides = '<div class="pd-slide"><div class="pd-noimg">'+esc((p.name||'?').charAt(0).toUpperCase())+'</div></div>';
   }
+  var photoUrls = photos.slice(0,3).map(function(ph){ return (ph && ph.url) ? ph.url : ph; });
   var nSlides = photos.length>1 ? Math.min(photos.length,3) : 0;
   var dots = nSlides>1 ? '<div class="pd-dots" id="pdDots">'+Array.from({length:nSlides}).map(function(_,i){ return '<span class="pd-dot'+(i===0?' on':'')+'"></span>'; }).join('')+'</div>' : '';
 
+  // ── Tira de miniaturas (hasta 3); la activa con borde verde ──
+  var thumbsBlock = '';
+  if(photoUrls.length>1){
+    thumbsBlock = '<div class="pd-thumbs" id="pdThumbs">'+photoUrls.map(function(url,i){
+      return '<button type="button" class="pd-thumb'+(i===0?' on':'')+'" data-thumb="'+i+'"><img src="'+esc(url)+'" alt="'+esc(p.name)+' '+(i+1)+'" loading="lazy" decoding="async"></button>';
+    }).join('')+'</div>';
+  }
+
   // ── Cabecera ──
+  var taglineBlock = p.tagline ? '<div class="pd-tagline">'+esc(p.tagline)+'</div>' : '';
   var rateLine = ratingCount>0
-    ? '<div class="pd-rate"><span class="stars">'+starStr(ratingAvg)+'</span><span>'+Number(ratingAvg).toFixed(1)+'</span><a id="pdToReviews">'+ratingCount+' reseña'+(ratingCount>1?'s':'')+'</a></div>'
+    ? '<div class="pd-rate"><span class="stars">'+starStr(ratingAvg)+'</span><span>'+Number(ratingAvg).toFixed(1)+' · '+ratingCount+' reseña'+(ratingCount>1?'s':'')+'</span><a id="pdToReviews">Ver reseñas</a></div>'
     : '<div class="pd-rate"><span class="stars">'+starStr(0)+'</span><span>Sin reseñas todavía</span></div>';
   var stockLine = soldOut
     ? '<div class="pd-stock out">Agotado</div>'
-    : (p.stock!=null && Number(p.stock)<=5 ? '<div class="pd-stock ok">Quedan pocas unidades ('+Number(p.stock)+')</div>' : '<div class="pd-stock ok">Disponible</div>');
+    : (p.stock==null ? '<div class="pd-stock ok">Disponible</div>' : '<div class="pd-stock ok">En inventario: '+Number(p.stock)+'</div>');
   var descBlock = p.description ? '<div class="pd-desc">'+esc(p.description)+'</div>' : '';
+  // ── Bullets de características desde product.features[] ──
+  var features = Array.isArray(p.features) ? p.features.filter(function(f){ return f && String(f).trim(); }) : [];
+  var checkSvg = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  var featuresBlock = features.length
+    ? '<ul class="pd-features">'+features.map(function(f){ return '<li>'+checkSvg+'<span>'+esc(String(f))+'</span></li>'; }).join('')+'</ul>'
+    : '';
   var varBlock = vars.length
     ? '<label class="pd-var-label">Variante</label><select class="pvar" id="pdVar" style="width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:12px;background:var(--card);color:var(--text);font-size:14px">'+vars.map(function(v){ return '<option value="'+esc(v)+'">'+esc(v)+'</option>'; }).join('')+'</select>'
     : '';
   var addBlock = soldOut
-    ? '<button class="btn" id="pdAdd" disabled style="margin-top:18px;background:var(--card-soft);color:var(--muted2)">Agotado</button>'
-    : '<button class="btn btn-teal pd-add" id="pdAdd">Añadir al carrito</button>';
+    ? '<div class="pd-actions">'+
+        '<button class="btn" id="pdAdd" disabled style="background:var(--card-soft);color:var(--muted2)">Agotado</button>'+
+        '<button class="btn pd-buynow" id="pdBuyNow" disabled>Comprar ahora</button>'+
+      '</div>'+
+      '<div class="pd-pay">Pago seguro · ATH Móvil, tarjeta, PayPal</div>'
+    : '<div class="pd-actions">'+
+        '<button class="btn btn-teal" id="pdAdd">Añadir al carrito</button>'+
+        '<button class="btn pd-buynow" id="pdBuyNow">Comprar ahora</button>'+
+      '</div>'+
+      '<div class="pd-pay">Pago seguro · ATH Móvil, tarjeta, PayPal</div>';
 
   // ── Reseñas ──
   var avgBlock = ratingCount>0
-    ? '<div class="pd-avg"><div class="num">'+Number(ratingAvg).toFixed(1)+'</div><div class="meta"><div class="stars">'+starStr(ratingAvg)+'</div><div class="cnt">'+ratingCount+' reseña'+(ratingCount>1?'s':'')+'</div></div></div>'
+    ? '<div class="pd-avg"><div class="num">'+Number(ratingAvg).toFixed(1)+'</div><div class="meta"><div class="stars">'+starStr(ratingAvg)+'</div><div class="cnt">'+Number(ratingAvg).toFixed(1)+' de 5 · '+ratingCount+' reseña'+(ratingCount>1?'s':'')+'</div></div></div>'
     : '';
   var verifiedBadge = '<span class="pd-verified"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Compra confirmada</span>';
   var reviewsBlock = reviews.length
@@ -1514,15 +1558,24 @@ function renderProductDetail(data){
     '<p style="font-size:12px;color:var(--muted);text-align:center;margin-top:10px">Solo quienes compraron este producto pueden reseñarlo.</p>';
 
   document.getElementById('prodSheetBody').innerHTML =
-    '<div class="pd-gallery"><div class="pd-track" id="pdTrack">'+slides+'</div></div>'+dots+
-    '<h2 class="pd-name">'+esc(p.name)+'</h2>'+
-    rateLine+
-    '<div class="pd-price">'+money(p.price_cents)+'</div>'+
-    stockLine+
-    descBlock+
-    varBlock+
-    addBlock+
-    '<div class="pd-sectitle" id="pdReviewsAnchor">Reseñas</div>'+
+    '<div class="pd-cols">'+
+      '<div class="pd-left">'+
+        '<div class="pd-gallery"><div class="pd-track" id="pdTrack">'+slides+'</div></div>'+dots+
+        thumbsBlock+
+      '</div>'+
+      '<div class="pd-right">'+
+        '<h2 class="pd-name">'+esc(p.name)+'</h2>'+
+        taglineBlock+
+        rateLine+
+        '<div class="pd-price">'+money(p.price_cents)+'</div>'+
+        stockLine+
+        descBlock+
+        featuresBlock+
+        varBlock+
+        addBlock+
+      '</div>'+
+    '</div>'+
+    '<div class="pd-sectitle" id="pdReviewsAnchor">Reseñas de clientes</div>'+
     avgBlock+
     reviewsBlock+
     formBlock;
@@ -1536,7 +1589,23 @@ function renderProductDetail(data){
     track.onscroll = function(){
       var idx = Math.round(track.scrollLeft / track.clientWidth);
       dotsEl.querySelectorAll('.pd-dot').forEach(function(d,i){ d.classList.toggle('on', i===idx); });
+      var th = document.getElementById('pdThumbs');
+      if(th){ th.querySelectorAll('.pd-thumb').forEach(function(t,i){ t.classList.toggle('on', i===idx); }); }
     };
+  }
+
+  // ── Miniaturas: clic cambia la imagen grande ──
+  var thumbsEl = document.getElementById('pdThumbs');
+  if(thumbsEl && nSlides>1){
+    var trackEl = document.getElementById('pdTrack');
+    thumbsEl.querySelectorAll('[data-thumb]').forEach(function(tb){
+      tb.onclick = function(){
+        var i = +tb.getAttribute('data-thumb');
+        trackEl.scrollTo({ left: i*trackEl.clientWidth, behavior:'smooth' });
+        thumbsEl.querySelectorAll('.pd-thumb').forEach(function(t,j){ t.classList.toggle('on', j===i); });
+        if(dotsEl){ dotsEl.querySelectorAll('.pd-dot').forEach(function(d,j){ d.classList.toggle('on', j===i); }); }
+      };
+    });
   }
 
   // ── Ir a reseñas desde el rating de la cabecera ──
@@ -1551,6 +1620,20 @@ function renderProductDetail(data){
       addToCart(p.id, sel ? sel.value : null);
       addBtn.textContent = 'Añadido ✓';
       setTimeout(function(){ if(addBtn) addBtn.textContent = 'Añadir al carrito'; }, 1400);
+    };
+  }
+
+  // ── Comprar ahora: añade y abre el carrito/checkout existente ──
+  var buyBtn = document.getElementById('pdBuyNow');
+  if(buyBtn && !soldOut){
+    buyBtn.onclick = function(){
+      var sel = document.getElementById('pdVar');
+      addToCart(p.id, sel ? sel.value : null);
+      closeSheet('prodSheet');
+      clearAlert('cartAlert');
+      document.getElementById('orderOk').style.display='none';
+      renderCart();
+      openSheet('cartSheet');
     };
   }
 

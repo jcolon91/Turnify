@@ -70,6 +70,10 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer;border:0
 .chip{font-size:11.5px;font-weight:600;padding:5px 11px;border-radius:99px;background:var(--card-soft);color:var(--muted)}
 .planbtn{font-size:12px;font-weight:700;padding:6px 12px;border-radius:9px;background:var(--ink-bar);color:var(--ink-bar-text);white-space:nowrap}
 .planbtn:hover{opacity:.88}
+.delbtn{font-size:12px;font-weight:700;padding:6px 12px;border-radius:9px;background:transparent;color:#c8392b;border:1px solid rgba(200,57,43,.4);white-space:nowrap;margin-left:6px}
+.delbtn:hover{background:rgba(200,57,43,.1)}
+.delbtn:disabled{opacity:.5}
+.acts{display:flex;align-items:center;flex-wrap:wrap;gap:0}
 .chip b{font-family:var(--mono)}
 .chip.green{background:var(--green-soft);color:var(--green)}
 .chip.amber{background:var(--amber-soft);color:var(--amber-ink)}
@@ -216,6 +220,21 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
     <div style="display:flex;gap:8px">
       <button id="pmCancel" style="flex:1;padding:11px;border-radius:10px;background:var(--card-soft);color:var(--text);font-weight:700">Cancelar</button>
       <button id="pmSave" style="flex:1;padding:11px;border-radius:10px;background:var(--green);color:var(--green-ink);font-weight:700">Aplicar</button>
+    </div>
+  </div>
+</div>
+
+<div id="delModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--card);color:var(--text);border-radius:18px;max-width:400px;width:100%;padding:22px;border:1px solid var(--border)">
+    <h3 style="font-family:var(--display,sans-serif);font-size:19px;margin-bottom:4px;color:#c8392b">Borrar cuenta</h3>
+    <p id="dmBiz" style="font-size:13px;color:var(--muted);margin-bottom:14px"></p>
+    <p style="font-size:13px;color:var(--text);margin-bottom:14px;line-height:1.5">Esto saca al negocio del marketplace, del buscador y bloquea su panel. Sus datos quedan archivados (no se borran del servidor), así que se puede recuperar más adelante si hace falta.</p>
+    <label style="font-size:12px;font-weight:700;display:block;margin-bottom:6px">Escribe <b>BORRAR</b> para confirmar</label>
+    <input id="dmConfirm" type="text" autocomplete="off" placeholder="BORRAR" style="width:100%;padding:11px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;margin-bottom:12px;background:var(--bg2);color:var(--text)">
+    <div id="dmAlert" style="display:none;font-size:13px;padding:9px;border-radius:8px;margin-bottom:12px"></div>
+    <div style="display:flex;gap:8px">
+      <button id="dmCancel" style="flex:1;padding:11px;border-radius:10px;background:var(--card-soft);color:var(--text);font-weight:700">Cancelar</button>
+      <button id="dmDelete" disabled style="flex:1;padding:11px;border-radius:10px;background:#c8392b;color:#fff;font-weight:700;opacity:.5">Borrar cuenta</button>
     </div>
   </div>
 </div>
@@ -407,12 +426,19 @@ function render(data){
         <td><span class="plan">${esc(b.plan_code||'free')}</span></td>
         <td><span class="pill ${esc(st)}">${esc(st)}</span></td>
         <td class="muted">${fdate(b.created_at)}</td>
-        <td><button class="planbtn" data-id="${esc(b.id)}" data-name="${esc(b.name)}" data-plan="${esc(b.plan_code||'free')}">Cambiar plan</button></td>
+        <td><div class="acts">
+          <button class="planbtn" data-id="${esc(b.id)}" data-name="${esc(b.name)}" data-plan="${esc(b.plan_code||'free')}">Cambiar plan</button>
+          <button class="delbtn" data-id="${esc(b.id)}" data-name="${esc(b.name)}">Borrar</button>
+        </div></td>
       </tr>`;
     }).join('');
     // Enganchar botones de cambiar plan
     document.querySelectorAll('.planbtn').forEach(function(btn){
       btn.onclick = function(){ openPlanChange(btn.dataset.id, btn.dataset.name, btn.dataset.plan); };
+    });
+    // Enganchar botones de borrar cuenta
+    document.querySelectorAll('.delbtn').forEach(function(btn){
+      btn.onclick = function(){ openDeleteBiz(btn.dataset.id, btn.dataset.name); };
     });
   }
 
@@ -472,6 +498,51 @@ document.getElementById('pmSave').onclick = async function(){
     al.textContent = 'Error de conexión';
   }
   saveBtn.disabled = false; saveBtn.textContent = 'Aplicar';
+};
+
+// ── Borrar cuenta de un negocio (admin, soft-delete con confirmación) ──
+let dmCurrentId = null;
+function openDeleteBiz(id, name){
+  dmCurrentId = id;
+  document.getElementById('dmBiz').textContent = 'Negocio: ' + name;
+  var inp = document.getElementById('dmConfirm'); inp.value = '';
+  var al = document.getElementById('dmAlert'); al.style.display = 'none';
+  var del = document.getElementById('dmDelete'); del.disabled = true; del.style.opacity = '.5';
+  document.getElementById('delModal').style.display = 'flex';
+  setTimeout(function(){ inp.focus(); }, 50);
+}
+document.getElementById('dmConfirm').oninput = function(){
+  var ok = this.value.trim().toUpperCase() === 'BORRAR';
+  var del = document.getElementById('dmDelete');
+  del.disabled = !ok; del.style.opacity = ok ? '1' : '.5';
+};
+document.getElementById('dmCancel').onclick = function(){
+  document.getElementById('delModal').style.display = 'none';
+};
+document.getElementById('dmDelete').onclick = async function(){
+  if(!dmCurrentId) return;
+  var al = document.getElementById('dmAlert');
+  var del = document.getElementById('dmDelete');
+  del.disabled = true; del.textContent = 'Borrando…';
+  try {
+    var r = await fetch(API + '/admin/businesses/' + dmCurrentId, {
+      method:'DELETE',
+      headers:{ 'Authorization':'Bearer '+token }
+    });
+    var data = await r.json().catch(function(){ return {}; });
+    if(r.ok){
+      al.style.display='block'; al.style.background='var(--green-soft)'; al.style.color='var(--green)';
+      al.textContent = 'Cuenta borrada ✓';
+      setTimeout(function(){ document.getElementById('delModal').style.display='none'; load(); }, 900);
+    } else {
+      al.style.display='block'; al.style.background='var(--red-soft)'; al.style.color='var(--red-ink)';
+      al.textContent = data.error || 'No se pudo borrar la cuenta';
+    }
+  } catch(e){
+    al.style.display='block'; al.style.background='var(--red-soft)'; al.style.color='var(--red-ink)';
+    al.textContent = 'Error de conexión';
+  }
+  del.disabled = false; del.textContent = 'Borrar cuenta';
 };
 
 load();

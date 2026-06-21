@@ -171,6 +171,44 @@ main{padding:22px 20px 90px;max-width:760px}
 .wk-card.st-no_show{opacity:.65;border-left-color:#C8472E}
 .wk-card.st-cancelled_business,.wk-card.st-cancelled_client{opacity:.55;border-left-color:#9A958A}
 .wk-empty{font-size:11px;color:var(--muted2);text-align:center;padding:8px 0}
+/* ── Día · Timeline premium ─────────────────────────────────────────────── */
+.tl-legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin:0 0 12px;padding:0 2px}
+.tl-leg{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--muted)}
+.tl-leg i{width:10px;height:10px;border-radius:50%;flex:none;display:inline-block}
+.tl-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--border);border-radius:16px;background:var(--card)}
+.tl-grid{display:grid;position:relative;min-width:max-content}
+.tl-corner{position:sticky;left:0;z-index:5;background:var(--card);border-bottom:1px solid var(--border);border-right:1px solid var(--border)}
+.tl-chead{display:flex;align-items:center;gap:7px;padding:11px 12px;font-size:12.5px;font-weight:700;color:var(--text);border-bottom:1px solid var(--border);border-right:1px solid var(--border);position:sticky;top:0;background:var(--card);z-index:4;white-space:nowrap}
+.tl-chead i{width:9px;height:9px;border-radius:50%;flex:none}
+.tl-chead:last-child{border-right:0}
+.tl-gutter{position:sticky;left:0;z-index:3;background:var(--card);border-right:1px solid var(--border)}
+.tl-hour{position:relative;font-family:var(--mono);font-size:10.5px;font-weight:600;color:var(--muted2);padding:3px 8px 0;text-align:right;box-sizing:border-box}
+.tl-hour::after{content:"";position:absolute;right:0;top:0;width:6px;height:1px;background:var(--border)}
+.tl-col{position:relative;border-right:1px solid var(--border)}
+.tl-col:last-child{border-right:0}
+.tl-col .tl-line{position:absolute;left:0;right:0;height:1px;background:var(--border);opacity:.55}
+.tl-evt{position:absolute;left:5px;right:5px;border-radius:9px;border-left:4px solid var(--green);background:var(--green-soft);padding:5px 8px;overflow:hidden;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.05);transition:transform .08s,box-shadow .12s}
+.tl-evt:hover{box-shadow:0 3px 10px rgba(0,0,0,.12);transform:translateY(-1px)}
+.tl-evt b{display:block;font-size:11.5px;font-weight:700;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
+.tl-evt small{display:block;font-size:10px;color:var(--muted);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tl-evt .tl-ico{font-size:10px;font-weight:800;margin-right:3px}
+.tl-evt.is-completed .tl-ico{color:#15803D}
+.tl-evt.is-done-state{opacity:.5}
+.tl-evt.is-done-state .tl-ico{color:#A33A24}
+.tl-evt.is-pending{border-left-style:dashed}
+.tl-now{position:absolute;left:0;right:0;height:2px;background:var(--mango);z-index:6;pointer-events:none}
+.tl-now-dot{position:absolute;top:-3px;width:8px;height:8px;border-radius:50%;background:var(--mango);transform:translateX(-50%)}
+.tl-pop{position:fixed;z-index:120;background:var(--card);border:1px solid var(--border);border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.22);padding:8px;min-width:200px;max-width:240px}
+.tl-pop h5{font-size:13px;font-weight:700;padding:4px 8px 2px;line-height:1.25}
+.tl-pop p{font-size:11px;color:var(--muted);padding:0 8px 7px;border-bottom:1px solid var(--border);margin-bottom:5px}
+.tl-pop button{display:flex;width:100%;align-items:center;gap:9px;font-size:13px;font-weight:600;text-align:left;padding:9px 10px;border-radius:9px;color:var(--text)}
+.tl-pop button:hover{background:var(--bg2)}
+.tl-pop button.tl-act-done{color:#15803D}
+.tl-pop button.tl-act-wa{color:var(--green)}
+.tl-pop-back{position:fixed;inset:0;z-index:110}
+@media(max-width:640px){
+  .tl-pop{left:12px!important;right:12px!important;max-width:none;width:auto}
+}
 /* Mes */
 .mo-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
 .mo-dow{font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);text-align:center;padding:2px 0 4px}
@@ -681,7 +719,7 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
     <main style="max-width:560px;margin:0 auto;padding-top:40px">
       <div class="welcome">
         <h2>¡Bienvenido a Bukéame!</h2>
-        <p>Vamos a crear tu negocio en 1 minuto. Después podrás añadir tus servicios, horario, y recibir reservas.</p>
+        <p>Vamos a crear tu negocio en 1 minuto. Después añades tus servicios, horario y empiezas a recibir reservas.</p>
       </div>
       <div class="alert" id="onbAlert"></div>
       <div class="card">
@@ -1676,51 +1714,205 @@ async function renderAgenda(){
   else renderMonth(list, items, r);
 }
 
+// ── Vista DÍA · Timeline tipo calendario ────────────────────────────────────
+// Paleta de respaldo para profesionales sin calendar_color asignado.
+const TL_PALETTE = ['#0E8074','#E0762E','#3B6FE0','#9B59B6','#C0392B','#16A085','#D4A017','#2C7BE5','#E0518A','#5D6F66'];
+let TL_STAFF_CACHE = null;   // [{id, display_name, calendar_color, is_active}]
+
+async function loadTimelineStaff(force){
+  if(TL_STAFF_CACHE && !force) return TL_STAFF_CACHE;
+  const r = await api('GET','/staff');
+  const all = (r.ok && r.data.staff) ? r.data.staff : [];
+  TL_STAFF_CACHE = all.filter(function(s){ return s.is_active !== false; });
+  return TL_STAFF_CACHE;
+}
+// Color final del profesional (su calendar_color o uno de la paleta por índice).
+function staffColor(s, idx){
+  return (s && s.calendar_color) ? s.calendar_color : TL_PALETTE[idx % TL_PALETTE.length];
+}
+// Minutos locales PR desde la medianoche para un ISO dado.
+function minsOfDay(iso){
+  try{
+    const hm = new Date(iso).toLocaleTimeString('en-GB',{timeZone:PR_TZ,hour:'2-digit',minute:'2-digit',hour12:false});
+    const p = hm.split(':'); return (+p[0])*60 + (+p[1]);
+  }catch(e){ return 0; }
+}
+
+// Cierra cualquier popover de cita abierto.
+function tlClosePopover(){
+  document.querySelectorAll('.tl-pop,.tl-pop-back').forEach(function(n){ n.remove(); });
+}
+
 function renderDayList(list, items){
-  if(items.length === 0){
-    const isToday = AG_ANCHOR===prToday();
-    list.innerHTML = '<div class="empty">No hay citas para '+(isToday?'hoy':'este día')+'.<br>Cuando alguien reserve, aparecerá aquí.</div>';
+  // El timeline necesita el staff: render asíncrono dentro de la función síncrona.
+  list.innerHTML = '<div class="empty">Cargando agenda…</div>';
+  loadTimelineStaff().then(function(staff){
+    buildDayTimeline(list, items, staff);
+  });
+}
+
+function buildDayTimeline(list, items, staff){
+  tlClosePopover();
+  if(!staff || staff.length === 0){
+    list.innerHTML = '<div class="empty">Aún no tienes profesionales.<br>Crea tu equipo en la pestaña Equipo para ver la agenda por columnas.</div>';
     return;
   }
-  list.innerHTML = items.map(function(a){
-      const t = new Date(a.starts_at).toLocaleTimeString('es-PR',{hour:'numeric',minute:'2-digit'});
+  // Solo las citas del día mostrado (defensa por si el rango trae extras).
+  const dayItems = items.filter(function(a){ return apptDay(a.starts_at)===AG_ANCHOR; });
+
+  // Colores por staff_id.
+  const colorById = {};
+  staff.forEach(function(s,i){ colorById[s.id] = staffColor(s,i); });
+
+  // Rango de horas: 9–19 ampliado para cubrir primera/última cita.
+  const PXH = 60;            // px por hora
+  let startMin = 9*60, endMin = 19*60;
+  dayItems.forEach(function(a){
+    const s = minsOfDay(a.starts_at);
+    const e = a.ends_at ? minsOfDay(a.ends_at) : s+30;
+    if(s < startMin) startMin = s;
+    if(e > endMin) endMin = e;
+  });
+  startMin = Math.floor(startMin/60)*60;
+  endMin = Math.ceil(endMin/60)*60;
+  if(endMin <= startMin) endMin = startMin + 60;
+  const totalMin = endMin - startMin;
+  const bodyH = (totalMin/60)*PXH;
+  const COLW = 150, GUT = 56, HEADH = 44;
+
+  // Leyenda.
+  let legend = '<div class="tl-legend">'+ staff.map(function(s,i){
+    return '<span class="tl-leg"><i style="background:'+esc(colorById[s.id])+'"></i>'+esc(s.display_name||'—')+'</span>';
+  }).join('') +'</div>';
+
+  // Rejilla: gutter + 1 columna por profesional.
+  let h = legend +
+    '<div class="tl-scroll"><div class="tl-grid" style="grid-template-columns:'+GUT+'px repeat('+staff.length+','+COLW+'px);grid-template-rows:'+HEADH+'px '+bodyH+'px">';
+
+  // Fila de encabezados.
+  h += '<div class="tl-corner"></div>';
+  staff.forEach(function(s){
+    h += '<div class="tl-chead"><i style="background:'+esc(colorById[s.id])+'"></i>'+esc(s.display_name||'—')+'</div>';
+  });
+
+  // Gutter de horas.
+  h += '<div class="tl-gutter">';
+  for(let m=startMin; m<endMin; m+=60){
+    const top = ((m-startMin)/60)*PXH;
+    const hr = Math.floor(m/60);
+    const lbl = (hr===0?12:(hr>12?hr-12:hr))+(hr<12?'a':'p');
+    h += '<div class="tl-hour" style="position:absolute;top:'+top+'px;right:0;width:'+GUT+'px">'+lbl+'</div>';
+  }
+  h += '</div>';
+
+  // Columnas con líneas de hora + citas.
+  const isToday = (AG_ANCHOR===prToday());
+  const nowMin = minsOfDay(new Date().toISOString());
+  const nowTop = ((nowMin-startMin)/60)*PXH;
+  const showNow = isToday && nowMin>=startMin && nowMin<=endMin;
+
+  staff.forEach(function(s){
+    h += '<div class="tl-col" data-staff="'+esc(s.id)+'">';
+    // líneas horarias
+    for(let m=startMin; m<=endMin; m+=60){
+      h += '<div class="tl-line" style="top:'+(((m-startMin)/60)*PXH)+'px"></div>';
+    }
+    // citas de este profesional
+    dayItems.filter(function(a){ return String(a.staff_id)===String(s.id); }).forEach(function(a){
       const st = a.status||'confirmed';
-      // etiqueta de estado
-      let badge = '';
-      if(st==='completed') badge = '<span class="stbadge done">Completada</span>';
-      else if(st==='no_show') badge = '<span class="stbadge noshow">No llegó</span>';
-      else if(st && st.indexOf('cancelled')>=0) badge = '<span class="stbadge canc">Cancelada</span>';
-      else if(st==='pending_deposit') badge = '<span class="stbadge pend">Falta depósito</span>';
-      // acciones solo si la cita está activa (confirmed o pending)
-      let actions = '';
-      const active = (st==='confirmed' || st==='pending_deposit');
-      if(active){
-        actions = '<div class="aptactions">'+
-          '<button class="aptbtn done" data-id="'+esc(a.id)+'" data-act="completed" data-price="'+(a.price_cents||0)+'" data-svc="'+esc(a.service_name||'')+'">✓ Completada</button>'+
-          '<button class="aptbtn noshow" data-id="'+esc(a.id)+'" data-act="no_show">No llegó</button>'+
-          '<button class="aptbtn canc" data-id="'+esc(a.id)+'" data-act="cancelled_business">Cancelar</button>'+
-          '</div>';
-      }
-      const phone = a.client_phone ? '<a class="aptwa" href="https://wa.me/'+esc(String(a.client_phone).replace(/\D/g,''))+'" target="_blank">WhatsApp</a>' : '';
-      return '<div class="apt apt-'+st+'"><time>'+t+'</time><div class="grow"><h4>'+esc(a.client_name||a.service_name||'Cita')+' '+badge+'</h4><p>'+esc(a.service_name||'')+(a.staff_name?(' · '+esc(a.staff_name)):'')+(a.price_cents?(' · '+money(a.price_cents)):'')+'</p>'+actions+'</div>'+phone+'</div>';
-    }).join('');
-    // conectar botones de acción
-    list.querySelectorAll('.aptbtn').forEach(function(btn){
-      btn.onclick = async function(){
-        const act = btn.dataset.act;
-        // Completar cita → abrir modal de cobro
-        if(act === 'completed'){
-          openCobro(btn.dataset.id, btn.dataset.svc, parseInt(btn.dataset.price,10)||0);
-          return;
-        }
-        const labels = {no_show:'marcar que NO LLEGÓ',cancelled_business:'CANCELAR esta cita'};
-        if(!confirm('¿Confirmas '+labels[act]+'?')) return;
-        btn.disabled=true;
-        const r = await api('PATCH','/appointments/'+btn.dataset.id,{ status:act });
-        if(r.ok){ loadDashboard(); }
-        else { alert(r.data.error||'No se pudo actualizar.'); btn.disabled=false; }
-      };
+      const sMin = minsOfDay(a.starts_at);
+      const eMin = a.ends_at ? minsOfDay(a.ends_at) : sMin+30;
+      const top = ((sMin-startMin)/60)*PXH;
+      const hgt = Math.max(((Math.max(eMin,sMin+15)-sMin)/60)*PXH - 2, 26);
+      const col = colorById[s.id];
+      const isCompleted = (st==='completed');
+      const isCancelledLike = (st==='no_show' || (st && st.indexOf('cancelled')>=0));
+      const isPending = (st==='pending_deposit');
+      let cls = 'tl-evt';
+      if(isCompleted) cls += ' is-completed';
+      if(isCancelledLike) cls += ' is-done-state';
+      if(isPending) cls += ' is-pending';
+      let ico = '';
+      if(isCompleted) ico = '<span class="tl-ico">✓</span>';
+      else if(isCancelledLike) ico = '<span class="tl-ico">✕</span>';
+      // fondo a baja opacidad del color del staff
+      const bg = (col)+'22';
+      const who = a.client_name || a.service_name || 'Cita';
+      const sub = hourLabel(a.starts_at) + (a.service_name? (' · '+a.service_name) : '');
+      h += '<div class="'+cls+'" data-id="'+esc(a.id)+'" data-st="'+esc(st)+'"'+
+        ' data-price="'+(a.price_cents||0)+'" data-svc="'+esc(a.service_name||'')+'"'+
+        ' data-name="'+esc(who)+'" data-phone="'+esc(a.client_phone||'')+'" data-when="'+esc(hourLabel(a.starts_at))+'"'+
+        ' style="top:'+top+'px;height:'+hgt+'px;background:'+esc(bg)+';border-left-color:'+esc(col)+'">'+
+        '<b>'+ico+esc(who)+'</b><small>'+esc(sub)+'</small></div>';
     });
+    // punto de la línea AHORA en cada columna
+    if(showNow){
+      h += '<div class="tl-now-dot" style="top:'+nowTop+'px;left:0"></div>';
+    }
+    h += '</div>';
+  });
+
+  // Línea AHORA cruzando todas las columnas (sobre la zona de columnas, no el gutter).
+  if(showNow){
+    h += '<div class="tl-now" style="top:'+(HEADH+nowTop)+'px;left:'+GUT+'px"></div>';
+  }
+
+  h += '</div></div>';
+  list.innerHTML = h;
+
+  // Interacción: clic en cita ACTIVA abre popover de acciones.
+  list.querySelectorAll('.tl-evt').forEach(function(ev){
+    ev.onclick = function(e){
+      e.stopPropagation();
+      const st = ev.dataset.st;
+      const active = (st==='confirmed' || st==='pending_deposit');
+      if(!active) return;
+      tlOpenPopover(ev);
+    };
+  });
+}
+
+// Popover compacto de acciones para una cita activa.
+function tlOpenPopover(ev){
+  tlClosePopover();
+  const id = ev.dataset.id, svc = ev.dataset.svc, price = parseInt(ev.dataset.price,10)||0;
+  const phone = String(ev.dataset.phone||'').replace(/\D/g,'');
+  const back = document.createElement('div'); back.className='tl-pop-back';
+  back.onclick = tlClosePopover;
+  const pop = document.createElement('div'); pop.className='tl-pop';
+  let html = '<h5>'+esc(ev.dataset.name||'Cita')+'</h5><p>'+esc(ev.dataset.when||'')+(svc?(' · '+esc(svc)):'')+'</p>'+
+    '<button class="tl-act-done" data-act="completed">✓ Completada</button>'+
+    '<button data-act="no_show">No llegó</button>'+
+    '<button data-act="cancelled_business">Cancelar</button>';
+  if(phone){
+    html += '<button class="tl-act-wa" data-act="wa">WhatsApp</button>';
+  }
+  pop.innerHTML = html;
+  document.body.appendChild(back);
+  document.body.appendChild(pop);
+  // posicionar junto al bloque
+  const r = ev.getBoundingClientRect();
+  let left = Math.min(r.left, window.innerWidth - 252);
+  let top = Math.min(r.bottom + 6, window.innerHeight - pop.offsetHeight - 12);
+  if(left < 8) left = 8;
+  if(top < 8) top = 8;
+  pop.style.left = left+'px';
+  pop.style.top = top+'px';
+
+  pop.querySelectorAll('button').forEach(function(btn){
+    btn.onclick = async function(){
+      const act = btn.dataset.act;
+      if(act==='wa'){ tlClosePopover(); window.open('https://wa.me/'+phone,'_blank'); return; }
+      if(act==='completed'){ tlClosePopover(); openCobro(id, svc, price); return; }
+      const labels = {no_show:'marcar que NO LLEGÓ', cancelled_business:'CANCELAR esta cita'};
+      if(!confirm('¿Confirmas '+labels[act]+'?')) return;
+      btn.disabled = true;
+      const resp = await api('PATCH','/appointments/'+id,{ status:act });
+      tlClosePopover();
+      if(resp.ok){ loadDashboard(); }
+      else { alert((resp.data && resp.data.error)||'No se pudo actualizar.'); }
+    };
+  });
 }
 
 // Agrupa las citas por día local PR (clave YYYY-MM-DD).

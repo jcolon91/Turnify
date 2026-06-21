@@ -286,6 +286,21 @@ function mount(app, { db, authRequired, h }) {
     res.json({ ok: true, business: biz.rows[0].name, subscription: rows[0] });
   }));
 
+  // ── DELETE /api/admin/businesses/:id ──────────────────────────────────────
+  // Borra la cuenta de un negocio (SOFT-delete: marca deleted_at + lo despublica).
+  // Reversible a nivel de datos (no hard delete); lo saca del marketplace, del
+  // panel del dueño y de todo el producto. Acción sensible → admin + audit.
+  app.delete('/api/admin/businesses/:id', authRequired, adminRequired, asyncH(async (req, res) => {
+    if (!isUuid(req.params.id)) return bad(res, 'ID inválido');
+    const { rows } = await db.query(
+      `UPDATE businesses SET deleted_at = now(), is_published = false
+        WHERE id = $1 AND deleted_at IS NULL
+        RETURNING name`, [req.params.id]);
+    if (!rows[0]) return bad(res, 'Negocio no encontrado o ya borrado', 404);
+    await audit(req, 'admin.business.delete', 'business', req.params.id, { name: rows[0].name });
+    res.json({ ok: true, business: rows[0].name });
+  }));
+
   // ── POST /api/admin/businesses/:id/addons ─────────────────────────────────
   // Conceder o revocar un add-on a un negocio TRAS confirmar el pago manual.
   // Body: { code, action: 'grant' | 'revoke' }   (cierra el bypass de monetización)

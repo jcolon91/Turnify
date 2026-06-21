@@ -1432,6 +1432,76 @@ app.get('/api/public/search', publicLimiter, asyncH(async (req, res) => {
   res.json({ results: rows });
 }));
 
+// ----------------------------------------------------------------------------
+// PORTADA DE DESCUBRIMIENTO (Bukéame home): featured / nearby / top_rated
+// ----------------------------------------------------------------------------
+// Público. Modela su SELECT en GET /api/public/search: mismas columnas, distance_km
+// vía earth_distance/ll_to_earth cuando hay lat/lng, category = name_es de la
+// categoría principal del negocio (subquery a business_categories+categories).
+// Resiliente: si alguna lista falla, devuelve [] en vez de tumbar la portada.
+app.get('/api/public/discover', publicLimiter, asyncH(async (req, res) => {
+  const { lat, lng, municipality } = req.query;
+  const la = parseFloat(lat), lo = parseFloat(lng);
+  const hasGeo = Number.isFinite(la) && Number.isFinite(lo);
+
+  // Construye un SELECT parametrizado para una de las 3 listas.
+  // `extraWhere`/`orderBy` son fragmentos fijos (NO entran datos de usuario).
+  // Todos los valores (geo + municipality) van por placeholders.
+  const buildList = async (extraWhere, orderBy, limit) => {
+    const vals = [];
+    const where = [`b.is_published`, `b.deleted_at IS NULL`];
+
+    let distSel = `NULL::float AS distance_km`;
+    if (hasGeo) {
+      vals.push(la, lo);
+      distSel = `round((earth_distance(ll_to_earth(b.lat,b.lng), ll_to_earth($${vals.length - 1},$${vals.length})) / 1000)::numeric, 1) AS distance_km`;
+    }
+    if (isStr(municipality, 60)) {
+      vals.push(municipality);
+      where.push(`EXISTS (SELECT 1 FROM pr_municipalities m WHERE m.id = b.municipality_id AND m.slug = $${vals.length})`);
+    }
+    if (extraWhere) where.push(extraWhere);
+
+    const { rows } = await db.query(
+      `SELECT b.slug, b.name, b.logo_url, b.cover_url, b.rating_avg, b.rating_count,
+              m.name AS municipality, ${distSel},
+              (SELECT c.name_es
+                 FROM business_categories bc JOIN categories c ON c.id = bc.category_id
+                WHERE bc.business_id = b.id
+                ORDER BY c.sort_order
+                LIMIT 1) AS category
+         FROM businesses b
+         LEFT JOIN pr_municipalities m ON m.id = b.municipality_id
+        WHERE ${where.join(' AND ')}
+        ORDER BY ${orderBy}
+        LIMIT ${limit}`, vals);
+    return rows;
+  };
+
+  // featured: negocios con featured vigente (featured_listings) o flag is_featured.
+  const featuredP = buildList(
+    `(EXISTS (SELECT 1 FROM featured_listings fl WHERE fl.business_id = b.id AND fl.ends_at > now()) OR b.is_featured)`,
+    `(EXISTS (SELECT 1 FROM featured_listings fl WHERE fl.business_id = b.id AND fl.ends_at > now())) DESC,
+     b.rating_avg DESC NULLS LAST, b.rating_count DESC`,
+    8,
+  ).catch(() => []);
+
+  // nearby: sólo si hay geo válida; los más cercanos por distancia.
+  const nearbyP = hasGeo
+    ? buildList(`b.lat IS NOT NULL AND b.lng IS NOT NULL`, `distance_km ASC NULLS LAST`, 12).catch(() => [])
+    : Promise.resolve([]);
+
+  // top_rated: con al menos 1 reseña, mejor promedio primero.
+  const topRatedP = buildList(
+    `b.rating_count >= 1`,
+    `b.rating_avg DESC NULLS LAST, b.rating_count DESC`,
+    12,
+  ).catch(() => []);
+
+  const [featured, nearby, top_rated] = await Promise.all([featuredP, nearbyP, topRatedP]);
+  res.json({ featured, nearby, top_rated });
+}));
+
 // Perfil público (la página SEO bukeame.com/<slug>)
 app.get('/api/public/:slug', publicLimiter, asyncH(async (req, res) => {
   const { rows } = await db.query(
@@ -1470,6 +1540,7 @@ app.get('/api/public/:slug', publicLimiter, asyncH(async (req, res) => {
     // las tablas aún no existen). first_photo = la 1ra por sort_order para la tarjeta;
     // rating_avg (1 decimal) / rating_count salen de product_reviews (migración 12).
     db.query(`SELECT p.id, p.name, p.description, p.price_cents, p.stock, p.variants,
+                     p.category, p.tagline,
                      COALESCE(
                        (SELECT json_agg(pp.url ORDER BY pp.id)
                           FROM product_photos pp WHERE pp.product_id = p.id),
@@ -1488,6 +1559,7 @@ app.get('/api/public/:slug', publicLimiter, asyncH(async (req, res) => {
         // Fallback si product_reviews aún no existe: trae productos sin el resumen,
         // pero igual con first_photo (que sólo depende de product_photos).
         db.query(`SELECT p.id, p.name, p.description, p.price_cents, p.stock, p.variants,
+                         p.category, p.tagline,
                          COALESCE(
                            (SELECT json_agg(pp.url ORDER BY pp.id)
                               FROM product_photos pp WHERE pp.product_id = p.id),
@@ -1554,7 +1626,7 @@ app.get('/api/public/:slug/products/:id', publicLimiter, asyncH(async (req, res)
   if (!biz) return bad(res, 'Negocio no encontrado', 404);
 
   const prod = await db.query(
-    `SELECT id, name, description, price_cents, stock, variants
+    `SELECT id, name, description, price_cents, stock, variants, category, tagline, features
        FROM products WHERE id = $1 AND business_id = $2 AND is_active = true`,
     [req.params.id, biz.id]);
   if (!prod.rows[0]) return bad(res, 'Producto no encontrado', 404);
