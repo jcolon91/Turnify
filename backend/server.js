@@ -1995,7 +1995,7 @@ app.post('/api/public/:slug/appointments/:code/ath/confirm', codeLimiter, asyncH
 // negocio comparte user_id, email o teléfono con el usuario autenticado.
 // $1 = req.user.id (uuid), $2 = req.user.email, $3 = req.user.phone (puede ser null).
 const CLIENT_MATCH =
-  `(c.user_id = $1 OR c.email = $2 OR ($3 IS NOT NULL AND c.phone = $3))`;
+  `(c.user_id = $1 OR c.email = $2 OR ($3::text IS NOT NULL AND c.phone = $3::text))`;
 
 // Las citas del usuario en TODOS los negocios.
 app.get('/api/me/appointments', authRequired, asyncH(async (req, res) => {
