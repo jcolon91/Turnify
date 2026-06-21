@@ -3,8 +3,21 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Panel — Bukéame</title>
+<meta name="description" content="Panel privado de Bukéame: gestiona tu agenda, servicios, equipo, clientes, lealtad, horario, contabilidad y pagos en un solo lugar.">
+<meta name="robots" content="noindex,nofollow">
+<link rel="canonical" href="https://bukeame.com/panel.html">
+<meta name="theme-color" content="#0E8074">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%230E8074'/%3E%3Ctext x='16' y='22' font-family='Arial,sans-serif' font-size='18' font-weight='700' fill='%23FFFFFF' text-anchor='middle'%3EB%3C/text%3E%3C/svg%3E">
+<meta property="og:title" content="Panel — Bukéame">
+<meta property="og:description" content="Panel privado para administrar tu negocio en Bukéame.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://bukeame.com/panel.html">
+<meta property="og:site_name" content="Bukéame">
+<meta property="og:locale" content="es_PR">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
 <style>
 :root{
 /* ── Bukéame tema CLARO ── */
@@ -14,6 +27,10 @@
 --awning:repeating-linear-gradient(90deg,#0E8074 0 26px,#0A5B52 26px 28px,#F8F5EA 28px 54px,#E7E2D1 54px 56px);
 --side-bg:#F7F4EA;--side-hover:#EDE9DB;--input-bg:#FCFBF7;--nav-ink:#FFF8EC;
 --plan-grad:linear-gradient(135deg,#11221E,#0A5B52);--plan-ink:#FFF8EC;--plan-accent:#9FE8D5;
+/* ── Superficies semánticas (claro) ── */
+--warn-bg:#FFF4E0;--warn-border:#F0C674;--warn-ink:#5a4a1f;
+--danger-bg:#FDF6F6;--danger-border:#E8B4B4;--danger-ink:#3a1414;--danger-ink2:#6b4242;
+--curplan-bg:#F4FBF9;--sub-active:#DCF5EC;--sub-other:#FBE9D7;
 /* ── Mapeo de variables viejas → nuevas ── */
 --paper:var(--bg);--ink:var(--text);--ink2:var(--muted);--teal:var(--green);--teal-ink:var(--green);--teal-soft:var(--green-soft);--line:var(--border);
 --mango:#EFA12F;--r:18px;
@@ -25,6 +42,9 @@ html[data-theme="dark"]{
 --awning:repeating-linear-gradient(90deg,#36E27B 0 26px,#0d6b46 26px 28px,#0E2218 28px 54px,#10241A 54px 56px);
 --side-bg:#0E2218;--side-hover:rgba(255,255,255,.06);--input-bg:rgba(255,255,255,.04);--nav-ink:#08160F;
 --plan-grad:linear-gradient(135deg,#0E2218,#0d6b46);--plan-ink:#ECEAE0;--plan-accent:#36E27B;
+--warn-bg:rgba(240,198,116,.12);--warn-border:rgba(240,198,116,.35);--warn-ink:#E3C98A;
+--danger-bg:rgba(192,57,43,.1);--danger-border:rgba(232,180,180,.3);--danger-ink:#F0C5BD;--danger-ink2:#C99A95;
+--curplan-bg:var(--green-soft);--sub-active:rgba(54,226,123,.16);--sub-other:rgba(240,198,116,.16);
 --teal-ink:var(--green);}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:var(--body);color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased}
@@ -36,7 +56,7 @@ input,select,textarea{font:inherit}
 .side{border-right:1px solid var(--border);padding:20px 16px;display:flex;flex-direction:column;gap:4px;background:var(--side-bg)}
 .side .logo{font-family:var(--display);font-weight:800;font-size:21px;padding:4px 10px 18px}.side .logo i{font-style:normal;color:var(--green)}
 .side a{display:flex;align-items:center;gap:11px;font-size:14px;font-weight:600;color:var(--muted);padding:11px 12px;border-radius:12px;cursor:pointer}
-.side a.on{background:var(--green);color:var(--green-ink)}
+.side a.on{background:var(--text);color:var(--nav-ink)}
 .side a:not(.on):hover{background:var(--side-hover)}
 .side .planbox{margin-top:auto;background:var(--plan-grad);color:var(--plan-ink);border-radius:14px;padding:14px}
 .side .planbox small{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;opacity:.7}
@@ -47,27 +67,27 @@ main{padding:22px 20px 90px;max-width:760px}
 .tophead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:20px}
 .tophead h1{font-family:var(--display);font-weight:800;font-size:clamp(20px,3.4vw,26px);letter-spacing:-.02em}
 .tophead p{font-size:13px;color:var(--muted);margin-top:3px}
-.theme-tg{display:inline-flex;background:var(--card-soft);border:1px solid var(--border);border-radius:11px;padding:3px}
-.theme-tg button{font:700 12.5px 'Instrument Sans',sans-serif;padding:6px 13px;border-radius:8px;cursor:pointer;border:0;background:transparent;color:var(--muted)}
+.theme-tg{display:inline-flex;gap:2px;background:var(--card-soft);border:1px solid var(--border);border-radius:999px;padding:3px}
+.theme-tg button{font:700 11.5px 'Instrument Sans',sans-serif;padding:6px 12px;border-radius:999px;line-height:1;cursor:pointer;border:0;background:transparent;color:var(--muted)}
 .theme-tg button.on{background:var(--green);color:var(--green-ink)}
-.mobnav{display:none;position:sticky;top:0;z-index:80;background:var(--side-bg);border-bottom:1px solid var(--border);gap:4px;padding:8px;overflow-x:auto}
+.mobnav{display:none;position:sticky;top:0;z-index:80;background:var(--text);gap:4px;padding:8px;overflow-x:auto}
 @media(max-width:860px){.mobnav{display:flex}}
-.mobnav a{font-size:12px;font-weight:600;color:var(--muted);padding:8px 13px;border-radius:10px;white-space:nowrap;cursor:pointer}
-.mobnav a.on{background:var(--green);color:var(--green-ink)}
+.mobnav a{font-size:12px;font-weight:600;color:var(--muted2);padding:8px 13px;border-radius:10px;white-space:nowrap;cursor:pointer}
+.mobnav a.on{background:var(--green-soft);color:var(--plan-accent)}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:22px}
 .kpi{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px}
 .kpi small{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
 .kpi b{display:block;font-family:var(--display);font-weight:800;font-size:24px;margin-top:4px;letter-spacing:-.02em}
 .view{display:none}.view.on{display:block}
 .period-btn{background:var(--card);border:1.5px solid var(--border);color:var(--muted);font-weight:600}
-.period-btn.on{background:var(--green);color:var(--green-ink);border-color:var(--green)}
+.period-btn.on{background:var(--text);color:var(--nav-ink);border-color:var(--text)}
 .acct-card{background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:3px}
 .acct-lbl{font-size:12px;font-weight:600;color:var(--muted)}
 .acct-val{font-size:22px;font-weight:800;font-family:var(--display,sans-serif)}
 .serv-row{display:flex;justify-content:space-between;align-items:center;padding:11px 13px;background:var(--card);border:1.5px solid var(--border);border-radius:11px;margin-bottom:7px}
 .exp-row{display:flex;justify-content:space-between;align-items:center;padding:11px 13px;background:var(--card);border:1.5px solid var(--border);border-radius:11px;margin-bottom:7px}
 .paymethod{padding:10px 16px;border:1.5px solid var(--border);border-radius:10px;background:var(--card);font-weight:600;font-size:14px;cursor:pointer;color:var(--muted)}
-.paymethod.on{background:var(--green);color:var(--green-ink);border-color:var(--green)}
+.paymethod.on{background:var(--text);color:var(--nav-ink);border-color:var(--text)}
 .seclabel{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:10px;margin:6px 0 14px}
 .seclabel::after{content:"";flex:1;height:1px;background:var(--border)}
 .card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:20px;margin-bottom:14px}
@@ -78,7 +98,7 @@ main{padding:22px 20px 90px;max-width:760px}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 @media(max-width:520px){.row2{grid-template-columns:1fr}}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:700;font-size:15px;padding:13px 20px;border-radius:13px;cursor:pointer}
-.btn-teal{background:var(--green);color:var(--green-ink)}.btn-dark{background:var(--green);color:var(--green-ink)}
+.btn-teal{background:var(--green);color:var(--green-ink)}
 .btn-ghost{background:var(--card);border:1.5px solid var(--border);color:var(--text)}
 .btn:disabled{opacity:.6;cursor:not-allowed}
 .btn-sm{font-size:13px;padding:9px 14px;border-radius:10px}
@@ -154,14 +174,27 @@ main{padding:22px 20px 90px;max-width:760px}
 .welcome{background:var(--plan-grad);color:var(--plan-ink);border-radius:18px;padding:24px;margin-bottom:18px}
 .welcome h2{font-family:var(--display);font-weight:800;font-size:22px;margin-bottom:6px}
 .welcome p{font-size:13.5px;opacity:.9;line-height:1.5}
+#locMap{width:100%;height:260px;border-radius:14px;border:1.5px solid var(--border);margin-bottom:12px;z-index:0}
+.leaflet-container{background:var(--card-soft)}
+.pf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px}
+.pf-item{position:relative;aspect-ratio:3/2;border-radius:12px;overflow:hidden;border:1.5px solid var(--border);background:var(--card-soft)}
+.pf-item img{width:100%;height:100%;object-fit:cover;display:block}
+.pf-del{position:absolute;top:5px;right:5px;width:26px;height:26px;border-radius:8px;background:rgba(20,18,12,.62);color:#fff;display:grid;place-items:center;cursor:pointer}
+.addon-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 0;border-bottom:1px solid var(--border)}
+.addon-row:last-child{border-bottom:0}
+.addon-row .grow{flex:1;min-width:0}
+.addon-row h4{font-size:14.5px;font-weight:700}
+.addon-row p{font-size:12.5px;color:var(--muted);margin-top:3px;line-height:1.45}
+.addon-price{font-family:var(--mono);font-weight:700;font-size:12.5px;color:var(--green)}
+.addon-pending{font-size:11px;font-weight:700;color:var(--warn-ink);background:var(--warn-bg);border:1px solid var(--warn-border);padding:2px 8px;border-radius:99px}
 </style>
 </head>
 <body>
 <script>
-(function(){var t=localStorage.getItem('bukeame_theme')||'light';document.documentElement.setAttribute('data-theme',t);
+(function(){var t=localStorage.getItem('bukeame_theme')||'dark';document.documentElement.setAttribute('data-theme',t);
 window.__setTheme=function(t){localStorage.setItem('bukeame_theme',t);document.documentElement.setAttribute('data-theme',t);
   document.querySelectorAll('.theme-tg button').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-theme-set')===t);});};
-document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('[data-theme-set]').forEach(function(b){b.addEventListener('click',function(){window.__setTheme(b.getAttribute('data-theme-set'));});});window.__setTheme(localStorage.getItem('bukeame_theme')||'light');});})();
+document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('[data-theme-set]').forEach(function(b){b.addEventListener('click',function(){window.__setTheme(b.getAttribute('data-theme-set'));});});window.__setTheme(localStorage.getItem('bukeame_theme')||'dark');});})();
 </script>
 <div style="height:12px;background:var(--awning)"></div>
 
@@ -176,10 +209,14 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
       <a data-v="servicios" class="navlink">Servicios</a>
       <a data-v="equipo" class="navlink">Equipo</a>
       <a data-v="clientes" class="navlink">Clientes</a>
+      <a data-v="lealtad" class="navlink">Lealtad</a>
+      <a href="productos.html" class="navlink">Tienda</a>
+      <a href="espera.html" class="navlink">Lista de espera</a>
       <a data-v="horario" class="navlink">Horario</a>
       <a data-v="contabilidad" class="navlink">Contabilidad</a>
       <a data-v="negocio" class="navlink">Mi negocio</a>
       <a data-v="pagos" class="navlink">Pagos</a>
+      <a href="referidos.html" class="navlink">Referidos</a>
       <a data-v="cuenta" class="navlink">Mi cuenta</a>
       <div class="planbox">
         <small>Tu plan</small>
@@ -227,6 +264,63 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
         <div id="clientsList"></div>
       </section>
 
+      <section class="view" id="view-lealtad">
+        <div class="tophead"><div><h1>Lealtad</h1><p>Premia a tus clientes frecuentes y recupéralos cuando se ausentan.</p></div></div>
+        <div class="alert" id="loyAlert"></div>
+
+        <div id="loyLocked" style="display:none">
+          <div class="card" style="text-align:center;padding:30px 20px">
+            <div style="font-size:32px;margin-bottom:8px">🎁</div>
+            <h3 style="font-family:var(--display);font-weight:800;font-size:18px;margin-bottom:6px">Programa de lealtad</h3>
+            <p style="font-size:13.5px;color:var(--muted);line-height:1.6">Disponible en el plan Studio o superior. Mejora tu plan para premiar a tus clientes frecuentes.</p>
+          </div>
+        </div>
+
+        <div id="loyContent" style="display:none">
+          <div class="card">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:4px">
+              <div style="flex:1">
+                <div style="font-weight:700;font-size:14.5px">Activar programa de lealtad</div>
+                <p style="font-size:12.5px;color:var(--muted);margin-top:3px">Tus clientes acumulan visitas y ganan un premio al llegar a la meta.</p>
+              </div>
+              <label class="switch"><input type="checkbox" id="loyActive"><span class="slider"></span></label>
+            </div>
+          </div>
+
+          <div class="card" id="loyFields">
+            <div class="field">
+              <label>Visitas requeridas</label>
+              <input id="loyVisits" type="number" min="2" max="50" value="10">
+            </div>
+            <div class="field">
+              <label>Texto del premio</label>
+              <input id="loyReward" maxlength="120" placeholder="Un corte gratis">
+            </div>
+            <button class="btn btn-teal" id="loySave">Guardar programa</button>
+          </div>
+        </div>
+
+        <div id="dueBox" style="display:none">
+          <div class="seclabel" style="margin-top:28px">Te toca</div>
+          <p style="font-size:13px;color:var(--muted);margin-bottom:12px">Recuérdale a un cliente que vuelva cuando lleva tiempo sin reservar.</p>
+          <div class="alert" id="dueAlert"></div>
+          <div class="card">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:4px">
+              <div style="flex:1">
+                <div style="font-weight:700;font-size:14.5px">Recordatorio "Te toca"</div>
+                <p style="font-size:12.5px;color:var(--muted);margin-top:3px">Avísale al cliente cuando pase cierto número de días sin volver.</p>
+              </div>
+              <label class="switch"><input type="checkbox" id="dueEnabled"><span class="slider"></span></label>
+            </div>
+            <div class="field" style="margin-top:14px;margin-bottom:0">
+              <label>Días sin volver</label>
+              <input id="dueDays" type="number" min="7" max="120" value="30">
+            </div>
+            <button class="btn btn-teal" id="dueSave" style="margin-top:14px">Guardar recordatorio</button>
+          </div>
+        </div>
+      </section>
+
       <section class="view" id="view-horario">
         <div class="tophead"><div><h1>Horario</h1><p>Cuándo está abierto tu negocio.</p></div></div>
         <div class="alert" id="hoursAlert"></div>
@@ -269,7 +363,7 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
         </div>
 
         <!-- Aviso de upgrade (free) -->
-        <div id="acctUpgrade" style="display:none;background:#FFF4E0;border:1px solid #F0C674;border-radius:12px;padding:14px;margin-bottom:20px;font-size:13.5px;color:#5a4a1f">
+        <div id="acctUpgrade" style="display:none;background:var(--warn-bg);border:1px solid var(--warn-border);border-radius:12px;padding:14px;margin-bottom:20px;font-size:13.5px;color:var(--warn-ink)">
           📊 <b>Desbloquea la contabilidad completa con Pro:</b> reportes por mes y año, desglose por servicio, registro de gastos y exportación para tu contable.
         </div>
 
@@ -371,6 +465,30 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
             <button id="shareLinkBtn" class="btn btn-ghost" style="padding:10px 16px;font-size:13px">Compartir</button>
           </div>
         </div>
+
+        <div class="card">
+          <div class="seclabel">Ubicación en el mapa</div>
+          <p style="font-size:12.5px;color:var(--ink2);margin-bottom:12px">Mueve el pin o tócalo en el mapa para fijar dónde estás. Tus clientes podrán abrir cómo llegar.</p>
+          <div class="alert" id="locAlert"></div>
+          <div id="locMap"></div>
+          <div class="row2">
+            <div class="field" style="margin-bottom:0"><label>Latitud</label><input id="locLat" readonly placeholder="—"></div>
+            <div class="field" style="margin-bottom:0"><label>Longitud</label><input id="locLng" readonly placeholder="—"></div>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
+            <button class="btn btn-ghost btn-sm" id="locGeoBtn">Usar mi ubicación</button>
+            <button class="btn btn-teal btn-sm" id="locSaveBtn">Guardar ubicación</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="seclabel">Portafolio</div>
+          <p style="font-size:12.5px;color:var(--ink2);margin-bottom:12px">Muestra tu trabajo. Hasta 12 fotos. Se ven en tu página pública.</p>
+          <div class="alert" id="pfAlert"></div>
+          <input type="file" id="pfFile" accept="image/jpeg,image/png,image/webp" style="display:none">
+          <button class="btn btn-teal btn-sm" id="pfAddBtn" style="margin-bottom:14px">+ Añadir foto</button>
+          <div class="pf-grid" id="pfGrid"></div>
+        </div>
       </section>
 
       <section class="view" id="view-pagos">
@@ -397,11 +515,34 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
           <div id="planList"></div>
         </div>
 
+        <!-- Add-ons -->
+        <div class="card">
+          <div class="seclabel">Add-ons</div>
+          <p style="font-size:13px;color:var(--ink2);margin-bottom:6px">Activa funciones extra sin cambiar de plan.</p>
+          <div class="alert" id="addonAlert"></div>
+          <div id="addonList"><p style="color:var(--ink2);font-size:13px">Cargando…</p></div>
+        </div>
+
+        <!-- Destacar mi negocio -->
+        <div class="card">
+          <div class="seclabel">Destacar mi negocio</div>
+          <p style="font-size:13px;color:var(--ink2);margin-bottom:6px">Aparece arriba en el buscador por las semanas que elijas.</p>
+          <div class="alert" id="featAlert"></div>
+          <div id="featStatus" style="font-size:13px;color:var(--ink2);margin-bottom:12px"></div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+            <div class="field" style="margin-bottom:0;max-width:160px">
+              <label>Semanas</label>
+              <select id="featWeeks"></select>
+            </div>
+            <button class="btn btn-teal btn-sm" id="featBuyBtn" style="padding:11px 18px">Destacar</button>
+          </div>
+        </div>
+
         <!-- Zona de peligro -->
-        <div class="card" style="border:1.5px solid #E8B4B4;background:#FDF6F6">
-          <div class="seclabel" style="color:#A33">Zona de peligro</div>
-          <p style="font-size:13.5px;color:#3a1414;margin-bottom:6px"><b>Borrar mi cuenta</b></p>
-          <p style="font-size:13px;color:#6b4242;margin-bottom:14px">
+        <div class="card" style="border:1.5px solid var(--danger-border);background:var(--danger-bg)">
+          <div class="seclabel" style="color:#C0392B">Zona de peligro</div>
+          <p style="font-size:13.5px;color:var(--danger-ink);margin-bottom:6px"><b>Borrar mi cuenta</b></p>
+          <p style="font-size:13px;color:var(--danger-ink2);margin-bottom:14px">
             Esta acción es <b>permanente</b>. Se borrarán tus datos personales y los de tus clientes
             (nombres, teléfonos, correos, fotos). Los registros de transacciones se conservan
             de forma anónima por requisito fiscal. Antes de borrar, descarga tu contabilidad.
@@ -894,7 +1035,7 @@ function fillBusiness(data){
       var prev = document.getElementById('logoPreview');
       var rm = document.getElementById('logoRemoveBtn');
       if(url){
-        prev.innerHTML = '<img src="'+url+'" alt="logo" style="width:100%;height:100%;object-fit:cover">';
+        prev.innerHTML = '<img src="'+url+'" alt="logo" width="84" height="84" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover">';
         if(rm) rm.style.display = isFree ? 'none' : 'inline-flex';
       } else {
         prev.innerHTML = '<span style="font-size:11px;color:var(--ink2);text-align:center;padding:6px">Sin logo</span>';
@@ -1238,6 +1379,104 @@ document.getElementById('saveBizBtn').onclick = async function(){
   showAlert('bizAlert', r.ok ? '¡Guardado!' : (r.data.error||'No se pudo guardar.'), r.ok);
 };
 
+// ── Ubicación (mapa Leaflet) ───────────────────────────────────────────────
+let locMap = null, locMarker = null, locLatVal = null, locLngVal = null;
+const PR_CENTER = [18.2, -66.4];
+function setLocPin(lat, lng){
+  locLatVal = lat; locLngVal = lng;
+  document.getElementById('locLat').value = lat.toFixed(6);
+  document.getElementById('locLng').value = lng.toFixed(6);
+  if(locMarker) locMarker.setLatLng([lat, lng]);
+}
+function initLocMap(){
+  if(typeof L === 'undefined'){   // Leaflet (defer) aún no cargó → reintenta hasta ~8s
+    if(initLocMap._t == null) initLocMap._t = 0;
+    if(initLocMap._t++ < 60) setTimeout(initLocMap, 130);
+    return;
+  }
+  const hasPin = BIZ && BIZ.lat != null && BIZ.lng != null;
+  const start = hasPin ? [Number(BIZ.lat), Number(BIZ.lng)] : PR_CENTER;
+  if(!locMap){
+    locMap = L.map('locMap').setView(start, hasPin ? 15 : 9);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19, attribution: '© OpenStreetMap'
+    }).addTo(locMap);
+    locMarker = L.marker(start, { draggable:true }).addTo(locMap);
+    locMarker.on('dragend', function(){ const p = locMarker.getLatLng(); setLocPin(p.lat, p.lng); });
+    locMap.on('click', function(e){ setLocPin(e.latlng.lat, e.latlng.lng); });
+    if(hasPin) setLocPin(start[0], start[1]);
+  } else {
+    locMap.setView(start, hasPin ? 15 : 9);
+    if(hasPin) setLocPin(start[0], start[1]);
+  }
+  setTimeout(function(){ if(locMap) locMap.invalidateSize(); }, 120);
+}
+document.getElementById('locGeoBtn').onclick = function(){
+  clearAlert('locAlert');
+  if(!navigator.geolocation){ showAlert('locAlert','Tu navegador no permite ubicación.', false); return; }
+  const btn = this; btn.disabled=true;
+  navigator.geolocation.getCurrentPosition(function(pos){
+    btn.disabled=false;
+    const lat = pos.coords.latitude, lng = pos.coords.longitude;
+    if(locMap){ locMap.setView([lat,lng], 16); }
+    setLocPin(lat, lng);
+  }, function(){ btn.disabled=false; showAlert('locAlert','No se pudo obtener tu ubicación.', false); });
+};
+document.getElementById('locSaveBtn').onclick = async function(){
+  clearAlert('locAlert');
+  if(locLatVal == null || locLngVal == null){ showAlert('locAlert','Fija el pin primero.', false); return; }
+  const btn = this; btn.disabled=true; btn.textContent='Guardando…';
+  const r = await api('PATCH','/businesses/me', { lat: locLatVal, lng: locLngVal });
+  btn.disabled=false; btn.textContent='Guardar ubicación';
+  if(r.ok){ if(BIZ){ BIZ.lat = locLatVal; BIZ.lng = locLngVal; } showAlert('locAlert','¡Ubicación guardada!', true); }
+  else showAlert('locAlert', r.data.error||'No se pudo guardar.', false);
+};
+
+// ── Portafolio ─────────────────────────────────────────────────────────────
+const PF_MAX = 12;
+async function loadPortfolio(){
+  const grid = document.getElementById('pfGrid');
+  const r = await api('GET','/businesses/me/portfolio');
+  const photos = (r.ok && r.data.photos) ? r.data.photos : [];
+  if(photos.length === 0){
+    grid.innerHTML = '<div class="empty" style="grid-column:1/-1">Aún no tienes fotos en tu portafolio.</div>';
+  } else {
+    grid.innerHTML = photos.map(function(p){
+      return '<div class="pf-item"><img src="'+esc(p.url)+'" alt="'+esc(p.caption||'Foto')+'" loading="lazy" decoding="async">'+
+        '<button class="pf-del" data-id="'+esc(p.id)+'" title="Quitar" aria-label="Quitar">'+
+        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>';
+    }).join('');
+    grid.querySelectorAll('.pf-del').forEach(function(b){
+      b.onclick = async function(){
+        if(!confirm('¿Quitar esta foto?')) return;
+        const rr = await api('DELETE','/businesses/me/portfolio/'+b.dataset.id);
+        if(rr.ok) loadPortfolio();
+        else showAlert('pfAlert', rr.data.error||'No se pudo quitar.', false);
+      };
+    });
+  }
+  const addBtn = document.getElementById('pfAddBtn');
+  if(photos.length >= PF_MAX){ addBtn.disabled = true; addBtn.textContent = 'Máximo 12 fotos'; }
+  else { addBtn.disabled = false; addBtn.textContent = '+ Añadir foto'; }
+}
+document.getElementById('pfAddBtn').onclick = function(){ clearAlert('pfAlert'); document.getElementById('pfFile').click(); };
+document.getElementById('pfFile').onchange = async function(){
+  const file = this.files && this.files[0];
+  this.value = '';
+  if(!file) return;
+  clearAlert('pfAlert');
+  const addBtn = document.getElementById('pfAddBtn'); addBtn.disabled=true; addBtn.textContent='Subiendo…';
+  const fd = new FormData(); fd.append('photo', file);
+  let res, data = {};
+  try {
+    res = await fetch(API+'/businesses/me/portfolio', { method:'POST', headers:{ 'Authorization':'Bearer '+token }, body: fd });
+    if(res.status === 401){ localStorage.clear(); location.href='acceso.html'; return; }
+    try { data = await res.json(); } catch(e){}
+  } catch(e){ addBtn.disabled=false; addBtn.textContent='+ Añadir foto'; showAlert('pfAlert','No se pudo subir la foto.', false); return; }
+  if(res.ok){ loadPortfolio(); }
+  else { addBtn.disabled=false; addBtn.textContent='+ Añadir foto'; showAlert('pfAlert', data.error || (res.status===409?'Llegaste al máximo de 12 fotos.':'No se pudo subir.'), false); }
+};
+
 function switchView(v){
   document.querySelectorAll('.view').forEach(function(s){ s.classList.toggle('on', s.id==='view-'+v); });
   document.querySelectorAll('.navlink').forEach(function(a){ a.classList.toggle('on', a.dataset.v===v); });
@@ -1245,18 +1484,23 @@ function switchView(v){
   if(v==='servicios') loadServices();
   if(v==='equipo') loadStaff();
   if(v==='clientes') loadClients();
+  if(v==='lealtad') loadLoyalty();
   if(v==='horario') loadBlocks();
   if(v==='contabilidad') loadAccounting();
   if(v==='pagos') loadPayments();
+  if(v==='negocio'){ initLocMap(); loadPortfolio(); }
   if(v==='cuenta') loadAccount();
 }
-document.querySelectorAll('.navlink').forEach(function(a){ a.onclick=function(){ switchView(a.dataset.v); }; });
+document.querySelectorAll('.navlink').forEach(function(a){ if(!a.dataset.v) return; a.onclick=function(){ switchView(a.dataset.v); }; });
 
 function buildMobnav(){
   const nav = document.getElementById('mobnav');
-  const items = [['agenda','Agenda'],['servicios','Servicios'],['equipo','Equipo'],['clientes','Clientes'],['horario','Horario'],['contabilidad','$'],['negocio','Negocio'],['pagos','Pagos'],['cuenta','Cuenta']];
-  nav.innerHTML = items.map(function(it,i){ return '<a data-v="'+it[0]+'" class="'+(i===0?'on':'')+'">'+it[1]+'</a>'; }).join('');
-  nav.querySelectorAll('a').forEach(function(a){ a.onclick=function(){ switchView(a.dataset.v); }; });
+  const items = [['agenda','Agenda'],['servicios','Servicios'],['equipo','Equipo'],['clientes','Clientes'],['lealtad','Lealtad'],['#productos.html','Tienda'],['#espera.html','Espera'],['horario','Horario'],['contabilidad','$'],['negocio','Negocio'],['pagos','Pagos'],['#referidos.html','Referidos'],['cuenta','Cuenta']];
+  nav.innerHTML = items.map(function(it,i){
+    if(it[0].charAt(0)==='#'){ return '<a href="'+it[0].slice(1)+'">'+it[1]+'</a>'; }
+    return '<a data-v="'+it[0]+'" class="'+(i===0?'on':'')+'">'+it[1]+'</a>';
+  }).join('');
+  nav.querySelectorAll('a[data-v]').forEach(function(a){ a.onclick=function(){ switchView(a.dataset.v); }; });
 }
 
 // ════════════════════════ CLIENTES (perfil + historial) ════════════════════════
@@ -1357,6 +1601,68 @@ function wireClient(id, d){
 }
 document.getElementById('cliSearch').oninput = function(){ const q=this.value.trim(); clearTimeout(cliSearchT); cliSearchT=setTimeout(function(){ loadClients(q); },300); };
 clientModal.onclick = function(e){ if(e.target===clientModal) clientModal.classList.remove('on'); };
+
+// ════════════════════════ LEALTAD + "TE TOCA" ════════════════════════
+async function loadLoyalty(){
+  clearAlert('loyAlert');
+  const locked = document.getElementById('loyLocked');
+  const content = document.getElementById('loyContent');
+  const dueBox = document.getElementById('dueBox');
+  const r = await api('GET','/loyalty');
+  if(!r.ok){ showAlert('loyAlert', r.data.error||'No se pudo cargar la lealtad', false); return; }
+  const allowed = r.data.allowed === true;
+  locked.style.display = allowed ? 'none' : 'block';
+  content.style.display = allowed ? 'block' : 'none';
+  dueBox.style.display = allowed ? 'block' : 'none';
+  if(!allowed) return;
+  const p = r.data.program || {};
+  document.getElementById('loyActive').checked = !!p.is_active;
+  document.getElementById('loyVisits').value = p.visits_required || 10;
+  document.getElementById('loyReward').value = p.reward_text || '';
+  toggleLoyFields();
+  loadDueReminder();
+}
+function toggleLoyFields(){
+  const on = document.getElementById('loyActive').checked;
+  document.getElementById('loyFields').style.opacity = on ? '1' : '.55';
+  document.getElementById('loyVisits').disabled = !on;
+  document.getElementById('loyReward').disabled = !on;
+}
+document.getElementById('loyActive').onchange = toggleLoyFields;
+document.getElementById('loySave').onclick = async function(){
+  clearAlert('loyAlert');
+  const isActive = document.getElementById('loyActive').checked;
+  const visits = parseInt(document.getElementById('loyVisits').value, 10);
+  const reward = document.getElementById('loyReward').value.trim();
+  if(isActive){
+    if(!visits || visits < 2 || visits > 50){ showAlert('loyAlert','Las visitas deben estar entre 2 y 50.', false); return; }
+    if(!reward){ showAlert('loyAlert','Escribe el texto del premio.', false); return; }
+  }
+  const btn = this; btn.disabled = true; btn.textContent = 'Guardando…';
+  const r = await api('PUT','/loyalty', { is_active:isActive, visits_required:visits, reward_text:reward });
+  btn.disabled = false; btn.textContent = 'Guardar programa';
+  if(r.ok){ showAlert('loyAlert','Programa guardado.', true); }
+  else showAlert('loyAlert', r.data.error||'No se pudo guardar.', false);
+};
+
+async function loadDueReminder(){
+  clearAlert('dueAlert');
+  const r = await api('GET','/due-reminder');
+  if(!r.ok) return;
+  document.getElementById('dueEnabled').checked = !!r.data.enabled;
+  document.getElementById('dueDays').value = r.data.days || 30;
+}
+document.getElementById('dueSave').onclick = async function(){
+  clearAlert('dueAlert');
+  const enabled = document.getElementById('dueEnabled').checked;
+  const days = parseInt(document.getElementById('dueDays').value, 10);
+  if(enabled && (!days || days < 7 || days > 120)){ showAlert('dueAlert','Los días deben estar entre 7 y 120.', false); return; }
+  const btn = this; btn.disabled = true; btn.textContent = 'Guardando…';
+  const r = await api('PUT','/due-reminder', { enabled:enabled, days:days });
+  btn.disabled = false; btn.textContent = 'Guardar recordatorio';
+  if(r.ok){ showAlert('dueAlert','Recordatorio guardado.', true); }
+  else showAlert('dueAlert', r.data.error||'No se pudo guardar.', false);
+};
 
 // ════════════════════════ PAGOS (métodos del negocio) ════════════════════════
 async function loadPayments(){
@@ -1485,7 +1791,7 @@ async function loadAccount(){
   if(d.subscription){
     const st = d.subscription.status;
     const stLabel = {trialing:'En prueba',active:'Activo',past_due:'Pago pendiente',cancelled:'Cancelado'}[st]||st;
-    subInfo = '<span style="font-size:12px;padding:3px 10px;border-radius:99px;background:'+(st==='active'?'#DCF5EC':'#FBE9D7')+';color:var(--ink)">'+stLabel+'</span>';
+    subInfo = '<span style="font-size:12px;padding:3px 10px;border-radius:99px;background:'+(st==='active'?'var(--sub-active)':'var(--sub-other)')+';color:var(--ink)">'+esc(stLabel)+'</span>';
     if(d.subscription.current_period_end){
       const dt = new Date(d.subscription.current_period_end);
       subInfo += '<span style="font-size:12px;color:var(--ink2);margin-left:8px">Vence '+dt.toLocaleDateString('es-PR')+'</span>';
@@ -1505,17 +1811,96 @@ async function loadAccount(){
     const featHtml = feats.map(function(k){ return '<li>'+FEATURE_LABELS[k]+'</li>'; }).join('');
     const staffTxt = p.max_staff>=9999 ? 'Staff ilimitado' : (p.max_staff+' '+(p.max_staff===1?'persona':'personas'));
     const apptTxt = p.max_appts_month ? (p.max_appts_month+' citas/mes') : 'Citas ilimitadas';
-    return '<div style="border:1.5px solid '+(p.is_current?'var(--teal)':'var(--line)')+';border-radius:13px;padding:14px;margin-bottom:10px;'+(p.is_current?'background:#F4FBF9':'')+'">'+
+    return '<div style="border:1.5px solid '+(p.is_current?'var(--teal)':'var(--line)')+';border-radius:13px;padding:14px;margin-bottom:10px;'+(p.is_current?'background:var(--curplan-bg)':'')+'">'+
       '<div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px">'+
       '<b style="font-size:16px">'+esc(p.name)+(p.is_current?' <span style="font-size:11px;color:var(--teal-ink)">· Tu plan</span>':'')+'</b>'+
       '<span style="font-weight:700">'+(p.price_monthly_cents?money(p.price_monthly_cents)+'<span style="font-size:11px;color:var(--ink2);font-weight:400">/mes</span>':'Gratis')+'</span>'+
       '</div>'+
       '<p style="font-size:12.5px;color:var(--ink2);margin:6px 0">'+staffTxt+' · '+apptTxt+'</p>'+
       (featHtml?'<ul style="font-size:12.5px;color:var(--ink);margin:6px 0 0 18px;line-height:1.7">'+featHtml+'</ul>':'')+
-      (p.is_upgrade?'<p style="font-size:12px;color:var(--ink2);margin-top:10px">Para cambiar de plan, contáctanos por WhatsApp.</p>':'')+
+      (p.is_upgrade?'<button class="btn btn-teal btn-sm plan-pick" data-code="'+esc(p.code||p.plan_code||p.id)+'" style="margin-top:12px;width:100%">Cambiar a este plan</button>':'')+
     '</div>';
   }).join('');
+  list.querySelectorAll('.plan-pick').forEach(function(b){
+    b.onclick = async function(){
+      clearAlert('acctMsg');
+      b.disabled=true; b.textContent='Procesando…';
+      const rr = await api('POST','/account/plan',{ plan_code:b.dataset.code });
+      if(rr.ok){ showAlert('acctMsg','¡Plan actualizado!', true); loadAccount(); return; }
+      b.disabled=false; b.textContent='Cambiar a este plan';
+      if(rr.status===402 && rr.data && rr.data.pending){ showAlert('acctMsg','Pago pendiente (se activa con Stripe).', false); }
+      else showAlert('acctMsg', (rr.data&&rr.data.error)||'No se pudo cambiar de plan.', false);
+    };
+  });
+
+  loadAddons();
+  loadFeatured();
 }
+
+// ── Add-ons ────────────────────────────────────────────────────────────────
+async function loadAddons(){
+  const wrap = document.getElementById('addonList');
+  const r = await api('GET','/account/addons');
+  const addons = (r.ok && Array.isArray(r.data)) ? r.data : (r.ok && r.data.addons ? r.data.addons : []);
+  // 'featured' tiene su propia tarjeta; aquí mostramos los demás como toggles
+  const rows = addons.filter(function(a){ return a.code !== 'featured'; });
+  if(rows.length === 0){ wrap.innerHTML = '<p style="font-size:13px;color:var(--ink2)">No hay add-ons disponibles.</p>'; return; }
+  wrap.innerHTML = rows.map(function(a){
+    const price = a.price_cents ? (money(a.price_cents)+(a.billing==='monthly'?'/mes':'')) : 'Gratis';
+    return '<div class="addon-row"><div class="grow"><h4>'+esc(a.name||a.code)+'</h4>'+
+      (a.description?'<p>'+esc(a.description)+'</p>':'')+
+      '<span class="addon-price">'+price+'</span></div>'+
+      '<label class="switch"><input type="checkbox" class="addon-tg" data-code="'+esc(a.code)+'" '+(a.is_active?'checked':'')+'><span class="slider"></span></label></div>';
+  }).join('');
+  wrap.querySelectorAll('.addon-tg').forEach(function(tg){
+    tg.onchange = async function(){
+      clearAlert('addonAlert');
+      const code = tg.dataset.code;
+      const turningOn = tg.checked;
+      tg.disabled = true;
+      const rr = await api('POST','/addons/'+code+'/'+(turningOn?'activate':'cancel'));
+      tg.disabled = false;
+      if(rr.ok){ loadAddons(); return; }
+      if(turningOn && rr.status===402 && rr.data && rr.data.pending){
+        tg.checked = false;
+        showAlert('addonAlert','Activación pendiente (se activa con Stripe).', false);
+        return;
+      }
+      tg.checked = !turningOn;
+      showAlert('addonAlert', (rr.data&&rr.data.error)||'No se pudo actualizar el add-on.', false);
+    };
+  });
+}
+
+// ── Destacar (featured) ────────────────────────────────────────────────────
+async function loadFeatured(){
+  const sel = document.getElementById('featWeeks');
+  if(sel && !sel.options.length){
+    let opts = '';
+    for(let i=1;i<=12;i++){ opts += '<option value="'+i+'">'+i+' '+(i===1?'semana':'semanas')+'</option>'; }
+    sel.innerHTML = opts;
+  }
+  const st = document.getElementById('featStatus');
+  const r = await api('GET','/featured/status');
+  if(r.ok && r.data){
+    if(r.data.active && r.data.featured_until){
+      const dt = new Date(r.data.featured_until);
+      st.innerHTML = 'Estás destacado hasta <b>'+esc(dt.toLocaleDateString('es-PR'))+'</b>.';
+    } else {
+      st.textContent = 'Tu negocio no está destacado ahora mismo.';
+    }
+  } else { st.textContent = ''; }
+}
+document.getElementById('featBuyBtn').onclick = async function(){
+  clearAlert('featAlert');
+  const weeks = parseInt(document.getElementById('featWeeks').value,10) || 1;
+  const btn = this; btn.disabled=true; btn.textContent='Procesando…';
+  const r = await api('POST','/featured/purchase',{ weeks:weeks });
+  btn.disabled=false; btn.textContent='Destacar';
+  if(r.ok){ showAlert('featAlert','¡Listo! Tu negocio está destacado.', true); loadFeatured(); return; }
+  if(r.status===402 && r.data && r.data.pending){ showAlert('featAlert','Activación pendiente (se activa con Stripe).', false); return; }
+  showAlert('featAlert', (r.data&&r.data.error)||'No se pudo destacar.', false);
+};
 
 // Descargar contabilidad antes de borrar (reusa el export del módulo accounting)
 document.getElementById('downloadBeforeDelete').onclick = async function(){

@@ -3,8 +3,25 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Reservar — Bukéame</title>
+<meta name="description" content="Reserva tu cita en línea en segundos: elige servicio, profesional, día y hora. Compra productos, gift cards y únete a la lista de espera con Bukéame.">
+<link rel="canonical" href="https://bukeame.com/negocio.html">
+<meta name="theme-color" content="#0E8074">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='32' fill='%230E8074'/%3E%3Ctext x='32' y='44' font-family='Arial,sans-serif' font-size='38' font-weight='bold' text-anchor='middle' fill='white'%3EB%3C/text%3E%3C/svg%3E">
+<meta property="og:title" content="Reservar — Bukéame">
+<meta property="og:description" content="Reserva tu cita en línea en segundos: elige servicio, profesional, día y hora. Compra productos, gift cards y más con Bukéame.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://bukeame.com/negocio.html">
+<meta property="og:site_name" content="Bukéame">
+<meta property="og:locale" content="es_PR">
+<meta property="og:image" content="https://bukeame.com/og-cover.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Reservar — Bukéame">
+<meta name="twitter:description" content="Reserva tu cita en línea en segundos con Bukéame: servicios, productos y gift cards.">
+<meta name="twitter:image" content="https://bukeame.com/og-cover.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
 <style>
 :root{
   /* ── Paleta nueva Bukéame (CLARO por defecto) ── */
@@ -180,22 +197,95 @@ html[data-theme="dark"] .alert.err{background:rgba(255,90,70,.14);color:#FFB3A8;
 .awning{height:12px;background:var(--awning)}
 
 /* ── Toggle Claro/Oscuro ── */
-.theme-tg{display:inline-flex;background:var(--card-soft);border:1px solid var(--border);border-radius:11px;padding:3px}
-.theme-tg button{font:700 12.5px 'Instrument Sans',sans-serif;padding:6px 13px;border-radius:8px;cursor:pointer;border:0;background:transparent;color:var(--muted)}
+.theme-tg{display:inline-flex;gap:2px;background:var(--card-soft);border:1px solid var(--border);border-radius:999px;padding:3px}
+.theme-tg button{font:700 11.5px 'Instrument Sans',sans-serif;padding:6px 12px;border-radius:999px;line-height:1;cursor:pointer;border:0;background:transparent;color:var(--muted)}
 .theme-tg button.on{background:var(--green);color:var(--green-ink)}
 /* Posición del toggle dentro del topnav del hero (legible sobre la foto) */
 .topnav .theme-tg{background:rgba(0,0,0,.3);border-color:rgba(255,255,255,.25);backdrop-filter:blur(6px)}
 .topnav .theme-tg button{color:rgba(255,255,255,.85)}
 .topnav .theme-tg button.on{background:var(--green);color:var(--green-ink)}
+
+/* ───────── TIENDA (productos) ───────── */
+.prod-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.prod-card{background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden;display:flex;flex-direction:column}
+.prod-card .ph{width:100%;aspect-ratio:1/1;background:var(--card-soft);display:grid;place-items:center;overflow:hidden}
+.prod-card .ph img{width:100%;height:100%;object-fit:cover}
+.prod-card .ph .noimg{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted2)}
+.prod-card .body{padding:12px;display:flex;flex-direction:column;gap:6px;flex:1}
+.prod-card h4{font-size:14.5px;font-weight:700;line-height:1.3}
+.prod-card .pdesc{font-size:12px;color:var(--muted);line-height:1.4}
+.prod-card .prow{margin-top:auto;display:flex;align-items:center;justify-content:space-between;gap:8px;padding-top:6px}
+.prod-card .pprice{font-family:var(--display);font-weight:800;font-size:16px;color:var(--text)}
+.prod-card .soldout{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted2)}
+.prod-card select.pvar{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:var(--card-soft);color:var(--text);font-size:12.5px}
+.addbtn{background:var(--green);color:var(--green-ink);border-radius:14px;font-weight:700;font-size:13px;padding:9px 14px;white-space:nowrap}
+.addbtn:active{transform:scale(.97)}
+.addbtn:disabled{opacity:.5;cursor:not-allowed}
+.pill{display:inline-flex;align-items:center;background:var(--green-soft);color:var(--green);border-radius:99px;padding:4px 11px;font-family:var(--mono);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}
+
+/* Botón flotante del carrito */
+.cart-fab{position:fixed;right:18px;bottom:calc(86px + env(safe-area-inset-bottom));z-index:31;background:var(--green);color:var(--green-ink);border-radius:99px;font-weight:700;font-size:14px;padding:13px 20px;box-shadow:0 6px 20px var(--green-glow);display:none;align-items:center;gap:8px}
+.cart-fab.on{display:inline-flex}
+.cart-fab .cnt{background:var(--green-ink);color:var(--green);border-radius:99px;min-width:20px;height:20px;display:grid;place-items:center;font-size:11px;padding:0 5px}
+
+/* Acciones extra (gift card / lista de espera) */
+.action-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;display:flex;align-items:center;gap:14px;margin-bottom:10px;width:100%;text-align:left}
+.action-card:active{transform:scale(.995)}
+.action-card .ic{width:42px;height:42px;flex:none;border-radius:12px;background:var(--green-soft);display:grid;place-items:center}
+.action-card .ic svg{width:22px;height:22px;stroke:var(--green);stroke-width:1.8;fill:none}
+.action-card .grow{flex:1;min-width:0}
+.action-card h4{font-size:15px;font-weight:700}
+.action-card p{font-size:12.5px;color:var(--muted);margin-top:3px;line-height:1.4}
+.action-card .arr{color:var(--muted2);font-size:20px;flex:none}
+
+/* Modal genérico (carrito / gift card / waitlist) — reusa estética del bookmodal */
+.sheet{position:fixed;inset:0;z-index:65;background:var(--bg);display:none;flex-direction:column;overflow-y:auto}
+.sheet.on{display:flex}
+.sheet-head{position:sticky;top:0;background:var(--card);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;padding:14px 18px;z-index:2}
+.sheet-head .x{font-size:26px;color:var(--muted);line-height:1}
+.sheet-head b{font-family:var(--display);font-size:17px}
+.sheet-body{flex:1;padding:18px;max-width:640px;margin:0 auto;width:100%}
+.cart-line{display:flex;gap:12px;align-items:center;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:11px;margin-bottom:10px}
+.cart-line .ci{width:52px;height:52px;flex:none;border-radius:10px;background:var(--card-soft);overflow:hidden;display:grid;place-items:center}
+.cart-line .ci img{width:100%;height:100%;object-fit:cover}
+.cart-line .cgrow{flex:1;min-width:0}
+.cart-line .cgrow h5{font-size:14px;font-weight:700}
+.cart-line .cgrow span{font-size:12px;color:var(--muted);display:block;margin-top:2px}
+.qty{display:flex;align-items:center;gap:0;border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.qty button{width:30px;height:30px;font-size:17px;font-weight:700;background:var(--card-soft);color:var(--text)}
+.qty span{min-width:30px;text-align:center;font-weight:700;font-size:14px}
+.empty-note{text-align:center;color:var(--muted);font-size:13.5px;padding:30px;background:var(--card);border:1px dashed var(--border);border-radius:14px;line-height:1.6}
+.seg{display:flex;gap:8px;margin-bottom:14px}
+.seg button{flex:1;padding:11px;border:1px solid var(--border);border-radius:12px;background:var(--card);font-weight:600;font-size:13.5px;color:var(--text)}
+.seg button.on{border-color:var(--green);background:var(--green);color:var(--green-ink)}
+/* ───────── PORTAFOLIO (galería) ───────── */
+.gal-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media(min-width:480px){.gal-grid{grid-template-columns:repeat(3,1fr)}}
+.gal-card{position:relative;border-radius:14px;overflow:hidden;background:var(--card-soft);border:1px solid var(--border);aspect-ratio:1/1}
+.gal-card img{width:100%;height:100%;object-fit:cover;display:block}
+.gal-card .cap{position:absolute;left:0;right:0;bottom:0;padding:14px 10px 8px;font-size:11.5px;font-weight:600;color:#fff;background:linear-gradient(to top,rgba(0,0,0,.6),transparent)}
+
+/* ───────── MAPA (Leaflet) ───────── */
+#bizMap{height:220px;border-radius:14px;overflow:hidden;border:1px solid var(--border);margin-top:6px}
+.dir-btns{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.dir-btn{display:inline-flex;align-items:center;gap:6px;padding:9px 14px;border:1.5px solid var(--border);border-radius:99px;background:var(--card);color:var(--text);font-size:13px;font-weight:600;cursor:pointer}
+.dir-btn:active{transform:scale(.97)}
+.dir-btn svg{width:15px;height:15px;stroke:var(--teal-ink);stroke-width:1.8;fill:none}
+.leaflet-container{background:var(--card-soft);font:inherit}
+
+/* Modo embed (widget.js abre negocio.html?embed=1 dentro de un iframe) */
+html[data-embed="1"] .topnav{display:none}
+html[data-embed="1"] .foot{display:none}
 </style>
 </head>
 <body>
 
 <script>
-(function(){var t=localStorage.getItem('bukeame_theme')||'light';document.documentElement.setAttribute('data-theme',t);
+(function(){var t=localStorage.getItem('bukeame_theme')||'dark';document.documentElement.setAttribute('data-theme',t);
+try{if(new URLSearchParams(location.search).get('embed'))document.documentElement.setAttribute('data-embed','1');}catch(e){}
 window.__setTheme=function(t){localStorage.setItem('bukeame_theme',t);document.documentElement.setAttribute('data-theme',t);
   document.querySelectorAll('.theme-tg button').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-theme-set')===t);});};
-document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('[data-theme-set]').forEach(function(b){b.addEventListener('click',function(){window.__setTheme(b.getAttribute('data-theme-set'));});});window.__setTheme(localStorage.getItem('bukeame_theme')||'light');});})();
+document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('[data-theme-set]').forEach(function(b){b.addEventListener('click',function(){window.__setTheme(b.getAttribute('data-theme-set'));});});window.__setTheme(localStorage.getItem('bukeame_theme')||'dark');});})();
 </script>
 
 <div id="boot" class="bootload">Cargando…</div>
@@ -235,6 +325,38 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
     <section class="sec" id="sec-services">
       <div class="sec-title">Servicios</div>
       <div id="svcPreview"></div>
+    </section>
+
+    <!-- PORTAFOLIO (galería) -->
+    <section class="sec" id="sec-gallery" style="display:none">
+      <div class="sec-title">Portafolio</div>
+      <div class="gal-grid" id="galGrid"></div>
+    </section>
+
+    <!-- TIENDA (productos) -->
+    <section class="sec" id="sec-shop" style="display:none">
+      <div class="sec-title">Tienda</div>
+      <div class="prod-grid" id="prodGrid"></div>
+    </section>
+
+    <!-- MÁS OPCIONES (gift card / lista de espera) -->
+    <section class="sec" id="sec-more" style="display:none">
+      <div class="sec-title">Más opciones</div>
+      <button class="action-card" id="openGift">
+        <span class="ic"><svg viewBox="0 0 24 24"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg></span>
+        <span class="grow"><h4>Regala una gift card</h4><p>Sorprende a alguien con saldo para usar en el negocio.</p></span>
+        <span class="arr">→</span>
+      </button>
+      <button class="action-card" id="checkGift">
+        <span class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+        <span class="grow"><h4>Consultar saldo de gift card</h4><p>Revisa cuánto saldo te queda en tu tarjeta de regalo.</p></span>
+        <span class="arr">→</span>
+      </button>
+      <button class="action-card" id="openWait">
+        <span class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+        <span class="grow"><h4>Únete a la lista de espera</h4><p>Te avisamos si se abre un espacio en las fechas que quieres.</p></span>
+        <span class="arr">→</span>
+      </button>
     </section>
 
     <!-- EQUIPO -->
@@ -286,6 +408,9 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
   </div>
   <a data-go="sec-about">Sobre nosotros</a>
   <a data-go="sec-services">Servicios</a>
+  <a data-go="sec-gallery">Portafolio</a>
+  <a data-go="sec-shop">Tienda</a>
+  <a data-go="sec-more">Más opciones</a>
   <a data-go="sec-staff">Equipo</a>
   <a data-go="sec-reviews">Reseñas</a>
   <a data-go="sec-hours">Horario</a>
@@ -361,6 +486,92 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
   </div>
 </div>
 
+<!-- Botón flotante del carrito -->
+<button class="cart-fab" id="cartFab"><span>Carrito</span><span class="cnt" id="cartCnt">0</span></button>
+
+<!-- SHEET: CARRITO / CHECKOUT -->
+<div class="sheet" id="cartSheet">
+  <div class="sheet-head"><button class="x" id="closeCart">&times;</button><b>Tu carrito</b></div>
+  <div class="sheet-body">
+    <div id="cartItems"></div>
+    <div id="cartCheckout" style="display:none">
+      <div class="summary" id="cartSummary"></div>
+      <div class="alert" id="cartAlert"></div>
+      <div class="seclabel" style="text-align:left">Entrega</div>
+      <div class="seg" id="fulfillSeg">
+        <button type="button" data-f="pickup" class="on">Recoger</button>
+        <button type="button" data-f="shipping">Envío</button>
+      </div>
+      <div class="field"><label>Tu nombre *</label><input id="oName" placeholder="Tu nombre completo"></div>
+      <div class="field"><label>WhatsApp / Teléfono *</label><input id="oPhone" type="tel" placeholder="787-555-1234"></div>
+      <div class="field"><label>Email (opcional)</label><input id="oEmail" type="email" placeholder="tu@correo.com"></div>
+      <button class="btn btn-teal" id="orderBtn">Confirmar pedido →</button>
+    </div>
+    <section class="view" id="orderOk" style="display:none">
+      <div class="success">
+        <div class="check"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <h2>¡Pedido confirmado!</h2>
+        <p id="orderOkDetail"></p>
+        <div class="code" id="orderOkCode"></div>
+        <p style="font-size:13px">Guarda este número. El negocio te contactará.</p>
+        <button class="btn btn-teal" id="orderOkClose" style="margin-top:18px">Listo</button>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- SHEET: GIFT CARD -->
+<div class="sheet" id="giftSheet">
+  <div class="sheet-head"><button class="x" id="closeGift">&times;</button><b>Regala una gift card</b></div>
+  <div class="sheet-body">
+    <div id="giftForm">
+      <div class="alert" id="giftAlert"></div>
+      <div class="field"><label>Monto (USD) *</label><input id="gAmount" type="number" inputmode="decimal" min="5" max="500" step="1" placeholder="25.00"></div>
+      <p style="font-size:12px;color:var(--muted);margin:-8px 0 14px">Entre $5.00 y $500.00</p>
+      <div class="field"><label>Tu nombre *</label><input id="gFrom" placeholder="Quién regala"></div>
+      <div class="field"><label>Tu email *</label><input id="gFromEmail" type="email" placeholder="tu@correo.com"></div>
+      <div class="field"><label>Nombre de quien recibe (opcional)</label><input id="gTo" placeholder="Para quién es"></div>
+      <div class="field"><label>Email de quien recibe (opcional)</label><input id="gToEmail" type="email" placeholder="destino@correo.com"></div>
+      <div class="field"><label>Mensaje (opcional)</label><textarea id="gMsg" rows="2" placeholder="Un mensaje cariñoso"></textarea></div>
+      <button class="btn btn-teal" id="giftBtn">Comprar gift card →</button>
+    </div>
+    <section class="view" id="giftOk" style="display:none">
+      <div class="success">
+        <div class="check"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <h2>¡Gift card creada!</h2>
+        <p id="giftOkDetail"></p>
+        <div class="code" id="giftOkCode"></div>
+        <button class="btn btn-teal" id="giftOkClose" style="margin-top:18px">Listo</button>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- SHEET: LISTA DE ESPERA -->
+<div class="sheet" id="waitSheet">
+  <div class="sheet-head"><button class="x" id="closeWait">&times;</button><b>Lista de espera</b></div>
+  <div class="sheet-body">
+    <div id="waitForm">
+      <div class="alert" id="waitAlert"></div>
+      <div class="field"><label>Servicio (opcional)</label><select id="wService" class="pvar" style="width:100%;padding:13px;border:1.5px solid var(--border);border-radius:12px;background:var(--card);color:var(--text)"></select></div>
+      <div class="field"><label>Profesional (opcional)</label><select id="wStaff" class="pvar" style="width:100%;padding:13px;border:1.5px solid var(--border);border-radius:12px;background:var(--card);color:var(--text)"></select></div>
+      <div class="field"><label>Desde *</label><input id="wFrom" type="date"></div>
+      <div class="field"><label>Hasta *</label><input id="wTo" type="date"></div>
+      <div class="field"><label>Tu nombre *</label><input id="wName" placeholder="Tu nombre completo"></div>
+      <div class="field"><label>WhatsApp / Teléfono *</label><input id="wPhone" type="tel" placeholder="787-555-1234"></div>
+      <button class="btn btn-teal" id="waitBtn">Unirme a la lista →</button>
+    </div>
+    <section class="view" id="waitOk" style="display:none">
+      <div class="success">
+        <div class="check"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <h2>¡Estás en la lista!</h2>
+        <p>Te avisaremos por WhatsApp si se abre un espacio en las fechas que elegiste.</p>
+        <button class="btn btn-teal" id="waitOkClose" style="margin-top:18px">Listo</button>
+      </div>
+    </section>
+  </div>
+</div>
+
 <script src="bukeame-banners.js"></script>
 <script>
 const API = '/api';
@@ -379,7 +590,7 @@ const DOW = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
 const DOW_FULL = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
 const MON = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 
-const state = { biz:null, services:[], staff:[], hours:[], reviews:[], service:null, selectedServices:[], staffId:null, date:null, slot:null };
+const state = { biz:null, services:[], staff:[], hours:[], reviews:[], products:[], gallery:[], cart:[], fulfillment:'pickup', service:null, selectedServices:[], staffId:null, date:null, slot:null };
 
 // Iconos SVG profesionales (líneas limpias, sin emojis)
 const ICONS = {
@@ -396,6 +607,20 @@ function money(c){ return '$'+((c||0)/100).toFixed(2); }
 function showAlert(id,msg){ const e=document.getElementById(id); if(e){e.textContent=msg; e.className='alert err';} }
 function clearAlert(id){ const e=document.getElementById(id); if(e){e.className='alert';} }
 
+// Helper unificado de fetch: devuelve {ok,status,data}
+async function api(method, path, body){
+  try{
+    const opt = { method:method, headers:{} };
+    if(body!==undefined){ opt.headers['Content-Type']='application/json'; opt.body=JSON.stringify(body); }
+    const r = await fetch(API+path, opt);
+    let data = null;
+    try{ data = await r.json(); }catch(e){ data = null; }
+    return { ok:r.ok, status:r.status, data:data||{} };
+  }catch(e){
+    return { ok:false, status:0, data:{} };
+  }
+}
+
 async function boot(){
   if(!SLUG){ document.getElementById('boot').textContent='Enlace inválido. Falta el nombre del negocio.'; return; }
   try{
@@ -409,8 +634,12 @@ async function boot(){
     state.hours = data.hours||[];
     state.reviews = data.reviews||[];
     state.payment_methods = data.payment_methods||[];
+    state.products = data.products||[];
+    state.gallery = data.gallery||[];
     renderProfile();
     renderServices();
+    renderGallery();
+    renderShop();
     document.getElementById('boot').style.display='none';
     document.getElementById('page').style.display='block';
   }catch(e){
@@ -433,7 +662,7 @@ function renderProfile(){
   // Logo
   const logo = document.getElementById('bizLogo');
   const initial = (b.name||'?').charAt(0).toUpperCase();
-  if(b.logo_url){ logo.innerHTML = '<img src="'+esc(b.logo_url)+'" alt="">'; }
+  if(b.logo_url){ logo.innerHTML = '<img src="'+esc(b.logo_url)+'" alt="" width="128" height="128" decoding="async">'; }
   else { logo.textContent = initial; }
   // Rating
   if(b.rating_count>0){
@@ -443,7 +672,7 @@ function renderProfile(){
   }
   // Drawer head
   const dl = document.getElementById('drawerLogo');
-  if(b.logo_url){ dl.className=''; dl.innerHTML = '<img src="'+esc(b.logo_url)+'" alt="" style="width:46px;height:46px;border-radius:50%;object-fit:cover">'; }
+  if(b.logo_url){ dl.className=''; dl.innerHTML = '<img src="'+esc(b.logo_url)+'" alt="" width="46" height="46" loading="lazy" decoding="async" style="width:46px;height:46px;border-radius:50%;object-fit:cover">'; }
   else { dl.textContent = initial; }
   document.getElementById('drawerName').textContent = b.name;
 
@@ -457,7 +686,7 @@ function renderProfile(){
   if(state.staff.length>0){
     document.getElementById('sec-staff').style.display='block';
     document.getElementById('staffGrid').innerHTML = state.staff.map(function(s){
-      var av = s.avatar_url ? '<img src="'+esc(s.avatar_url)+'" alt="">' : (s.display_name||'?').charAt(0).toUpperCase();
+      var av = s.avatar_url ? '<img src="'+esc(s.avatar_url)+'" alt="" width="64" height="64" loading="lazy" decoding="async">' : (s.display_name||'?').charAt(0).toUpperCase();
       var spec = (s.specialties && s.specialties.length) ? esc(s.specialties.slice(0,2).join(', ')) : (s.rating_count>0?('★ '+Number(s.rating_avg).toFixed(1)):'');
       return '<div class="staff-card"><div class="av">'+av+'</div><b>'+esc(s.display_name)+'</b><span>'+spec+'</span></div>';
     }).join('');
@@ -492,12 +721,31 @@ function renderProfile(){
   var ci = [];
   if(b.phone) ci.push('<div class="inforow"><span class="ic">'+ICONS.phone+'</span><span class="lbl">Teléfono</span><span class="val"><a href="tel:'+esc(b.phone)+'" style="color:var(--teal-ink)">'+esc(b.phone)+'</a></span></div>');
   if(b.whatsapp) ci.push('<div class="inforow"><span class="ic">'+ICONS.chat+'</span><span class="lbl">WhatsApp</span><span class="val"><a href="https://wa.me/'+esc((b.whatsapp||'').replace(/\D/g,''))+'" style="color:var(--teal-ink)">'+esc(b.whatsapp)+'</a></span></div>');
+  var hasGeo = typeof b.lat==='number' && typeof b.lng==='number' && isFinite(b.lat) && isFinite(b.lng);
   if(b.address_line || b.municipality){
     var addr = [b.address_line, b.municipality].filter(Boolean).join(', ');
-    var maps = 'https://maps.google.com/?q='+encodeURIComponent(addr);
-    ci.push('<div class="inforow"><span class="ic">'+ICONS.pin+'</span><span class="lbl">Dirección</span><span class="val">'+esc(addr)+'<br><a class="map-link" href="'+maps+'" target="_blank">Ver en el mapa →</a></span></div>');
+    if(hasGeo){
+      ci.push('<div class="inforow"><span class="ic">'+ICONS.pin+'</span><span class="lbl">Dirección</span><span class="val">'+esc(addr)+'</span></div>');
+    } else {
+      var maps = 'https://maps.google.com/?q='+encodeURIComponent(addr);
+      ci.push('<div class="inforow"><span class="ic">'+ICONS.pin+'</span><span class="lbl">Dirección</span><span class="val">'+esc(addr)+'<br><a class="map-link" href="'+maps+'" target="_blank" rel="noopener">Ver en el mapa →</a></span></div>');
+    }
+  }
+  if(hasGeo){
+    var gmaps = 'https://www.google.com/maps/dir/?api=1&destination='+b.lat+','+b.lng;
+    var amaps = 'https://maps.apple.com/?daddr='+b.lat+','+b.lng;
+    var waze = 'https://waze.com/ul?ll='+b.lat+','+b.lng+'&navigate=yes';
+    var navic = '<svg viewBox="0 0 24 24"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>';
+    ci.push('<div id="bizMap"></div>'+
+      '<div style="font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:14px 0 8px">Cómo llegar</div>'+
+      '<div class="dir-btns">'+
+        '<a class="dir-btn" href="'+gmaps+'" target="_blank" rel="noopener">'+navic+'Google Maps</a>'+
+        '<a class="dir-btn" href="'+amaps+'" target="_blank" rel="noopener">'+navic+'Apple Maps</a>'+
+        '<a class="dir-btn" href="'+waze+'" target="_blank" rel="noopener">'+navic+'Waze</a>'+
+      '</div>');
   }
   document.getElementById('contactList').innerHTML = ci.join('') || '<p class="bio-text">Reserva en línea para ver los detalles.</p>';
+  if(hasGeo){ initBizMap(b.lat, b.lng, b.name); }
   // Botón de llamar en drawer
   if(b.phone){
     var dc = document.getElementById('drawerCall');
@@ -551,6 +799,53 @@ function renderServices(){
   list.querySelectorAll('.svc').forEach(function(el){
     el.onclick = function(){ toggleService(el.dataset.id); };
   });
+}
+
+// Portafolio (galería) — render desde state.gallery [{url,caption}]
+function renderGallery(){
+  var sec = document.getElementById('sec-gallery');
+  var grid = document.getElementById('galGrid');
+  var items = state.gallery || [];
+  if(!items.length){ sec.style.display='none'; return; }
+  grid.innerHTML = items.map(function(g){
+    var cap = g.caption ? '<span class="cap">'+esc(g.caption)+'</span>' : '';
+    return '<div class="gal-card"><img src="'+esc(g.url)+'" alt="'+esc(g.caption||'')+'" loading="lazy" decoding="async">'+cap+'</div>';
+  }).join('');
+  sec.style.display='block';
+}
+
+// Mapa Leaflet (read-only) — se inicializa cuando la sección es visible
+var __bizMap = null;
+function initBizMap(lat, lng, name){
+  var el = document.getElementById('bizMap');
+  if(!el) return;
+  function build(){
+    if(__bizMap || !window.L) return;
+    try{
+      __bizMap = L.map(el, { scrollWheelZoom:false, attributionControl:true }).setView([lat,lng], 15);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom:19, attribution:'&copy; OpenStreetMap'
+      }).addTo(__bizMap);
+      L.marker([lat,lng]).addTo(__bizMap).bindPopup(esc(name||''));
+      setTimeout(function(){ if(__bizMap) __bizMap.invalidateSize(); }, 60);
+    }catch(e){}
+  }
+  function whenLeaflet(cb){
+    if(window.L){ cb(); return; }
+    var t = setInterval(function(){ if(window.L){ clearInterval(t); cb(); } }, 120);
+    setTimeout(function(){ clearInterval(t); }, 8000);
+  }
+  function start(){ whenLeaflet(build); }
+  if('IntersectionObserver' in window){
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if(en.isIntersecting){ start(); io.disconnect(); }
+      });
+    }, { rootMargin:'200px' });
+    io.observe(el);
+  } else {
+    start();
+  }
 }
 
 // Marcar/desmarcar un servicio en el modal
@@ -783,6 +1078,219 @@ document.getElementById('confirmBtn').onclick = async function(){
     btn.disabled=false; btn.textContent='Confirmar reserva →';
   }
 };
+
+// ═══════════ TIENDA (productos + carrito) ═══════════
+function parseVariants(v){
+  // variants puede venir como array, JSON string, o null
+  if(!v) return [];
+  if(Array.isArray(v)) return v.filter(Boolean).map(String);
+  if(typeof v==='string'){
+    try{ var j=JSON.parse(v); if(Array.isArray(j)) return j.filter(Boolean).map(String); }catch(e){}
+    return v.split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+  }
+  if(typeof v==='object'){ try{ return Object.values(v).filter(Boolean).map(String); }catch(e){} }
+  return [];
+}
+
+function renderShop(){
+  if(!state.products || state.products.length===0) return;
+  document.getElementById('sec-shop').style.display='block';
+  document.getElementById('sec-more').style.display='block';
+  var grid = document.getElementById('prodGrid');
+  grid.innerHTML = state.products.map(function(p){
+    var photos = Array.isArray(p.photos)? p.photos : [];
+    var img = photos.length ? '<img src="'+esc(photos[0])+'" alt="'+esc(p.name)+'" loading="lazy" decoding="async">' : '<span class="noimg">Sin foto</span>';
+    var vars = parseVariants(p.variants);
+    var soldOut = (p.stock!=null && Number(p.stock)<=0);
+    var varSel = vars.length ? '<select class="pvar" data-var="'+esc(p.id)+'">'+vars.map(function(v){ return '<option value="'+esc(v)+'">'+esc(v)+'</option>'; }).join('')+'</select>' : '';
+    var desc = p.description ? '<div class="pdesc">'+esc(p.description)+'</div>' : '';
+    var action = soldOut
+      ? '<span class="soldout">Agotado</span>'
+      : '<button class="addbtn" data-add="'+esc(p.id)+'">Añadir</button>';
+    return '<div class="prod-card">'+
+      '<div class="ph">'+img+'</div>'+
+      '<div class="body"><h4>'+esc(p.name)+'</h4>'+desc+varSel+
+      '<div class="prow"><span class="pprice">'+money(p.price_cents)+'</span>'+action+'</div></div></div>';
+  }).join('');
+  grid.querySelectorAll('[data-add]').forEach(function(btn){
+    btn.onclick = function(){
+      var id = btn.getAttribute('data-add');
+      var selEl = grid.querySelector('[data-var="'+id+'"]');
+      addToCart(id, selEl ? selEl.value : null);
+    };
+  });
+}
+
+function findProduct(id){ return state.products.find(function(p){ return String(p.id)===String(id); }); }
+
+function addToCart(id, variant){
+  var p = findProduct(id); if(!p) return;
+  var line = state.cart.find(function(l){ return String(l.product_id)===String(id) && (l.variant||null)===(variant||null); });
+  if(line){ line.qty++; } else { state.cart.push({ product_id:id, qty:1, variant:variant||null }); }
+  updateCartFab();
+}
+
+function cartTotal(){
+  return state.cart.reduce(function(sum,l){ var p=findProduct(l.product_id); return sum + (p?p.price_cents:0)*l.qty; }, 0);
+}
+function cartCount(){ return state.cart.reduce(function(s,l){ return s+l.qty; }, 0); }
+
+function updateCartFab(){
+  var fab = document.getElementById('cartFab');
+  var n = cartCount();
+  document.getElementById('cartCnt').textContent = n;
+  fab.classList.toggle('on', n>0);
+}
+
+function renderCart(){
+  var wrap = document.getElementById('cartItems');
+  var checkout = document.getElementById('cartCheckout');
+  if(state.cart.length===0){
+    wrap.innerHTML = '<div class="empty-note">Tu carrito está vacío.<br>Añade productos desde la tienda.</div>';
+    checkout.style.display='none';
+    return;
+  }
+  wrap.innerHTML = state.cart.map(function(l,i){
+    var p = findProduct(l.product_id); if(!p) return '';
+    var photos = Array.isArray(p.photos)? p.photos : [];
+    var img = photos.length ? '<img src="'+esc(photos[0])+'" alt="" width="52" height="52" loading="lazy" decoding="async">' : '';
+    var v = l.variant ? '<span>'+esc(l.variant)+'</span>' : '';
+    return '<div class="cart-line"><div class="ci">'+img+'</div>'+
+      '<div class="cgrow"><h5>'+esc(p.name)+'</h5>'+v+'<span>'+money(p.price_cents)+'</span></div>'+
+      '<div class="qty"><button data-dec="'+i+'">−</button><span>'+l.qty+'</span><button data-inc="'+i+'">+</button></div></div>';
+  }).join('');
+  wrap.querySelectorAll('[data-inc]').forEach(function(b){ b.onclick=function(){ state.cart[+b.getAttribute('data-inc')].qty++; renderCart(); updateCartFab(); }; });
+  wrap.querySelectorAll('[data-dec]').forEach(function(b){ b.onclick=function(){ var i=+b.getAttribute('data-dec'); state.cart[i].qty--; if(state.cart[i].qty<=0) state.cart.splice(i,1); renderCart(); updateCartFab(); }; });
+  checkout.style.display='block';
+  document.getElementById('cartSummary').innerHTML =
+    state.cart.map(function(l){ var p=findProduct(l.product_id); return p?('<div class="row"><span>'+esc(p.name)+' × '+l.qty+'</span><b>'+money(p.price_cents*l.qty)+'</b></div>'):''; }).join('')+
+    '<div class="row tot"><span>Total</span><b>'+money(cartTotal())+'</b></div>';
+}
+
+function openSheet(id){ document.getElementById(id).classList.add('on'); document.body.style.overflow='hidden'; }
+function closeSheet(id){ document.getElementById(id).classList.remove('on'); document.body.style.overflow=''; }
+
+document.getElementById('cartFab').onclick = function(){ clearAlert('cartAlert'); document.getElementById('orderOk').style.display='none'; renderCart(); openSheet('cartSheet'); };
+document.getElementById('closeCart').onclick = function(){ closeSheet('cartSheet'); };
+
+// Selector de entrega (pickup / shipping)
+document.querySelectorAll('#fulfillSeg button').forEach(function(b){
+  b.onclick = function(){
+    document.querySelectorAll('#fulfillSeg button').forEach(function(x){ x.classList.remove('on'); });
+    b.classList.add('on');
+    state.fulfillment = b.getAttribute('data-f');
+  };
+});
+
+document.getElementById('orderBtn').onclick = async function(){
+  clearAlert('cartAlert');
+  if(state.cart.length===0){ showAlert('cartAlert','Tu carrito está vacío.'); return; }
+  var name = document.getElementById('oName').value.trim();
+  var phone = document.getElementById('oPhone').value.trim();
+  var email = document.getElementById('oEmail').value.trim();
+  if(!name){ showAlert('cartAlert','Escribe tu nombre.'); return; }
+  if(phone.replace(/\D/g,'').length < 10){ showAlert('cartAlert','Escribe un teléfono válido (10 dígitos).'); return; }
+  var body = {
+    items: state.cart.map(function(l){ return { product_id:l.product_id, qty:l.qty, variant:l.variant||null }; }),
+    buyer_name:name, buyer_phone:phone, fulfillment:state.fulfillment
+  };
+  if(email) body.buyer_email = email;
+  var btn = document.getElementById('orderBtn');
+  btn.disabled=true; btn.textContent='Procesando…';
+  var res = await api('POST','/public/'+encodeURIComponent(SLUG)+'/orders', body);
+  btn.disabled=false; btn.textContent='Confirmar pedido →';
+  if(!res.ok){
+    if(res.status===404){ showAlert('cartAlert','Este negocio no está aceptando pedidos en línea por ahora.'); return; }
+    showAlert('cartAlert', res.data.error || 'No se pudo procesar el pedido. Intenta de nuevo.');
+    return;
+  }
+  var orderId = res.data.order_id || (res.data.order && res.data.order.id) || '—';
+  document.getElementById('orderOkDetail').textContent = cartCount()+' artículo'+(cartCount()>1?'s':'')+' · '+money(cartTotal());
+  document.getElementById('orderOkCode').textContent = orderId;
+  document.getElementById('cartItems').innerHTML='';
+  document.getElementById('cartCheckout').style.display='none';
+  document.getElementById('orderOk').style.display='block';
+  state.cart = []; updateCartFab();
+};
+document.getElementById('orderOkClose').onclick = function(){ closeSheet('cartSheet'); document.getElementById('orderOk').style.display='none'; };
+
+// ═══════════ GIFT CARD ═══════════
+document.getElementById('openGift').onclick = function(){ clearAlert('giftAlert'); document.getElementById('giftForm').style.display='block'; document.getElementById('giftOk').style.display='none'; openSheet('giftSheet'); };
+document.getElementById('closeGift').onclick = function(){ closeSheet('giftSheet'); };
+document.getElementById('checkGift').onclick = function(){ location.href = 'gift-card.html?slug='+encodeURIComponent(SLUG); };
+document.getElementById('giftBtn').onclick = async function(){
+  clearAlert('giftAlert');
+  var amt = parseFloat(document.getElementById('gAmount').value);
+  var from = document.getElementById('gFrom').value.trim();
+  var fromEmail = document.getElementById('gFromEmail').value.trim();
+  var to = document.getElementById('gTo').value.trim();
+  var toEmail = document.getElementById('gToEmail').value.trim();
+  var msg = document.getElementById('gMsg').value.trim();
+  if(isNaN(amt) || amt<5 || amt>500){ showAlert('giftAlert','El monto debe estar entre $5.00 y $500.00.'); return; }
+  if(!from){ showAlert('giftAlert','Escribe tu nombre.'); return; }
+  if(!/.+@.+\..+/.test(fromEmail)){ showAlert('giftAlert','Escribe tu email.'); return; }
+  var body = { amount_cents: Math.round(amt*100), purchaser_name:from, purchaser_email:fromEmail };
+  if(to) body.recipient_name = to;
+  if(toEmail) body.recipient_email = toEmail;
+  if(msg) body.message = msg;
+  var btn = document.getElementById('giftBtn');
+  btn.disabled=true; btn.textContent='Procesando…';
+  var res = await api('POST','/public/'+encodeURIComponent(SLUG)+'/gift-cards', body);
+  btn.disabled=false; btn.textContent='Comprar gift card →';
+  if(!res.ok){
+    if(res.status===404){ showAlert('giftAlert','Este negocio no vende gift cards por ahora.'); return; }
+    showAlert('giftAlert', res.data.error || 'No se pudo crear la gift card. Intenta de nuevo.');
+    return;
+  }
+  document.getElementById('giftOkDetail').textContent = 'Gift card de '+money(Math.round(amt*100))+(to?(' para '+to):'')+'.';
+  var code = res.data.code || res.data.gift_card_id || (res.data.gift_card && (res.data.gift_card.code||res.data.gift_card.id)) || '';
+  document.getElementById('giftOkCode').textContent = code || '✓';
+  document.getElementById('giftForm').style.display='none';
+  document.getElementById('giftOk').style.display='block';
+};
+document.getElementById('giftOkClose').onclick = function(){ closeSheet('giftSheet'); };
+
+// ═══════════ LISTA DE ESPERA ═══════════
+document.getElementById('openWait').onclick = function(){
+  clearAlert('waitAlert');
+  document.getElementById('waitForm').style.display='block';
+  document.getElementById('waitOk').style.display='none';
+  // poblar selects con servicios y staff actuales
+  var ws = document.getElementById('wService');
+  ws.innerHTML = '<option value="">Cualquier servicio</option>'+state.services.map(function(s){ return '<option value="'+esc(s.id)+'">'+esc(s.name)+'</option>'; }).join('');
+  var wt = document.getElementById('wStaff');
+  wt.innerHTML = '<option value="">Cualquier profesional</option>'+state.staff.map(function(s){ return '<option value="'+esc(s.id)+'">'+esc(s.display_name)+'</option>'; }).join('');
+  openSheet('waitSheet');
+};
+document.getElementById('closeWait').onclick = function(){ closeSheet('waitSheet'); };
+document.getElementById('waitBtn').onclick = async function(){
+  clearAlert('waitAlert');
+  var serviceId = document.getElementById('wService').value;
+  var staffId = document.getElementById('wStaff').value;
+  var from = document.getElementById('wFrom').value;
+  var to = document.getElementById('wTo').value;
+  var name = document.getElementById('wName').value.trim();
+  var phone = document.getElementById('wPhone').value.trim();
+  if(!from || !to){ showAlert('waitAlert','Elige el rango de fechas.'); return; }
+  if(to < from){ showAlert('waitAlert','La fecha "hasta" no puede ser antes de "desde".'); return; }
+  if(!name){ showAlert('waitAlert','Escribe tu nombre.'); return; }
+  if(phone.replace(/\D/g,'').length < 10){ showAlert('waitAlert','Escribe un teléfono válido (10 dígitos).'); return; }
+  var body = { date_from:from, date_to:to, full_name:name, phone:phone };
+  if(serviceId) body.service_id = serviceId;
+  if(staffId) body.staff_id = staffId;
+  var btn = document.getElementById('waitBtn');
+  btn.disabled=true; btn.textContent='Enviando…';
+  var res = await api('POST','/public/'+encodeURIComponent(SLUG)+'/waitlist', body);
+  btn.disabled=false; btn.textContent='Unirme a la lista →';
+  if(!res.ok){
+    if(res.status===404){ showAlert('waitAlert','Este negocio no tiene lista de espera por ahora.'); return; }
+    showAlert('waitAlert', res.data.error || 'No se pudo unir a la lista. Intenta de nuevo.');
+    return;
+  }
+  document.getElementById('waitForm').style.display='none';
+  document.getElementById('waitOk').style.display='block';
+};
+document.getElementById('waitOkClose').onclick = function(){ closeSheet('waitSheet'); };
 
 boot();
 </script>

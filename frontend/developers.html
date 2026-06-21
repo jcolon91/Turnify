@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Para desarrolladores — Bukéame</title>
+<meta name="description" content="Integra las reservas de Bukéame en tu web: botón embebido, enlace directo, gift cards y API REST de reservas lista para usar. Sin servidores ni mantenimiento.">
+<link rel="canonical" href="https://bukeame.com/developers.html">
+<meta name="theme-color" content="#0E8074">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230E8074'/%3E%3Ctext x='16' y='23' font-family='Arial,sans-serif' font-size='20' font-weight='800' fill='%23fff' text-anchor='middle'%3EB%3C/text%3E%3C/svg%3E">
+<meta property="og:title" content="Para desarrolladores — Bukéame">
+<meta property="og:description" content="Integra las reservas de Bukéame en tu web: botón embebido, enlace directo, gift cards y API REST de reservas lista para usar.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://bukeame.com/developers.html">
+<meta property="og:site_name" content="Bukéame">
+<meta property="og:locale" content="es_PR">
+<meta property="og:image" content="https://bukeame.com/og-cover.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Para desarrolladores — Bukéame">
+<meta name="twitter:description" content="Integra las reservas de Bukéame en tu web: botón embebido, enlace directo, gift cards y API REST de reservas lista para usar.">
+<meta name="twitter:image" content="https://bukeame.com/og-cover.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+--bg:#F1EFE5;--bg2:#F7F4EA;--card:#FFFFFF;--card-soft:#EDE9DB;--border:#E1DCCD;
+--text:#17150F;--muted:#5E594B;--muted2:#B3AD9C;--green:#0E8074;--green-ink:#FFFFFF;
+--green-soft:#E3EFE9;--green-glow:rgba(14,128,116,.45);
+--codebg:#11221E;--codeink:#D6EFE8;
+--awning:repeating-linear-gradient(90deg,#0E8074 0 26px,#0A5B52 26px 28px,#F8F5EA 28px 54px,#E7E2D1 54px 56px);
+--hero:linear-gradient(135deg,#11221E,#0A5B52);--hero-ink:#FFF8EC;
+--display:"Bricolage Grotesque",sans-serif;--body:"Instrument Sans",sans-serif;--mono:"Spline Sans Mono",monospace}
+html[data-theme="dark"]{
+--bg:#0B1A13;--bg2:#0E2218;--card:#12251B;--card-soft:rgba(255,255,255,.05);--border:rgba(255,255,255,.1);
+--text:#ECEAE0;--muted:#8AA197;--muted2:#5d6f66;--green:#36E27B;--green-ink:#08160F;
+--green-soft:rgba(54,226,123,.12);--green-glow:rgba(54,226,123,.3);
+--codebg:#0A130F;--codeink:#BFE6DB;
+--awning:repeating-linear-gradient(90deg,#36E27B 0 26px,#0d6b46 26px 28px,#0E2218 28px 54px,#10241A 54px 56px);
+--hero:linear-gradient(135deg,#10231D,#0A453A);--hero-ink:#ECF6F2}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--body);color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+.nav{background:var(--card);border-bottom:1px solid var(--border);padding:14px 18px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:50}
+.nav a.back{font-size:18px;line-height:1}
+.nav .logo{font-family:var(--display);font-weight:800;font-size:19px}.nav .logo i{font-style:normal;color:var(--green)}
+.theme-tg{margin-left:auto;display:inline-flex;background:var(--card-soft);border:1px solid var(--border);border-radius:11px;padding:3px}
+.theme-tg button{font:700 12.5px var(--body);padding:6px 13px;border-radius:8px;cursor:pointer;border:0;background:transparent;color:var(--muted)}
+.theme-tg button.on{background:var(--green);color:var(--green-ink)}
+.awning{height:12px;background:var(--awning)}
+.wrap{max-width:680px;margin:0 auto;padding:24px 16px 50px}
+.hero{background:var(--hero);color:var(--hero-ink);border-radius:20px;padding:26px 24px;margin-bottom:22px}
+.hero .lab{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;opacity:.72}
+.hero h1{font-family:var(--display);font-weight:800;font-size:30px;letter-spacing:-.02em;margin:8px 0}
+.hero p{font-size:14px;opacity:.9;line-height:1.6;max-width:520px}
+.sec{margin-bottom:26px}
+.sec .shead{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.sec .shead .ic-svg{flex:none;color:var(--green)}
+.sec h2{font-family:var(--display);font-weight:800;font-size:19px;letter-spacing:-.01em}
+.sec .sdesc{font-size:13.5px;color:var(--muted);line-height:1.6;margin-bottom:12px}
+.sec .sdesc:last-child{margin-bottom:0}
+.sec .sdesc b{color:var(--text);font-weight:700}
+.sec .sdesc code.inl{font-family:var(--mono);font-size:11.5px;background:var(--green-soft);color:var(--green);padding:1px 6px;border-radius:5px}
+.badge{font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:4px 9px;border-radius:99px;background:var(--green-soft);color:var(--green);border:1px solid var(--green-glow)}
+.code{position:relative;background:var(--codebg);border-radius:14px;padding:16px;border:1px solid var(--border);margin-bottom:12px}
+.code pre{font-family:var(--mono);font-size:12.5px;line-height:1.7;color:var(--codeink);white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;padding-right:78px;margin:0}
+.code .copy{position:absolute;top:12px;right:12px;display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.1);color:#EAF6F2;font:700 11.5px var(--body);padding:7px 11px;border-radius:9px;transition:background .15s}
+.code .copy:hover{background:rgba(255,255,255,.18)}
+.code .copy.done{background:rgba(54,226,123,.28);color:#EAF6F2}
+.code .copy .ic-svg{flex:none}
+.ic-svg{flex:none;vertical-align:-.18em;display:inline-block}
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);background:var(--text);color:var(--bg);font-size:13px;font-weight:600;padding:11px 18px;border-radius:99px;opacity:0;transition:.25s;pointer-events:none;z-index:90}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.foot{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:20px 0 40px}
+</style>
+<script>
+(function(){var t=localStorage.getItem('bukeame_theme')||'dark';document.documentElement.setAttribute('data-theme',t);
+window.__setTheme=function(t){localStorage.setItem('bukeame_theme',t);document.documentElement.setAttribute('data-theme',t);
+  document.querySelectorAll('.theme-tg button').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-theme-set')===t);});};
+document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('[data-theme-set]').forEach(function(b){b.addEventListener('click',function(){window.__setTheme(b.getAttribute('data-theme-set'));});});window.__setTheme(localStorage.getItem('bukeame_theme')||'dark');});})();
+</script>
+</head>
+<body>
+<div id="app">
+<nav class="nav"><a href="index.html" class="back" aria-label="Volver">←</a><span class="logo">Buk<i>é</i>ame</span><div class="theme-tg"><button type="button" data-theme-set="light">Claro</button><button type="button" data-theme-set="dark">Oscuro</button></div></nav>
+<div class="awning"></div>
+<div class="wrap">
+
+  <div class="hero">
+    <div class="lab">Developers</div>
+    <h1>Bukéame para desarrolladores</h1>
+    <p>Lleva las reservas de tu negocio a tu propia web con un enlace o una línea de código. Sin servidores, sin mantenimiento: tú diseñas, Bukéame agenda.</p>
+  </div>
+
+  <!-- Botón embebido -->
+  <div class="sec">
+    <div class="shead">
+      <svg class="ic-svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 7 4 12 9 17"/><polyline points="15 7 20 12 15 17"/></svg>
+      <h2>Botón de reservas embebido</h2>
+      <span class="badge">Listo</span>
+    </div>
+    <p class="sdesc">Pega esta línea en tu HTML. Aparece un <b>botón flotante “Reservar”</b> abajo a la derecha que abre tu agenda en una ventana — el cliente reserva sin salir de tu sitio.</p>
+    <div class="code" data-snippet="&lt;script src=&quot;https://bukeame.com/widget.js&quot; data-slug=&quot;tu-negocio&quot; defer&gt;&lt;/script&gt;"></div>
+    <p class="sdesc">¿Lo quieres <b>fijo en un lugar</b> de la página? Añade un contenedor y apúntale con <code class="inl">data-target</code>:</p>
+    <div class="code" data-snippet="&lt;div id=&quot;reservar&quot;&gt;&lt;/div&gt;
+&lt;script src=&quot;https://bukeame.com/widget.js&quot; data-slug=&quot;tu-negocio&quot; data-target=&quot;#reservar&quot; defer&gt;&lt;/script&gt;"></div>
+    <p class="sdesc">Cambia <code class="inl">data-slug</code> por el slug de tu negocio. Opciones: <code class="inl">data-label</code> (texto del botón), <code class="inl">data-color</code> (color), <code class="inl">data-position</code> (<code class="inl">float</code> o <code class="inl">inline</code>).</p>
+  </div>
+
+  <!-- Enlace directo -->
+  <div class="sec">
+    <div class="shead">
+      <svg class="ic-svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>
+      <h2>Enlace directo</h2>
+    </div>
+    <p class="sdesc">Comparte tu página de reservas con un solo enlace: en tu bio, en redes o en un botón. El cliente reserva sin instalar nada.</p>
+    <div class="code" data-snippet="https://bukeame.com/negocio.html?slug=tu-negocio"></div>
+  </div>
+
+  <!-- Gift cards -->
+  <div class="sec">
+    <div class="shead">
+      <svg class="ic-svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="13" rx="2"/><path d="M3 12h18M12 8v13"/><path d="M12 8S10.7 4 8.5 4a2 2 0 0 0 0 4M12 8s1.3-4 3.5-4a2 2 0 0 1 0 4"/></svg>
+      <h2>Gift cards</h2>
+    </div>
+    <p class="sdesc">Enlaza tu página de gift cards para que tus clientes compren y consulten saldo directamente.</p>
+    <div class="code" data-snippet="https://bukeame.com/gift-card.html?slug=tu-negocio"></div>
+  </div>
+
+  <!-- API -->
+  <div class="sec">
+    <div class="shead">
+      <svg class="ic-svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4l-4 8 4 8"/><path d="M16 4l4 8-4 8"/></svg>
+      <h2>API</h2>
+      <span class="badge">Listo</span>
+    </div>
+    <p class="sdesc">La <b>API REST pública de reservas</b> ya está disponible: accede a la disponibilidad y crea citas de tu negocio desde tus propios sistemas.</p>
+    <div class="code" data-snippet="curl https://bukeame.com/api/public/tu-negocio"></div>
+    <p class="sdesc">¿Quieres una llave de acceso o más endpoints? Escríbenos a <a href="mailto:hola@bukeame.com" style="color:var(--green);font-weight:700">hola@bukeame.com</a>.</p>
+  </div>
+
+</div>
+</div>
+<div class="foot">Hecho con Bukéame · bukeame.com</div>
+<div class="toast" id="toast"></div>
+
+<script>
+function toast(msg){var t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(function(){t.classList.remove('show');},1700);}
+
+var COPY_IC='<svg class="ic-svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>';
+var CHECK_IC='<svg class="ic-svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+
+document.querySelectorAll('.code[data-snippet]').forEach(function(box){
+  // data-snippet ya viene escapado (entidades) para mostrarse como texto
+  var html=box.getAttribute('data-snippet');
+  var raw=html.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&amp;/g,'&');
+  var pre=document.createElement('pre');
+  pre.innerHTML=html;
+  var btn=document.createElement('button');
+  btn.type='button';
+  btn.className='copy';
+  btn.innerHTML=COPY_IC+'<span>Copiar</span>';
+  btn.addEventListener('click',function(){
+    function done(){
+      btn.classList.add('done');
+      btn.innerHTML=CHECK_IC+'<span>¡Copiado!</span>';
+      toast('Copiado');
+      setTimeout(function(){btn.classList.remove('done');btn.innerHTML=COPY_IC+'<span>Copiar</span>';},1800);
+    }
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      navigator.clipboard.writeText(raw).then(done).catch(function(){fallback(raw);done();});
+    }else{fallback(raw);done();}
+  });
+  function fallback(text){
+    var ta=document.createElement('textarea');
+    ta.value=text;ta.style.position='fixed';ta.style.opacity='0';
+    document.body.appendChild(ta);ta.select();
+    try{document.execCommand('copy');}catch(e){}
+    document.body.removeChild(ta);
+  }
+  box.appendChild(btn);
+  box.appendChild(pre);
+});
+</script>
+</body>
+</html>

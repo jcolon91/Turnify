@@ -16,28 +16,44 @@ module.exports.mount = function (app, ctx) {
 
   const ALIVE = ['pending_deposit', 'confirmed'];
 
+  // ¿el negocio compró el add-on 'loyalty'? (lealtad como add-on, migración 08)
+  // Defensivo: si el enum addon_code aún no tiene 'loyalty', no revienta → false.
+  async function hasLoyaltyAddon(businessId) {
+    try {
+      const { rows } = await db.query(
+        `SELECT 1 FROM addons WHERE business_id = $1 AND code = 'loyalty' AND status = 'active'`,
+        [businessId]);
+      return !!rows[0];
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  // lealtad permitida = el plan tiene la feature 'loyalty' OR el negocio tiene el add-on
+  async function loyaltyAllowed(businessId) {
+    const eff = await db.query(
+      `SELECT effective_plan FROM v_effective_plan WHERE business_id = $1`, [businessId]);
+    const feat = await db.query(
+      `SELECT (features->>'loyalty')::boolean ok FROM plans WHERE code = $1`,
+      [eff.rows[0]?.effective_plan || 'free']);
+    if (feat.rows[0]?.ok) return true;
+    return await hasLoyaltyAddon(businessId);
+  }
+
   // ==========================================================================
   //  PROGRAMA DE LEALTAD (lo paga el negocio; Bukeame solo cuenta)
   // ==========================================================================
   app.get('/api/loyalty', authRequired, businessScope, asyncH(async (req, res) => {
-    // requiere feature de plan (Studio+) o estar en trial premium
-    const eff = await db.query(`SELECT effective_plan, in_trial FROM v_effective_plan WHERE business_id = $1`,
-      [req.business.id]);
-    const feat = await db.query(`SELECT (features->>'loyalty')::boolean ok FROM plans WHERE code = $1`,
-      [eff.rows[0]?.effective_plan || 'free']);
-    const allowed = !!feat.rows[0]?.ok;
+    // requiere feature de plan (Studio+), trial premium, O el add-on 'loyalty'
+    const allowed = await loyaltyAllowed(req.business.id);
 
     const { rows } = await db.query(`SELECT * FROM loyalty_programs WHERE business_id = $1`, [req.business.id]);
     res.json({ allowed, program: rows[0] || null });
   }));
 
   app.put('/api/loyalty', authRequired, businessScope, asyncH(async (req, res) => {
-    const eff = await db.query(`SELECT effective_plan FROM v_effective_plan WHERE business_id = $1`,
-      [req.business.id]);
-    const feat = await db.query(`SELECT (features->>'loyalty')::boolean ok FROM plans WHERE code = $1`,
-      [eff.rows[0]?.effective_plan || 'free']);
-    if (!feat.rows[0]?.ok)
-      return bad(res, 'El programa de lealtad está en el plan Studio o superior', 403);
+    if (!(await loyaltyAllowed(req.business.id)))
+      return bad(res, 'El programa de lealtad está en el plan Studio o superior, o como add-on', 403);
 
     const { is_active, visits_required, reward_text } = req.body || {};
     if (visits_required != null && (!Number.isInteger(visits_required) || visits_required < 2 || visits_required > 50))

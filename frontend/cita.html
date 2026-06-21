@@ -3,6 +3,21 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mi cita — Bukéame</title>
+<meta name="description" content="Consulta o cancela tu cita en segundos. Escribe tu código de confirmación para ver los detalles de tu reserva hecha con Bukéame.">
+<link rel="canonical" href="https://bukeame.com/cita.html">
+<meta name="theme-color" content="#0E8074">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230E8074'/%3E%3Ctext x='16' y='23' font-family='Arial,sans-serif' font-size='20' font-weight='800' fill='%23fff' text-anchor='middle'%3EB%3C/text%3E%3C/svg%3E">
+<meta property="og:title" content="Mi cita — Bukéame">
+<meta property="og:description" content="Consulta o cancela tu cita en segundos con tu código de confirmación.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://bukeame.com/cita.html">
+<meta property="og:site_name" content="Bukéame">
+<meta property="og:locale" content="es_PR">
+<meta property="og:image" content="https://bukeame.com/og-cover.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Mi cita — Bukéame">
+<meta name="twitter:description" content="Consulta o cancela tu cita en segundos con tu código de confirmación.">
+<meta name="twitter:image" content="https://bukeame.com/og-cover.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -11,8 +26,6 @@
   --text:#17150F;--muted:#5E594B;--muted2:#B3AD9C;--green:#0E8074;--green-ink:#FFFFFF;
   --green-soft:#E3EFE9;--green-glow:rgba(14,128,116,.45);
   --awning:repeating-linear-gradient(90deg,#0E8074 0 26px,#0A5B52 26px 28px,#F8F5EA 28px 54px,#E7E2D1 54px 56px);
-  /* aliases viejos → nuevos */
-  --paper:var(--bg);--ink:var(--text);--ink2:var(--muted);--teal:var(--green);--teal-ink:var(--green-ink);--teal-soft:var(--green-soft);--line:var(--border);--mango:#EFA12F;
   --display:"Bricolage Grotesque",sans-serif;--body:"Instrument Sans",sans-serif;--mono:"Spline Sans Mono",monospace}
 html[data-theme="dark"]{
   --bg:#0B1A13;--bg2:#0E2218;--card:#12251B;--card-soft:rgba(255,255,255,.05);--border:rgba(255,255,255,.1);
@@ -26,8 +39,8 @@ input{font:inherit}
 .awning{height:12px;background:var(--awning)}
 .topbar{background:var(--card);color:var(--muted);text-align:center;padding:7px;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:14px;border-bottom:1px solid var(--border)}
 .topbar b{color:var(--green);font-weight:700}
-.theme-tg{display:inline-flex;background:var(--card-soft);border:1px solid var(--border);border-radius:11px;padding:3px}
-.theme-tg button{font:700 12.5px 'Instrument Sans',sans-serif;padding:6px 13px;border-radius:8px;cursor:pointer;border:0;background:transparent;color:var(--muted)}
+.theme-tg{display:inline-flex;background:var(--card-soft);border:1px solid var(--border);border-radius:999px;padding:3px}
+.theme-tg button{font:700 12.5px 'Instrument Sans',sans-serif;padding:6px 13px;border-radius:999px;cursor:pointer;border:0;background:transparent;color:var(--muted)}
 .theme-tg button.on{background:var(--green);color:var(--green-ink)}
 .wrap{max-width:480px;margin:0 auto;padding:30px 18px}
 h1{font-family:var(--display);font-weight:800;font-size:26px;letter-spacing:-.02em;text-align:center;margin-bottom:6px}
@@ -35,10 +48,11 @@ h1{font-family:var(--display);font-weight:800;font-size:26px;letter-spacing:-.02
 .card{background:var(--card);border:1.5px solid var(--border);border-radius:18px;padding:22px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
 .field{margin-bottom:14px}
 .field label{display:block;font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
-.field input{width:100%;padding:13px;border:1.5px solid var(--border);border-radius:12px;background:var(--bg2);color:var(--text);text-align:center;font-family:var(--mono);font-weight:700;font-size:16px;letter-spacing:.1em;text-transform:uppercase}
-.field input:focus{outline:none;border-color:var(--green)}
-.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;font-weight:700;font-size:15px;padding:14px;border-radius:14px;cursor:pointer}
-.btn-teal{background:var(--green);color:var(--green-ink)}
+.field input{width:100%;padding:13px;border:1.5px solid var(--border);border-radius:12px;background:var(--bg2);color:var(--text);text-align:center;font-family:var(--mono);font-weight:700;font-size:16px;letter-spacing:.1em;text-transform:uppercase;transition:border-color .12s ease,box-shadow .12s ease}
+.field input:focus{outline:none;border-color:var(--green);box-shadow:0 0 0 3px var(--green-soft)}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;font-weight:700;font-size:15px;padding:14px;border-radius:14px;cursor:pointer;transition:transform .12s ease,box-shadow .12s ease,opacity .12s ease}
+.btn:active{transform:translateY(1px)}
+.btn-teal{background:var(--green);color:var(--green-ink);box-shadow:0 6px 18px -8px var(--green-glow)}
 .btn-dark{background:var(--card);border:1.5px solid var(--border);color:var(--text)}
 .btn-danger{background:var(--card);border:1.5px solid #E8B5A8;color:#A33A24;font-size:14px;padding:12px}
 .btn:disabled{opacity:.55;cursor:not-allowed}
@@ -62,10 +76,10 @@ h1{font-family:var(--display);font-weight:800;font-size:26px;letter-spacing:-.02
 </head>
 <body>
 <script>
-(function(){var t=localStorage.getItem('bukeame_theme')||'light';document.documentElement.setAttribute('data-theme',t);
+(function(){var t=localStorage.getItem('bukeame_theme')||'dark';document.documentElement.setAttribute('data-theme',t);
 window.__setTheme=function(t){localStorage.setItem('bukeame_theme',t);document.documentElement.setAttribute('data-theme',t);
   document.querySelectorAll('.theme-tg button').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-theme-set')===t);});};
-document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('[data-theme-set]').forEach(function(b){b.addEventListener('click',function(){window.__setTheme(b.getAttribute('data-theme-set'));});});window.__setTheme(localStorage.getItem('bukeame_theme')||'light');});})();
+document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('[data-theme-set]').forEach(function(b){b.addEventListener('click',function(){window.__setTheme(b.getAttribute('data-theme-set'));});});window.__setTheme(localStorage.getItem('bukeame_theme')||'dark');});})();
 </script>
 <div class="topbar">Reservas por <b>Buk<span style="color:var(--green)">é</span>ame</b><div class="theme-tg"><button type="button" data-theme-set="light">Claro</button><button type="button" data-theme-set="dark">Oscuro</button></div></div>
 <div class="awning"></div>

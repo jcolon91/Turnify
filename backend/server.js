@@ -71,8 +71,10 @@ app.use(express.json({ limit: '1mb' }));
 const UPLOAD_DIR = path.join(__dirname, 'uploads');
 const LOGO_DIR   = path.join(UPLOAD_DIR, 'logos');
 const COVER_DIR  = path.join(UPLOAD_DIR, 'covers');
+const PORTFOLIO_DIR = path.join(UPLOAD_DIR, 'portfolio');
 try { fs.mkdirSync(LOGO_DIR, { recursive: true }); } catch (e) { /* ya existe */ }
 try { fs.mkdirSync(COVER_DIR, { recursive: true }); } catch (e) { /* ya existe */ }
+try { fs.mkdirSync(PORTFOLIO_DIR, { recursive: true }); } catch (e) { /* ya existe */ }
 
 // Borra un archivo de /uploads de forma SEGURA. Toma solo el basename y verifica
 // que el path resuelto quede DENTRO del dir permitido → neutraliza path traversal
@@ -103,7 +105,14 @@ const origins = CORS_ORIGINS.split(',').map(s => s.trim()).filter(Boolean);
 const corsOrigin = origins.length ? origins : (NODE_ENV === 'production' ? false : true);
 if (!origins.length && NODE_ENV === 'production')
   console.warn('⚠ CORS_ORIGINS vacío en producción: el API rechazará peticiones cross-origin.');
-app.use(cors({ origin: corsOrigin, credentials: false }));
+// La API pública de reservas (/api/public/*) se puede consumir desde CUALQUIER web de
+// negocio: son rutas sin login ni cookies, ya con rate-limit (publicLimiter/bookingLimiter).
+// Por eso abrimos CORS a '*' SOLO en ese prefijo. El resto del API (rutas con token) queda
+// restringido a CORS_ORIGINS. Un único dispatcher evita cabeceras CORS duplicadas.
+const publicCors  = cors({ origin: '*', methods: ['GET', 'POST', 'OPTIONS'], credentials: false });
+const privateCors = cors({ origin: corsOrigin, credentials: false });
+app.use((req, res, next) =>
+  req.path.startsWith('/api/public') ? publicCors(req, res, next) : privateCors(req, res, next));
 
 app.use(rateLimit({ windowMs: 60_000, max: 300, standardHeaders: true, legacyHeaders: false }));
 const authLimiter   = rateLimit({ windowMs: 15 * 60_000, max: 20,  message: { error: 'Demasiados intentos. Espera 15 minutos.' } });
@@ -438,6 +447,16 @@ app.patch('/api/businesses/me', authRequired, businessScope, asyncH(async (req, 
       if (!isPhone(v)) return bad(res, `${k} inválido`); v = normPhone(v);
     }
     if (k === 'email' && v && !isEmail(v)) return bad(res, 'Email inválido');
+    // lat/lng: solo null (limpiar) o número en rango geográfico. Si no es número válido lo ignoramos.
+    if (k === 'lat' || k === 'lng') {
+      if (v == null) { v = null; }
+      else {
+        const n = Number(v);
+        const max = k === 'lat' ? 90 : 180;
+        if (!Number.isFinite(n) || n < -max || n > max) continue;   // ignorar valor inválido
+        v = n;
+      }
+    }
     // logo_url/cover_url: solo null (limpiar) o una ruta nuestra segura → bloquea path traversal
     if ((k === 'logo_url' || k === 'cover_url') && v != null &&
         (typeof v !== 'string' || !/^\/uploads\/(logos|covers)\/[A-Za-z0-9._-]+$/.test(v)))
@@ -539,6 +558,66 @@ app.delete('/api/businesses/me/cover', authRequired, businessScope, asyncH(async
     `UPDATE businesses SET cover_url = NULL WHERE id = $1 RETURNING *`, [req.business.id]);
   await audit(req, 'business.cover.delete', 'business', req.business.id, {});
   res.json({ business: rows[0] });
+}));
+
+// ── PORTAFOLIO (galería del negocio) ─────────────────────────────────────────
+// Reusa la tabla existente gallery_photos (staff_id NULL = foto del negocio).
+// Máx 12 fotos por negocio. Imágenes ≈1200x800 webp 82% en /uploads/portfolio.
+const PORTFOLIO_MAX = 12;
+
+// Subir una foto al portafolio
+app.post('/api/businesses/me/portfolio', authRequired, businessScope,
+  (req, res, next) => uploadLogo.single('photo')(req, res, (err) => {
+    if (err) return bad(res, err.message || 'Error al subir la foto');
+    next();
+  }),
+  asyncH(async (req, res) => {
+    if (!req.file) return bad(res, 'No se recibió ninguna imagen');
+    // Tope de 12 fotos por negocio
+    const c = await db.query(
+      `SELECT count(*)::int n, COALESCE(max(sort_order), 0) AS maxo
+         FROM gallery_photos WHERE business_id = $1`, [req.business.id]);
+    if (c.rows[0].n >= PORTFOLIO_MAX)
+      return bad(res, `El portafolio permite un máximo de ${PORTFOLIO_MAX} fotos. Borra alguna antes de subir más.`, 409);
+
+    const filename = `${req.business.id}-${crypto.randomUUID()}.webp`;
+    const filepath = path.join(PORTFOLIO_DIR, filename);
+    try {
+      await sharp(req.file.buffer)
+        .resize(1200, 800, { fit: 'cover', position: 'centre' })
+        .webp({ quality: 82 })
+        .toFile(filepath);
+    } catch (e) {
+      return bad(res, 'La imagen no se pudo procesar. Prueba con otra.');
+    }
+    const url = `/uploads/portfolio/${filename}`;
+    const sortOrder = c.rows[0].maxo + 1;
+    const { rows } = await db.query(
+      `INSERT INTO gallery_photos (business_id, url, sort_order)
+       VALUES ($1, $2, $3) RETURNING id, url, sort_order`,
+      [req.business.id, url, sortOrder]);
+    await audit(req, 'business.portfolio.add', 'business', req.business.id, {});
+    res.status(201).json({ photo: rows[0] });
+  }));
+
+// Listar las fotos del portafolio
+app.get('/api/businesses/me/portfolio', authRequired, businessScope, asyncH(async (req, res) => {
+  const { rows } = await db.query(
+    `SELECT id, url, caption, sort_order FROM gallery_photos
+      WHERE business_id = $1 ORDER BY sort_order`, [req.business.id]);
+  res.json({ photos: rows });
+}));
+
+// Borrar una foto del portafolio
+app.delete('/api/businesses/me/portfolio/:id', authRequired, businessScope, asyncH(async (req, res) => {
+  if (!isUuid(req.params.id)) return bad(res, 'ID inválido');
+  const { rows } = await db.query(
+    `DELETE FROM gallery_photos WHERE id = $1 AND business_id = $2 RETURNING url`,
+    [req.params.id, req.business.id]);
+  if (!rows[0]) return bad(res, 'Foto no encontrada', 404);
+  safeUnlinkUpload(rows[0].url, PORTFOLIO_DIR);
+  await audit(req, 'business.portfolio.delete', 'business', req.business.id, {});
+  res.json({ ok: true });
 }));
 
 // Reemplaza el horario semanal completo: [{day_of_week, opens, closes}, …]
@@ -908,7 +987,7 @@ app.get('/api/public/:slug', publicLimiter, asyncH(async (req, res) => {
   const biz = rows[0];
   if (!biz) return bad(res, 'Negocio no encontrado', 404);
 
-  const [services, staff, hours, reviews, payMethods] = await Promise.all([
+  const [services, staff, hours, reviews, payMethods, products, gallery] = await Promise.all([
     db.query(`SELECT id, name, description, duration_min, price_cents, deposit_cents, photo_url, is_featured
               FROM services WHERE business_id = $1 AND is_active AND deleted_at IS NULL
               ORDER BY is_featured DESC, sort_order`, [biz.id]),
@@ -922,10 +1001,26 @@ app.get('/api/public/:slug', publicLimiter, asyncH(async (req, res) => {
     db.query(`SELECT provider FROM payment_providers
               WHERE business_id = $1 AND is_enabled = true AND status = 'connected'`, [biz.id])
       .catch(() => ({ rows: [] })),
+    // Productos activos del negocio con sus fotos (resiliente si las tablas aún no existen)
+    db.query(`SELECT p.id, p.name, p.description, p.price_cents, p.stock, p.variants,
+                     COALESCE(
+                       (SELECT json_agg(pp.url ORDER BY pp.id)
+                          FROM product_photos pp WHERE pp.product_id = p.id),
+                       '[]'::json) AS photos
+                FROM products p
+               WHERE p.business_id = $1 AND p.is_active = true
+               ORDER BY p.name`, [biz.id])
+      .catch(() => ({ rows: [] })),
+    // Galería / portafolio del negocio (resiliente si la tabla aún no existe)
+    db.query(`SELECT url, caption FROM gallery_photos
+              WHERE business_id = $1 ORDER BY sort_order`, [biz.id])
+      .catch(() => ({ rows: [] })),
   ]);
   res.json({
     business: biz, services: services.rows, staff: staff.rows, hours: hours.rows, reviews: reviews.rows,
     payment_methods: payMethods.rows.map(r => r.provider),
+    products: products.rows,
+    gallery: gallery.rows,
   });
 }));
 

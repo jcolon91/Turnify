@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Refiere y gana — Bukéame</title>
+<meta name="robots" content="noindex,nofollow">
+<meta name="description" content="Comparte Bukéame con otros negocios: ellos reciben 15 días gratis del plan Pro y tú ganas $5/mes de crédito por cada referido que se queda.">
+<meta name="theme-color" content="#0E8074">
+<link rel="canonical" href="https://bukeame.com/referidos.html">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230E8074'/%3E%3Ctext x='16' y='23' font-family='Arial,sans-serif' font-size='20' font-weight='700' fill='white' text-anchor='middle'%3EB%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+--bg:#F1EFE5;--bg2:#F7F4EA;--card:#FFFFFF;--card-soft:#EDE9DB;--border:#E1DCCD;
+--text:#17150F;--muted:#5E594B;--muted2:#B3AD9C;--green:#0E8074;--green-ink:#FFFFFF;
+--green-soft:#E3EFE9;--green-glow:rgba(14,128,116,.45);--field:#FDFCF8;
+--awning:repeating-linear-gradient(90deg,#0E8074 0 26px,#0A5B52 26px 28px,#F8F5EA 28px 54px,#E7E2D1 54px 56px);
+--hero:linear-gradient(135deg,#11221E,#0A5B52);--hero-ink:#FFF8EC;--hero-accent:#9FE8D5;
+--display:"Bricolage Grotesque",sans-serif;--body:"Instrument Sans",sans-serif;--mono:"Spline Sans Mono",monospace;
+--teal:var(--green);--teal-ink:#0A5B52;--teal-soft:var(--green-soft);--line:var(--border);--mango:#EFA12F}
+html[data-theme="dark"]{
+--bg:#0B1A13;--bg2:#0E2218;--card:#12251B;--card-soft:rgba(255,255,255,.05);--border:rgba(255,255,255,.1);
+--text:#ECEAE0;--muted:#8AA197;--muted2:#5d6f66;--green:#36E27B;--green-ink:#08160F;
+--green-soft:rgba(54,226,123,.12);--green-glow:rgba(54,226,123,.3);--field:rgba(255,255,255,.05);
+--awning:repeating-linear-gradient(90deg,#36E27B 0 26px,#0A5B52 26px 28px,#15201B 28px 54px,#1C2B25 54px 56px);
+--hero:linear-gradient(135deg,#10231D,#0A453A);--hero-ink:#ECF6F2;--hero-accent:#8FE3D2;--teal-ink:#8FE3D2;--mango:#EFB85C}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--body);color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+.bootload{min-height:100vh;display:grid;place-items:center;color:var(--muted);font-size:14px}
+.nav{background:var(--card);border-bottom:1px solid var(--border);padding:14px 18px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:50}
+.nav a.back{font-size:18px;line-height:1}
+.nav .logo{font-family:var(--display);font-weight:800;font-size:19px}.nav .logo i{font-style:normal;color:var(--green)}
+.theme-tg{margin-left:auto;display:inline-flex;background:var(--card-soft);border:1px solid var(--border);border-radius:11px;padding:3px}
+.theme-tg button{font:700 12.5px 'Instrument Sans',sans-serif;padding:6px 13px;border-radius:8px;cursor:pointer;border:0;background:transparent;color:var(--muted)}
+.theme-tg button.on{background:var(--green);color:var(--green-ink)}
+.awning{height:12px;background:var(--awning)}
+.wrap{max-width:620px;margin:0 auto;padding:24px 16px 50px}
+h1{font-family:var(--display);font-weight:800;font-size:27px;letter-spacing:-.025em;margin-bottom:5px}
+.sub{font-size:14px;color:var(--muted);line-height:1.55;margin-bottom:20px}
+.hero{background:var(--hero);color:var(--hero-ink);border-radius:20px;padding:24px;text-align:center;box-shadow:0 12px 36px var(--green-glow)}
+.hero .lab{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;opacity:.72}
+.hero .code{font-family:var(--mono);font-weight:700;font-size:38px;letter-spacing:.12em;margin:10px 0 4px;word-break:break-all}
+.hero .row{display:flex;gap:9px;justify-content:center;flex-wrap:wrap;margin-top:14px}
+.hero .btn{display:inline-flex;align-items:center;gap:7px;font-weight:800;font-size:13.5px;padding:11px 18px;border-radius:11px}
+.hero .btn.solid{background:var(--hero-accent);color:#0A453A}
+.hero .btn.ghost{background:rgba(255,255,255,.12);color:var(--hero-ink)}
+.share{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:13px 15px;margin-top:12px;display:flex;align-items:center;gap:10px}
+.share .lk{flex:1;min-width:0;font-family:var(--mono);font-size:12.5px;color:var(--teal-ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+.share .cp{flex:none;background:var(--green);color:var(--green-ink);font-weight:700;font-size:12.5px;padding:9px 14px;border-radius:10px}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-top:14px}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:15px}
+.stat .n{font-family:var(--display);font-weight:800;font-size:25px;letter-spacing:-.02em}
+.stat .n.tealn{color:var(--green)}
+.stat .n small{font-size:13px;color:var(--muted);font-weight:600}
+.stat .l{font-size:11.5px;color:var(--muted);margin-top:3px}
+.how{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:20px;margin-top:18px}
+.how h2{font-family:var(--display);font-weight:800;font-size:18px;letter-spacing:-.02em;margin-bottom:14px}
+.step{display:flex;gap:13px;align-items:flex-start;margin-bottom:14px}
+.step:last-child{margin-bottom:0}
+.step .dot{width:28px;height:28px;border-radius:50%;background:var(--green-soft);color:var(--teal-ink);font-family:var(--display);font-weight:800;font-size:14px;display:grid;place-items:center;flex:none}
+.step .tx{font-size:13.5px;color:var(--muted);line-height:1.5;padding-top:3px}
+.step .tx b{color:var(--text)}
+.list-lab{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 11px}
+.ref{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:13px 15px;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
+.ref h4{font-size:14px;font-weight:700}
+.ref .pill{font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px;flex:none}
+.ref .pill.ok{background:var(--green-soft);color:var(--teal-ink)}
+.ref .pill.pend{background:#FBEFD8;color:#8a5a13}
+html[data-theme="dark"] .ref .pill.pend{background:rgba(239,184,92,.16);color:#EFB85C}
+.empty{text-align:center;color:var(--muted);font-size:14px;padding:30px 20px;line-height:1.6;background:var(--card);border:1px dashed var(--border);border-radius:16px}
+.ic{flex:none;vertical-align:-.18em}
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);background:var(--text);color:var(--bg);font-size:13px;font-weight:600;padding:11px 18px;border-radius:99px;opacity:0;transition:.25s;pointer-events:none;z-index:90}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.foot{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:20px 0 40px}
+</style>
+<script>
+(function(){var t=localStorage.getItem('bukeame_theme')||'dark';document.documentElement.setAttribute('data-theme',t);
+window.__setTheme=function(t){localStorage.setItem('bukeame_theme',t);document.documentElement.setAttribute('data-theme',t);
+  document.querySelectorAll('.theme-tg button').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-theme-set')===t);});};
+document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('[data-theme-set]').forEach(function(b){b.addEventListener('click',function(){window.__setTheme(b.getAttribute('data-theme-set'));});});window.__setTheme(localStorage.getItem('bukeame_theme')||'dark');});})();
+</script>
+</head>
+<body>
+<div id="boot" class="bootload">Cargando…</div>
+<div id="app" style="display:none">
+<nav class="nav">
+  <a href="panel.html" class="back" aria-label="Volver">←</a>
+  <span class="logo">Buk<i>é</i>ame</span>
+  <div class="theme-tg"><button type="button" data-theme-set="light">Claro</button><button type="button" data-theme-set="dark">Oscuro</button></div>
+</nav>
+<div class="awning"></div>
+<div class="wrap">
+  <h1>Refiere y gana</h1>
+  <p class="sub">Comparte tu código. El negocio que refieras recibe <b>15 días gratis del plan Pro</b>, y tú ganas <b>$5/mes de crédito</b> mientras tu referido siga pagando. Solo 1 referido cuenta por mes (no se acumula con varios).</p>
+  <div id="content"></div>
+</div>
+</div>
+<div class="foot">Hecho con Bukéame · bukeame.com</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const API='/api';
+const token=localStorage.getItem('bukeame_token');
+if(!token){ location.href='acceso.html'; }
+
+function esc(s){return (s==null?'':String(s)).replace(/[&<>"]/g,function(c){return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]);});}
+function money(cents){const n=(Number(cents)||0)/100;return '$'+(n%1===0?n.toFixed(0):n.toFixed(2));}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(function(){t.classList.remove('show');},1800);}
+
+async function api(method,path,body){
+  const opts={method,headers:{'Authorization':'Bearer '+token}};
+  if(body){opts.headers['Content-Type']='application/json';opts.body=JSON.stringify(body);}
+  const r=await fetch(API+path,opts);
+  if(r.status===401){localStorage.clear();location.href='acceso.html';throw new Error('sesion');}
+  let data={};try{data=await r.json();}catch(e){}
+  return {status:r.status,ok:r.ok,data};
+}
+
+const ICON_COPY='<svg class="ic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>';
+const ICON_WA='<svg class="ic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 20.5 5 16.7A8 8 0 1 1 8 19.4z"/></svg>';
+
+function copyText(txt){
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(function(){toast('Copiado');},function(){toast('Copiado');});}
+  else{toast('Copiado');}
+}
+
+async function load(){
+  const r=await api('GET','/subscription');
+  document.getElementById('boot').style.display='none';
+  document.getElementById('app').style.display='block';
+  const content=document.getElementById('content');
+
+  if(!r.ok){
+    content.innerHTML='<div class="empty">No pudimos cargar tu información de referidos.<br>Intenta de nuevo en un momento.</div>';
+    return;
+  }
+  const d=r.data||{};
+  const code=(d.referral_code||'').toUpperCase();
+  const active=Number(d.active_referrals||0);
+  const discount=Number(d.discount_cents||0);
+  const price=Number(d.effective_monthly_cents||0);
+  const link='https://bukeame.com/acceso.html?ref='+encodeURIComponent(code);
+  const waMsg='Únete a Bukéame con mi código '+code+' y obtén 15 días gratis del plan Pro: '+link;
+  const waUrl='https://wa.me/?text='+encodeURIComponent(waMsg);
+
+  content.innerHTML=
+    '<div class="hero">'+
+      '<div class="lab">Tu código de referido</div>'+
+      '<div class="code">'+esc(code||'—')+'</div>'+
+      '<div class="row">'+
+        '<button class="btn solid" id="copyCode">'+ICON_COPY+' Copiar código</button>'+
+        '<a class="btn ghost" id="waBtn" href="'+esc(waUrl)+'" target="_blank" rel="noopener">'+ICON_WA+' Compartir por WhatsApp</a>'+
+      '</div>'+
+    '</div>'+
+    '<div class="share">'+
+      '<span class="lk" id="shareLink">'+esc(link)+'</span>'+
+      '<button class="cp" id="copyLink">Copiar enlace</button>'+
+    '</div>'+
+    '<div class="cards">'+
+      '<div class="stat"><div class="n tealn">'+active+'</div><div class="l">Referidos activos</div></div>'+
+      '<div class="stat"><div class="n">'+money(discount)+'<small>/mes</small></div><div class="l">Descuento actual</div></div>'+
+      '<div class="stat"><div class="n">'+money(price)+'<small>/mes</small></div><div class="l">Tu precio</div></div>'+
+    '</div>'+
+    '<div class="how">'+
+      '<h2>Cómo funciona</h2>'+
+      '<div class="step"><div class="dot">1</div><div class="tx"><b>Comparte tu código</b> o tu enlace con otro negocio.</div></div>'+
+      '<div class="step"><div class="dot">2</div><div class="tx">Tu referido recibe <b>15 días gratis del plan Pro</b> al registrarse con tu código.</div></div>'+
+      '<div class="step"><div class="dot">3</div><div class="tx">Cuando empieza a pagar, tú recibes <b>$5/mes de crédito</b> mientras tu referido siga pagando. Solo 1 referido cuenta por mes (no se acumula con varios referidos en el mismo mes).</div></div>'+
+    '</div>'+
+    '<div class="list-lab">Tus referidos</div>'+
+    '<div id="refList"></div>';
+
+  document.getElementById('copyCode').onclick=function(){copyText(code);};
+  document.getElementById('copyLink').onclick=function(){copyText(link);};
+  var sl=document.getElementById('shareLink');
+  if(sl){sl.onclick=function(){copyText(link);};}
+
+  renderRefs(d.referrals);
+}
+
+function renderRefs(refs){
+  const box=document.getElementById('refList');
+  const list=Array.isArray(refs)?refs:[];
+  if(list.length===0){
+    box.innerHTML='<div class="empty">Aún no tienes referidos.<br>Comparte tu código para empezar a ganar crédito.</div>';
+    return;
+  }
+  box.innerHTML=list.map(function(x){
+    const paying=(x.status==='active'||x.paying===true);
+    const pill=paying?'<span class="pill ok">Activo · $5/mes</span>':'<span class="pill pend">Pendiente de pago</span>';
+    return '<div class="ref"><h4>'+esc(x.business_name||x.name||'Negocio')+'</h4>'+pill+'</div>';
+  }).join('');
+}
+
+load();
+</script>
+</body>
+</html>

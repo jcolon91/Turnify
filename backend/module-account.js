@@ -15,10 +15,17 @@
 
 module.exports.mount = function (app, ctx) {
   const { db, authRequired, businessScope, h } = ctx;
-  const { asyncH, bad, audit } = h;
+  const { asyncH, bad, audit, notify } = h;
 
   // Orden de planes para saber cuáles son "superiores"
   const PLAN_ORDER = ['free', 'pro', 'studio', 'team', 'grande', 'ilimitado'];
+
+  // Planes válidos para el upgrade self-serve (mismo enum que admin)
+  const VALID_PLANS = ['free', 'pro', 'studio', 'team', 'grande', 'ilimitado'];
+
+  // Flag de monetización: 'true' = upgrade/add-ons se activan al instante (pre-Stripe).
+  // Cualquier otro valor = queda pendiente hasta confirmar el pago.
+  const SELF_SERVE_PAID = process.env.SELF_SERVE_PAID === 'true';
 
   // ──────────────────────────────────────────────────────────────────────────
   // GET /api/account/plan — plan actual + planes superiores con sus beneficios
@@ -86,6 +93,79 @@ module.exports.mount = function (app, ctx) {
       },
       plans,
     });
+  }));
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // POST /api/account/plan — UPGRADE de plan (self-serve)
+  //   Body: { plan_code }
+  //   · Si SELF_SERVE_PAID === 'true' → aplica el cambio al instante (misma
+  //     lógica que POST /api/admin/businesses/:id/plan): para pagos el período
+  //     vence en 1 mes; para 'free' queda sin vencimiento. → { ok, plan_code }
+  //   · Si NO → registra la solicitud, notifica al negocio y responde 402 con
+  //     { pending:true } (el cobro real se activa cuando entre Stripe).
+  // ──────────────────────────────────────────────────────────────────────────
+  app.post('/api/account/plan', authRequired, businessScope, asyncH(async (req, res) => {
+    const planCode = String(req.body?.plan_code || '').trim().toLowerCase();
+    if (!VALID_PLANS.includes(planCode))
+      return bad(res, 'Plan inválido. Usa: ' + VALID_PLANS.join(', '));
+
+    // Confirmar que el negocio tiene una suscripción registrada
+    const subQ = await db.query(
+      `SELECT plan_code FROM subscriptions WHERE business_id = $1`, [req.business.id]);
+    if (!subQ.rows[0]) return bad(res, 'El negocio no tiene suscripción registrada', 404);
+
+    // Sin pago confirmado: registramos la solicitud y avisamos. Se activa con Stripe.
+    if (!SELF_SERVE_PAID) {
+      await audit(req, 'plan.request', 'business', req.business.id, { plan_code: planCode });
+      await notify(req.business.id, 'system', 'Solicitud de cambio de plan recibida',
+        `Pediste cambiar al plan "${planCode}". Se activa al confirmar el pago.`, { plan_code: planCode });
+      return res.status(402).json({ error: 'Pago pendiente — se activa con Stripe', pending: true });
+    }
+
+    // Self-serve activo: aplicar el cambio (misma lógica que el admin).
+    let rows;
+    if (planCode === 'free') {
+      ({ rows } = await db.query(
+        `UPDATE subscriptions
+            SET plan_code = 'free', status = 'active',
+                current_period_start = now(), current_period_end = NULL,
+                cancel_at_period_end = false, trial_ends_at = NULL
+          WHERE business_id = $1
+          RETURNING plan_code`,
+        [req.business.id]));
+    } else {
+      ({ rows } = await db.query(
+        `UPDATE subscriptions
+            SET plan_code = $2::plan_code, status = 'active',
+                current_period_start = now(),
+                current_period_end = now() + interval '1 month',
+                cancel_at_period_end = false, trial_ends_at = NULL
+          WHERE business_id = $1
+          RETURNING plan_code`,
+        [req.business.id, planCode]));
+    }
+    if (!rows[0]) return bad(res, 'El negocio no tiene suscripción registrada', 404);
+
+    await audit(req, 'plan.selfserve', 'business', req.business.id, { plan_code: planCode });
+    res.json({ ok: true, plan_code: rows[0].plan_code });
+  }));
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // GET /api/account/addons — catálogo de add-ons + estado del negocio
+  //   → [{ code, name, price_cents, billing, description, is_active }]
+  //   is_active = el negocio tiene ese add-on con status 'active'.
+  // ──────────────────────────────────────────────────────────────────────────
+  app.get('/api/account/addons', authRequired, businessScope, asyncH(async (req, res) => {
+    const { rows } = await db.query(
+      `SELECT c.code, c.name, c.price_cents, c.billing, c.description,
+              (a.code IS NOT NULL) AS is_active
+         FROM addon_catalog c
+         LEFT JOIN addons a
+                ON a.code = c.code
+               AND a.business_id = $1
+               AND a.status = 'active'
+        ORDER BY c.price_cents`, [req.business.id]);
+    res.json({ addons: rows });
   }));
 
   // ──────────────────────────────────────────────────────────────────────────

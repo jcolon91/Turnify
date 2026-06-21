@@ -3,6 +3,21 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Buscar negocios — Bukéame</title>
+<meta name="description" content="Encuentra y reserva turnos en barberías, salones y más en Puerto Rico. Busca por nombre o servicio, filtra por categoría y agenda tu cita con Bukéame.">
+<link rel="canonical" href="https://bukeame.com/buscar.html">
+<meta name="theme-color" content="#0E8074">
+<meta property="og:title" content="Buscar negocios — Bukéame">
+<meta property="og:description" content="Encuentra y reserva turnos en barberías, salones y más en Puerto Rico. Busca por nombre o servicio y agenda tu cita.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://bukeame.com/buscar.html">
+<meta property="og:site_name" content="Bukéame">
+<meta property="og:locale" content="es_PR">
+<meta property="og:image" content="https://bukeame.com/og-cover.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Buscar negocios — Bukéame">
+<meta name="twitter:description" content="Encuentra y reserva turnos en barberías, salones y más en Puerto Rico. Busca por nombre o servicio y agenda tu cita.">
+<meta name="twitter:image" content="https://bukeame.com/og-cover.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230E8074'/%3E%3Ctext x='16' y='23' font-family='Arial,sans-serif' font-size='20' font-weight='700' fill='%23ffffff' text-anchor='middle'%3EB%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -12,8 +27,7 @@
   --green-soft:#E3EFE9;--green-glow:rgba(14,128,116,.45);
   --awning:repeating-linear-gradient(90deg,#0E8074 0 26px,#0A5B52 26px 28px,#F8F5EA 28px 54px,#E7E2D1 54px 56px);
   --display:"Bricolage Grotesque",sans-serif;--body:"Instrument Sans",sans-serif;--mono:"Spline Sans Mono",monospace;
-  /* alias viejos → nuevos */
-  --paper:var(--bg);--ink:var(--text);--ink2:var(--muted);--teal:var(--green);--teal-ink:var(--green);--teal-soft:var(--green-soft);--mango:#EFA12F;--line:var(--border)}
+  --paper:var(--bg);--ink:var(--text);--ink2:var(--muted);--teal:var(--green);--teal-soft:var(--green-soft);--line:var(--border)}
 html[data-theme="dark"]{
   --bg:#0B1A13;--bg2:#0E2218;--card:#12251B;--card-soft:rgba(255,255,255,.05);--border:rgba(255,255,255,.1);
   --text:#ECEAE0;--muted:#8AA197;--muted2:#5d6f66;--green:#36E27B;--green-ink:#08160F;
@@ -24,27 +38,29 @@ body{font-family:var(--body);color:var(--ink);background:var(--paper);-webkit-fo
 a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
 input,select{font:inherit}
 .nav{background:var(--card);border-bottom:1px solid var(--border);padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:10px;position:sticky;top:0;z-index:50}
-.nav .logo{font-family:var(--display);font-weight:800;font-size:21px}.nav .logo i{font-style:normal;color:var(--green)}
+.nav .logo{font-family:var(--display);font-weight:800;font-size:21px;letter-spacing:-.01em}.nav .logo i{font-style:normal;color:var(--green)}
 .nav .navright{display:flex;align-items:center;gap:12px}
 .nav a.login{font-size:13px;font-weight:600;color:var(--green)}
 .theme-tg{display:inline-flex;background:var(--card-soft);border:1px solid var(--border);border-radius:11px;padding:3px}
-.theme-tg button{font:700 12.5px 'Instrument Sans',sans-serif;padding:6px 13px;border-radius:8px;cursor:pointer;border:0;background:transparent;color:var(--muted)}
+.theme-tg button{font:700 12.5px 'Instrument Sans',sans-serif;padding:6px 13px;border-radius:8px;cursor:pointer;border:0;background:transparent;color:var(--muted);transition:.15s}
 .theme-tg button.on{background:var(--green);color:var(--green-ink)}
-.hero{text-align:center;padding:30px 18px 10px}
-.hero h1{font-family:var(--display);font-weight:800;font-size:clamp(24px,5vw,32px);letter-spacing:-.02em;margin-bottom:6px}
+.hero{text-align:center;padding:34px 18px 8px}
+.hero h1{font-family:var(--display);font-weight:800;font-size:clamp(25px,5.4vw,34px);letter-spacing:-.025em;margin-bottom:7px;line-height:1.05}
 .hero p{font-size:14.5px;color:var(--muted)}
 .wrap{max-width:680px;margin:0 auto;padding:0 16px}
-.searchbar{display:flex;gap:8px;margin:18px 0 10px}
-.searchbar input{flex:1;padding:14px 16px;border:1.5px solid var(--border);border-radius:14px;background:var(--card);color:var(--text);font-size:15px}
-.searchbar input:focus{outline:none;border-color:var(--green)}
-.searchbar button{background:var(--green);color:var(--green-ink);font-weight:700;padding:0 22px;border-radius:14px}
+.searchbar{display:flex;gap:8px;margin:20px 0 10px}
+.searchbar input{flex:1;padding:14px 16px;border:1.5px solid var(--border);border-radius:14px;background:var(--card);color:var(--text);font-size:15px;transition:.15s}
+.searchbar input:focus{outline:none;border-color:var(--green);box-shadow:0 0 0 3px var(--green-soft)}
+.searchbar button{background:var(--green);color:var(--green-ink);font-weight:700;padding:0 22px;border-radius:14px;transition:.15s}
+.searchbar button:hover{filter:brightness(.96)}
 .filters{display:flex;gap:8px;overflow-x:auto;padding:6px 0 14px;-webkit-overflow-scrolling:touch}
-.chip{flex:none;padding:8px 15px;border:1.5px solid var(--border);border-radius:99px;font-size:13px;font-weight:600;cursor:pointer;background:var(--card);color:var(--text);white-space:nowrap}
+.chip{flex:none;padding:8px 15px;border:1.5px solid var(--border);border-radius:99px;font-size:13px;font-weight:600;cursor:pointer;background:var(--card);color:var(--text);white-space:nowrap;transition:.15s}
+.chip:hover{border-color:var(--green)}
 .chip.sel{border-color:var(--green);background:var(--green);color:var(--green-ink)}
 .results{padding:6px 0 40px}
 .count{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
 .biz{background:var(--card);border:1.5px solid var(--border);border-radius:18px;padding:16px;display:flex;gap:14px;align-items:center;margin-bottom:12px;cursor:pointer;transition:.15s;box-shadow:0 1px 2px rgba(0,0,0,.04)}
-.biz:hover{border-color:var(--green);transform:translateY(-1px)}
+.biz:hover{border-color:var(--green);transform:translateY(-1px);box-shadow:0 8px 24px -12px var(--green-glow)}
 .biz .logo{width:62px;height:62px;border-radius:16px;background:var(--green-soft);display:grid;place-items:center;font-family:var(--display);font-weight:800;font-size:24px;color:var(--green);flex:none;overflow:hidden}
 .biz .logo img{width:100%;height:100%;object-fit:cover}
 .biz .grow{flex:1;min-width:0}
@@ -60,10 +76,10 @@ input,select{font:inherit}
 </head>
 <body>
 <script>
-(function(){var t=localStorage.getItem('bukeame_theme')||'light';document.documentElement.setAttribute('data-theme',t);
+(function(){var t=localStorage.getItem('bukeame_theme')||'dark';document.documentElement.setAttribute('data-theme',t);
 window.__setTheme=function(t){localStorage.setItem('bukeame_theme',t);document.documentElement.setAttribute('data-theme',t);
   document.querySelectorAll('.theme-tg button').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-theme-set')===t);});};
-document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('[data-theme-set]').forEach(function(b){b.addEventListener('click',function(){window.__setTheme(b.getAttribute('data-theme-set'));});});window.__setTheme(localStorage.getItem('bukeame_theme')||'light');});})();
+document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('[data-theme-set]').forEach(function(b){b.addEventListener('click',function(){window.__setTheme(b.getAttribute('data-theme-set'));});});window.__setTheme(localStorage.getItem('bukeame_theme')||'dark');});})();
 </script>
 <div style="height:12px;background:var(--awning)"></div>
 <nav class="nav">
@@ -139,7 +155,7 @@ async function search(){
     results.innerHTML = '<div class="count">'+list.length+' negocio'+(list.length>1?'s':'')+'</div>'+
       list.map(function(b){
         const initial = (b.name||'?').charAt(0).toUpperCase();
-        const logo = b.logo_url ? '<img src="'+esc(b.logo_url)+'" alt="">' : initial;
+        const logo = b.logo_url ? '<img src="'+esc(b.logo_url)+'" alt="" loading="lazy" decoding="async" width="62" height="62">' : initial;
         const cats = (b.categories||[]).map(c=>esc(c.name)).join(' · ');
         const feat = b.is_featured ? '<span class="feat">Destacado</span>' : '';
         const rating = b.rating_count>0 ? '★ '+Number(b.rating_avg).toFixed(1) : 'Nuevo';

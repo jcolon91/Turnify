@@ -13,6 +13,53 @@
 
 ---
 
+## MODELO RECOMENDADO — sin custodiar la llave privada del negocio (actualización)
+
+Tras revisar TODO el org de Evertec (8 repos), hay un camino que **evita que Bukéame guarde
+el `privateToken` de los negocios**. Combina dos productos oficiales:
+
+- **`athmovil-javascript-api`** — el **botón de pago client-side** (HTML/JS). Usa SOLO el
+  **`publicToken`** del negocio EN EL NAVEGADOR (el publicToken NO es secreto: está diseñado
+  para vivir en el frontend). Para COBRAR no hace falta el privateToken.
+- **`athmovil-webhooks`** — el negocio configura un **webhook EN SU PROPIA cuenta ATH Business**
+  (app → Ajustes → Development → Webhooks, con SU password/tokens) apuntando a una URL de Bukéame.
+  ATH le hace push del evento "eCommerce Payment Completed".
+
+**Flujo seguro:**
+1. El negocio pega su **publicToken** (de su app ATH Business) en el slot ATH del panel "Pagos".
+   Bukéame guarda SOLO el publicToken (no es secreto). El privateToken NUNCA se le pide.
+2. En la página de reserva se renderiza el botón ATH Móvil con el publicToken (objeto
+   `ATHM_Checkout`: amount, metadata1=confirmation_code, metadata2=appointment_id, callbacks).
+   El cliente paga confirmando en SU app ATH Móvil → dispara `authorizationATHM()` con el reference.
+3. **Confirmación por webhook**: el negocio ya configuró su webhook → ATH avisa a Bukéame.
+   AVISO: los webhooks de ATH **no vienen firmados** (según el doc), así que Bukéame **NO debe
+   confiar en el payload tal cual**. Al recibir el webhook, **verifica** llamando
+   `/business/findPayment` (necesita **solo el publicToken**, read-only). Si findPayment dice
+   COMPLETED y el monto/metadata cuadran → marca la cita `confirmed` y `payments.status='paid'`.
+4. **Reembolsos**: la ÚNICA operación que necesita el `privateToken` es `/ecommerce/refund`
+   (y searchTransaction). Solución: **el negocio hace los reembolsos desde su propia app ATH
+   Business**. Bukéame no ofrece refund in-app → **nunca necesita el privateToken**.
+
+**Resultado: Bukéame guarda solo el `publicToken` (no secreto); cobra client-side; confirma por
+webhook + findPayment (publicToken); los reembolsos los hace el negocio en su app. El privateToken
+jamás toca Bukéame.** Esto reemplaza, para el caso de uso normal, el enfoque del REST API de más
+abajo (que sí pedía custodiar el privateToken cifrado).
+
+| Operación | Token que necesita | Quién la hace |
+|---|---|---|
+| Cobrar (botón) | publicToken (frontend) | Bukéame (botón en la reserva) |
+| findPayment (verificar) | publicToken | Bukéame (al recibir webhook) |
+| cancel | publicToken | Bukéame |
+| **refund** | public + **private** | **el negocio, en su app ATH Business** |
+| searchTransaction | public + private | (no necesario) |
+
+Caveats: sigue **sin sandbox** (ver abajo); y el publicToken identifica al negocio — alguien
+podría iniciar un pago HACIA el negocio con él, pero sin daño real (el dinero va al negocio) y
+findPayment + el monto/metadata lo validan. SDKs nativos disponibles si algún día hay app:
+`athmovil-android-sdk`, `athmovil-ios-sdk`, `athmovil-flutter-sdk`, `athmovil-xamarin-sdk`.
+
+---
+
 ## AVISO IMPORTANTE — no hay ambiente de pruebas (sandbox)
 
 > Evertec lo dice explícito en el README: **"We currently do not have a Testing

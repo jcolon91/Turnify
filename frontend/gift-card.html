@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gift cards — Bukéame</title>
+<meta name="description" content="Compra o regala una gift card para usar en este negocio, o consulta el saldo de tu tarjeta. Un regalo perfecto que se usa para reservar y pagar servicios.">
+<link rel="canonical" href="https://bukeame.com/gift-card.html">
+<meta name="theme-color" content="#0E8074">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230E8074'/%3E%3Ctext x='16' y='22' font-family='Arial,sans-serif' font-size='19' font-weight='700' fill='%23fff' text-anchor='middle'%3EB%3C/text%3E%3C/svg%3E">
+<meta property="og:title" content="Gift cards — Bukéame">
+<meta property="og:description" content="Compra o regala una gift card para usar en este negocio, o consulta el saldo de tu tarjeta.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://bukeame.com/gift-card.html">
+<meta property="og:site_name" content="Bukéame">
+<meta property="og:locale" content="es_PR">
+<meta property="og:image" content="https://bukeame.com/og-cover.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Gift cards — Bukéame">
+<meta name="twitter:description" content="Compra o regala una gift card para usar en este negocio, o consulta el saldo de tu tarjeta.">
+<meta name="twitter:image" content="https://bukeame.com/og-cover.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+--bg:#F1EFE5;--bg2:#F7F4EA;--card:#FFFFFF;--card-soft:#EDE9DB;--border:#E1DCCD;
+--text:#17150F;--muted:#5E594B;--muted2:#B3AD9C;--green:#0E8074;--green-ink:#FFFFFF;
+--green-soft:#E3EFE9;--green-glow:rgba(14,128,116,.45);--field:#FDFCF8;
+--awning:repeating-linear-gradient(90deg,#0E8074 0 26px,#0A5B52 26px 28px,#F8F5EA 28px 54px,#E7E2D1 54px 56px);
+--hero:linear-gradient(135deg,#11221E,#0A5B52);--hero-ink:#FFF8EC;
+--display:"Bricolage Grotesque",sans-serif;--body:"Instrument Sans",sans-serif;--mono:"Spline Sans Mono",monospace;
+/* mapeo variables viejas → nuevas */
+--paper:var(--bg);--ink:var(--text);--ink2:var(--muted);--teal:var(--green);--teal-ink:var(--green);--teal-soft:var(--green-soft);--line:var(--border);--mango:#EFA12F}
+html[data-theme="dark"]{
+--bg:#0B1A13;--bg2:#0E2218;--card:#12251B;--card-soft:rgba(255,255,255,.05);--border:rgba(255,255,255,.1);
+--text:#ECEAE0;--muted:#8AA197;--muted2:#5d6f66;--green:#36E27B;--green-ink:#08160F;
+--green-soft:rgba(54,226,123,.12);--green-glow:rgba(54,226,123,.3);--field:rgba(255,255,255,.05);
+--awning:repeating-linear-gradient(90deg,#36E27B 0 26px,#0d6b46 26px 28px,#0E2218 28px 54px,#10241A 54px 56px);
+--hero:linear-gradient(135deg,#10231D,#0A453A);--hero-ink:#ECF6F2}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--body);color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+.bootload{min-height:100vh;display:grid;place-items:center;color:var(--muted);font-size:14px}
+.nav{background:var(--card);border-bottom:1px solid var(--border);padding:14px 18px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:50}
+.nav a.back{font-size:18px;line-height:1}.nav .logo{font-family:var(--display);font-weight:800;font-size:19px}.nav .logo i{font-style:normal;color:var(--green)}
+.nav .spacer{flex:1}
+.theme-tg{display:inline-flex;background:var(--card-soft);border:1px solid var(--border);border-radius:11px;padding:3px}
+.theme-tg button{font:700 12.5px 'Instrument Sans',sans-serif;padding:6px 13px;border-radius:8px;cursor:pointer;border:0;background:transparent;color:var(--muted)}
+.theme-tg button.on{background:var(--green);color:var(--green-ink)}
+.wrap{max-width:520px;margin:0 auto;padding:24px 16px 50px}
+h1{font-family:var(--display);font-weight:800;font-size:27px;letter-spacing:-.02em;margin-bottom:5px}
+.sub{font-size:14px;color:var(--muted);line-height:1.55;margin-bottom:20px}
+.empty{text-align:center;color:var(--muted);font-size:14px;padding:40px 22px;line-height:1.7;background:var(--card);border:1px dashed var(--border);border-radius:18px}
+.empty a{color:var(--green);font-weight:700}
+.foot{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:20px 0 40px}
+
+/* cabecera hero del negocio */
+.gchead{background:var(--hero);color:var(--hero-ink);border-radius:20px;padding:22px;margin-bottom:18px;position:relative;overflow:hidden}
+.gchead .biz{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;opacity:.75}
+.gchead h2{font-family:var(--display);font-weight:800;font-size:22px;margin-top:6px}
+.gchead p{font-size:13px;opacity:.9;line-height:1.5;margin-top:6px}
+.gchead .deco{position:absolute;right:-30px;top:-30px;width:150px;height:150px;border-radius:50%;background:rgba(255,255,255,.06)}
+
+/* control segmentado / tabs */
+.tabs{display:flex;background:var(--card-soft);border:1px solid var(--border);border-radius:12px;padding:4px;margin-bottom:18px}
+.tabs button{flex:1;font-weight:700;font-size:13.5px;padding:10px;border-radius:9px;background:none;color:var(--muted);transition:background .18s ease,color .18s ease}
+.tabs button.on{background:var(--green);color:var(--green-ink)}
+.pane{display:none}.pane.on{display:block;animation:fade .22s ease}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1}}
+
+.card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:20px}
+.lab{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:9px}
+
+.chips{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:14px}
+.chip{flex:1;min-width:88px;text-align:center;font-family:var(--mono);font-weight:700;font-size:17px;padding:14px 0;border-radius:13px;border:1.5px solid var(--border);background:var(--field);color:var(--text);transition:border-color .15s,background .15s}
+.chip.on{border-color:var(--green);background:var(--green-soft);color:var(--green)}
+
+.field{margin-bottom:12px}
+.field label{display:block;font-size:11.5px;font-weight:700;color:var(--muted);margin-bottom:6px}
+.field label .opt{color:var(--muted);opacity:.7;font-weight:500}
+.field input,.field textarea{width:100%;font:inherit;font-size:15px;padding:13px 14px;border-radius:13px;border:1.5px solid var(--border);background:var(--field);color:var(--text)}
+.field input::placeholder,.field textarea::placeholder{color:var(--muted2)}
+.field input:focus,.field textarea:focus{outline:none;border-color:var(--green)}
+.field textarea{resize:vertical;min-height:70px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+.cta{width:100%;background:var(--green);color:var(--green-ink);font-weight:800;font-size:15px;padding:15px;border-radius:14px;margin-top:6px}
+.cta:disabled{opacity:.6;cursor:not-allowed}
+.note{font-size:11.5px;color:var(--muted);line-height:1.5;margin-top:12px;text-align:center}
+
+.alert{display:none;font-size:13px;font-weight:600;padding:11px 13px;border-radius:12px;margin-bottom:14px;line-height:1.45}
+.alert.err{display:block;background:#FCE8E6;color:#A1281C;border:1px solid #F3C0BA}
+html[data-theme="dark"] .alert.err{background:rgba(225,75,60,.14);color:#FF9A8E;border-color:rgba(225,75,60,.35)}
+.alert.ok{display:block;background:var(--green-soft);color:var(--green);border:1px solid var(--green-glow)}
+
+/* resultado compra */
+.result{text-align:center}
+.result .ok-ic{width:74px;height:74px;border-radius:50%;background:var(--green);display:grid;place-items:center;margin:6px auto 16px}
+.result h3{font-family:var(--display);font-weight:800;font-size:22px;margin-bottom:6px}
+.result .gccode{font-family:var(--mono);font-weight:700;font-size:30px;letter-spacing:.12em;color:var(--green);background:var(--green-soft);border-radius:13px;padding:14px;margin:14px 0;word-break:break-all}
+.result .copy{display:inline-flex;align-items:center;gap:7px;background:var(--card-soft);color:var(--green);font-weight:700;font-size:13px;padding:9px 18px;border-radius:11px;border:1px solid var(--border);margin-bottom:6px}
+.result .meta{display:flex;justify-content:space-between;font-size:13.5px;padding:8px 0;border-top:1px solid var(--border)}
+.result .meta span:first-child{color:var(--muted)}
+.result .meta b{font-family:var(--mono)}
+
+/* resultado saldo */
+.bal{text-align:center}
+.bal .amt{font-family:var(--display);font-weight:800;font-size:42px;letter-spacing:-.02em;margin:6px 0}
+.bal .st{display:inline-block;font-size:12px;font-weight:700;padding:4px 12px;border-radius:99px;background:var(--green-soft);color:var(--green)}
+.bal .st.dead{background:#FCE8E6;color:#A1281C}
+html[data-theme="dark"] .bal .st.dead{background:rgba(225,75,60,.14);color:#FF9A8E}
+.bal .exp{font-size:13px;color:var(--muted);margin-top:12px}
+.ic{flex:none;vertical-align:-.18em}
+</style>
+</head>
+<body>
+<script>
+(function(){var t=localStorage.getItem('bukeame_theme')||'dark';document.documentElement.setAttribute('data-theme',t);
+window.__setTheme=function(t){localStorage.setItem('bukeame_theme',t);document.documentElement.setAttribute('data-theme',t);
+  document.querySelectorAll('.theme-tg button').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-theme-set')===t);});};
+document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('[data-theme-set]').forEach(function(b){b.addEventListener('click',function(){window.__setTheme(b.getAttribute('data-theme-set'));});});window.__setTheme(localStorage.getItem('bukeame_theme')||'dark');});})();
+</script>
+<div id="boot" class="bootload">Cargando…</div>
+<div id="app" style="display:none">
+<nav class="nav"><a href="#" class="back" id="backBtn" aria-label="Volver">←</a><span class="logo">Buk<i>é</i>ame</span><span class="spacer"></span><div class="theme-tg"><button type="button" data-theme-set="light">Claro</button><button type="button" data-theme-set="dark">Oscuro</button></div></nav>
+<div style="height:12px;background:var(--awning)"></div>
+<div class="wrap">
+  <h1 id="title">Gift cards</h1>
+  <p class="sub" id="sub">Regala servicios o saldo para usar en este negocio.</p>
+  <div id="content"></div>
+</div>
+</div>
+<div class="foot">Hecho con Bukéame · bukeame.com</div>
+
+<script>
+const API='/api';
+const slug=new URLSearchParams(location.search).get('slug');
+
+function esc(s){return (s==null?'':String(s)).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+
+document.getElementById('backBtn').onclick=function(e){e.preventDefault();if(history.length>1){history.back();}else{location.href='index.html';}};
+
+// fetch público simple (sin Authorization)
+async function pub(method,path,body){
+  const opts={method,headers:{}};
+  if(body){opts.headers['Content-Type']='application/json';opts.body=JSON.stringify(body);}
+  const r=await fetch(API+path,opts);
+  let data={};try{data=await r.json();}catch(e){}
+  return {status:r.status,ok:r.ok,data:data};
+}
+
+function fmt(cents){return '$'+(Number(cents||0)/100).toFixed(2);}
+function fmtDate(s){if(!s)return '—';try{return new Date(s).toLocaleDateString('es-PR');}catch(e){return esc(s);}}
+
+const statusLabels={active:'Activa',partial:'Usada parcialmente',void:'Anulada',expired:'Vencida',redeemed:'Canjeada'};
+
+const ICON_CHECK='<svg viewBox="0 0 24 24" width="38" height="38" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 7"/></svg>';
+
+function show(){
+  document.getElementById('boot').style.display='none';
+  document.getElementById('app').style.display='block';
+}
+
+// ── Sin slug: estado vacío ───────────────────────────────────────────────
+if(!slug){
+  show();
+  document.getElementById('content').innerHTML=
+    '<div class="empty">Para comprar o consultar una gift card, abre el enlace desde la página de un negocio.<br><br>'+
+    '<a href="buscar.html">Buscar negocios →</a></div>';
+}else{
+  initWithSlug();
+}
+
+async function initWithSlug(){
+  show();
+  renderPanels();
+  // intenta cargar nombre del negocio para el título y la cabecera (resiliente)
+  try{
+    const r=await pub('GET','/public/'+encodeURIComponent(slug));
+    const name=r.ok&&r.data&&(r.data.name||r.data.business_name||(r.data.business&&r.data.business.name));
+    if(name){
+      document.getElementById('title').textContent='Gift cards · '+name;
+      document.title='Gift cards · '+name+' — Bukéame';
+      const bn=document.getElementById('bizName');if(bn)bn.textContent=name;
+    }
+  }catch(e){/* título genérico */}
+}
+
+function renderPanels(){
+  const c=document.getElementById('content');
+  c.innerHTML=
+    '<div class="gchead"><div class="deco"></div><div class="biz">Gift card de</div><h2 id="bizName">'+esc(slug)+'</h2><p>Un regalo perfecto. El saldo se usa para reservar y pagar servicios en este negocio.</p></div>'+
+    '<div class="tabs">'+
+      '<button class="on" data-p="buy">Comprar</button>'+
+      '<button data-p="balance">Consultar saldo</button>'+
+    '</div>'+
+    '<div class="pane on" id="buy"></div>'+
+    '<div class="pane" id="balance"></div>';
+
+  c.querySelectorAll('.tabs button').forEach(function(b){
+    b.onclick=function(){
+      c.querySelectorAll('.tabs button').forEach(function(x){x.classList.toggle('on',x===b);});
+      c.querySelectorAll('.pane').forEach(function(p){p.classList.toggle('on',p.id===b.dataset.p);});
+    };
+  });
+
+  renderBuy();
+  renderBalance();
+}
+
+// ── PANEL COMPRAR ─────────────────────────────────────────────────────────
+let selectedDollars=25;
+
+function renderBuy(){
+  const el=document.getElementById('buy');
+  el.innerHTML=
+    '<div class="card">'+
+      '<div class="alert" id="buyAlert"></div>'+
+      '<div class="lab">Monto</div>'+
+      '<div class="chips">'+
+        '<button type="button" class="chip on" data-amt="25">$25</button>'+
+        '<button type="button" class="chip" data-amt="50">$50</button>'+
+        '<button type="button" class="chip" data-amt="100">$100</button>'+
+      '</div>'+
+      '<div class="field"><label>Otro monto <span class="opt">(mín $5 · máx $500)</span></label><input id="otherAmt" type="number" inputmode="decimal" min="5" max="500" step="1" placeholder="Ej. 75"></div>'+
+      '<div class="two">'+
+        '<div class="field"><label>Tu nombre *</label><input id="pName" autocomplete="name" placeholder="Quién compra"></div>'+
+        '<div class="field"><label>Tu email * <span class="opt">(para el recibo)</span></label><input id="pEmail" type="email" autocomplete="email" placeholder="tu@email.com"></div>'+
+      '</div>'+
+      '<div class="two">'+
+        '<div class="field"><label>Nombre de quien recibe <span class="opt">(opcional)</span></label><input id="rName" placeholder="A quién se la regalas"></div>'+
+        '<div class="field"><label>Email de quien recibe <span class="opt">(opcional)</span></label><input id="rEmail" type="email" placeholder="su@email.com"></div>'+
+      '</div>'+
+      '<div class="field"><label>Mensaje <span class="opt">(opcional)</span></label><textarea id="msg" maxlength="300" placeholder="¡Feliz cumpleaños! Disfruta tu regalo."></textarea></div>'+
+      '<button class="cta" id="buyBtn">Comprar gift card</button>'+
+      '<div class="note">El pago se procesa por los métodos del negocio (ATH Móvil, tarjeta, PayPal o Klarna). La gift card vence en 2 años.</div>'+
+    '</div>';
+
+  el.querySelectorAll('.chips .chip').forEach(function(b){
+    b.onclick=function(){
+      el.querySelectorAll('.chips .chip').forEach(function(x){x.classList.remove('on');});
+      b.classList.add('on');selectedDollars=Number(b.dataset.amt);document.getElementById('otherAmt').value='';
+    };
+  });
+  document.getElementById('otherAmt').addEventListener('input',function(){
+    el.querySelectorAll('.chips .chip').forEach(function(x){x.classList.remove('on');});
+    selectedDollars=null;
+  });
+
+  document.getElementById('buyBtn').onclick=submitBuy;
+}
+
+function buyAlert(msg,ok){
+  const el=document.getElementById('buyAlert');
+  el.textContent=msg;el.className='alert '+(ok?'ok':'err');
+}
+
+async function submitBuy(){
+  const other=document.getElementById('otherAmt').value.trim();
+  let dollars=selectedDollars;
+  if(other!==''){dollars=parseFloat(other);}
+  if(dollars==null||isNaN(dollars)){buyAlert('Elige o escribe un monto.',false);return;}
+  const amount_cents=Math.round(dollars*100);
+  if(amount_cents<500||amount_cents>50000){buyAlert('El monto debe estar entre $5 y $500.',false);return;}
+
+  const purchaser_name=document.getElementById('pName').value.trim();
+  const purchaser_email=document.getElementById('pEmail').value.trim();
+  if(!purchaser_name){buyAlert('Escribe tu nombre.',false);return;}
+  if(!purchaser_email){buyAlert('Escribe tu email para el recibo.',false);return;}
+
+  const body={
+    amount_cents:amount_cents,
+    purchaser_name:purchaser_name,
+    purchaser_email:purchaser_email,
+    recipient_name:document.getElementById('rName').value.trim(),
+    recipient_email:document.getElementById('rEmail').value.trim(),
+    message:document.getElementById('msg').value.trim()
+  };
+
+  const btn=document.getElementById('buyBtn');
+  btn.disabled=true;const old=btn.innerHTML;btn.textContent='Procesando…';
+  try{
+    const r=await pub('POST','/public/'+encodeURIComponent(slug)+'/gift-cards',body);
+    if(r.status===201||r.ok){
+      renderBuySuccess(r.data,amount_cents);
+      return;
+    }
+    const m=(r.data&&(r.data.error||r.data.message))||
+      (r.status===404?'Este negocio no vende gift cards.':'No se pudo completar la compra.');
+    buyAlert(m,false);
+  }catch(e){
+    buyAlert('Algo salió mal. Intenta de nuevo.',false);
+  }finally{
+    btn.disabled=false;btn.innerHTML=old;
+  }
+}
+
+function renderBuySuccess(data,fallbackCents){
+  const gc=(data&&data.gift_card)||data||{};
+  const code=gc.code||gc.gift_card_code||'';
+  const amount=gc.initial_cents!=null?gc.initial_cents:(gc.amount_cents!=null?gc.amount_cents:fallbackCents);
+  const note=(data&&data.note)||'El pago se procesa por los métodos del negocio (ATH Móvil, tarjeta, PayPal o Klarna). La tarjeta se activa al confirmarse.';
+  const el=document.getElementById('buy');
+  el.innerHTML=
+    '<div class="card result">'+
+      '<div class="ok-ic">'+ICON_CHECK+'</div>'+
+      '<h3>¡Gift card creada!</h3>'+
+      '<p style="font-size:13.5px;color:var(--muted);line-height:1.5">Guarda este código. Se lo puedes enviar a quien la recibe.</p>'+
+      '<div class="gccode" id="gcCode">'+esc(code)+'</div>'+
+      '<button class="copy" id="copyBtn">'+
+        '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>'+
+        'Copiar código</button>'+
+      '<div class="meta"><span>Monto</span><b>'+fmt(amount)+'</b></div>'+
+      '<div class="meta"><span>Vence</span><b>'+fmtDate(gc.expires_at)+'</b></div>'+
+      '<div class="note">'+esc(note)+'</div>'+
+    '</div>';
+  document.getElementById('copyBtn').onclick=function(){
+    const btn=document.getElementById('copyBtn');
+    function done(){btn.innerHTML='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Copiado';}
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      navigator.clipboard.writeText(code).then(done).catch(function(){done();});
+    }else{done();}
+  };
+}
+
+// ── PANEL CONSULTAR SALDO ─────────────────────────────────────────────────
+function renderBalance(){
+  const el=document.getElementById('balance');
+  el.innerHTML=
+    '<div class="card">'+
+      '<div class="alert" id="balAlert"></div>'+
+      '<div class="field"><label>Código de la gift card</label>'+
+        '<input id="balCode" placeholder="BKM-XXXX-XXXX" style="font-family:var(--mono);text-transform:uppercase;letter-spacing:.05em"></div>'+
+      '<button class="cta" id="balBtn">Consultar saldo</button>'+
+      '<div id="balResult"></div>'+
+    '</div>';
+  document.getElementById('balBtn').onclick=submitBalance;
+  document.getElementById('balCode').addEventListener('keydown',function(e){if(e.key==='Enter')submitBalance();});
+}
+
+function balAlert(msg,ok){
+  const el=document.getElementById('balAlert');
+  el.textContent=msg;el.className='alert '+(ok?'ok':'err');
+}
+
+async function submitBalance(){
+  document.getElementById('balResult').innerHTML='';
+  const code=document.getElementById('balCode').value.trim().toUpperCase();
+  if(!code){balAlert('Escribe el código de la gift card.',false);return;}
+  document.getElementById('balAlert').className='alert';
+
+  const btn=document.getElementById('balBtn');
+  btn.disabled=true;const old=btn.innerHTML;btn.textContent='Consultando…';
+  try{
+    const r=await pub('GET','/public/'+encodeURIComponent(slug)+'/gift-cards/'+encodeURIComponent(code));
+    if(r.ok&&r.data&&r.data.gift_card){
+      renderBalanceResult(r.data.gift_card);
+      return;
+    }
+    if(r.status===404){balAlert('Gift card no encontrada. Revisa el código.',false);return;}
+    const m=(r.data&&(r.data.error||r.data.message))||'No se pudo consultar el saldo.';
+    balAlert(m,false);
+  }catch(e){
+    balAlert('Algo salió mal. Intenta de nuevo.',false);
+  }finally{
+    btn.disabled=false;btn.innerHTML=old;
+  }
+}
+
+function renderBalanceResult(gc){
+  const st=gc.status||'';
+  const dead=(st!=='active'&&st!=='valid'&&st!=='partial'&&st!=='');
+  const label=statusLabels[st]||(st?esc(st):'Activa');
+  document.getElementById('balResult').innerHTML=
+    '<div class="bal" style="margin-top:18px">'+
+      '<div class="lab" style="text-align:center">Saldo disponible</div>'+
+      '<div class="amt">'+fmt(gc.balance_cents)+'</div>'+
+      '<div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">de '+fmt(gc.initial_cents)+' inicial</div>'+
+      '<span class="st'+(dead?' dead':'')+'">'+esc(label)+'</span>'+
+      '<div class="exp">Vence: '+fmtDate(gc.expires_at)+'</div>'+
+    '</div>';
+}
+</script>
+</body>
+</html>

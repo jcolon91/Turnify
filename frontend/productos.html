@@ -3,6 +3,11 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tienda — Bukéame</title>
+<meta name="robots" content="noindex,nofollow">
+<meta name="description" content="Gestiona la tienda de tu negocio en Bukéame: añade productos, fotos, precios e inventario, y véndelos directo a tus clientes desde tu panel.">
+<meta name="theme-color" content="#0E8074">
+<link rel="canonical" href="https://bukeame.com/productos.html">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230E8074'/%3E%3Ctext x='16' y='22' font-family='Arial,sans-serif' font-size='18' font-weight='700' fill='%23fff' text-anchor='middle'%3EB%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -29,36 +34,39 @@ input,textarea{font:inherit}
 .bootload{min-height:100vh;display:grid;place-items:center;color:var(--muted);font-size:14px}
 .nav{background:var(--card);border-bottom:1px solid var(--border);padding:14px 18px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:50}
 .nav a.back{font-size:18px;color:var(--text)}.nav .logo{font-family:var(--display);font-weight:800;font-size:19px}.nav .logo i{font-style:normal;color:var(--green)}
-.theme-tg{display:inline-flex;background:var(--card-soft);border:1px solid var(--border);border-radius:11px;padding:3px}
-.theme-tg button{font:700 12.5px 'Instrument Sans',sans-serif;padding:6px 13px;border-radius:8px;cursor:pointer;border:0;background:transparent;color:var(--muted)}
+.theme-tg{display:inline-flex;background:var(--card-soft);border:1px solid var(--border);border-radius:999px;padding:3px}
+.theme-tg button{font:700 12px 'Instrument Sans',sans-serif;padding:6px 12px;border-radius:999px;cursor:pointer;border:0;background:transparent;color:var(--muted);line-height:1}
 .theme-tg button.on{background:var(--green);color:var(--green-ink)}
 .wrap{max-width:600px;margin:0 auto;padding:24px 16px 60px}
-.tophead{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px}
-h1{font-family:var(--display);font-weight:800;font-size:26px;letter-spacing:-.02em}
-.sub{font-size:13px;color:var(--muted);margin-top:3px}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:700;font-size:14px;padding:10px 16px;border-radius:14px;cursor:pointer;background:var(--green);color:var(--green-ink)}
-.btn:disabled{opacity:.55}
-.prod{background:var(--card);border:1.5px solid var(--border);border-radius:16px;padding:14px;display:flex;gap:13px;align-items:center;margin-bottom:10px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
-.prod .ph{width:60px;height:60px;border-radius:12px;background:var(--card-soft);flex:none;display:grid;place-items:center;font-size:24px;overflow:hidden}
+.tophead{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;gap:14px}
+h1{font-family:var(--display);font-weight:800;font-size:26px;letter-spacing:-.02em;line-height:1.05}
+.sub{font-size:13px;color:var(--muted);margin-top:3px;line-height:1.4}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:700;font-size:14px;padding:10px 16px;border-radius:12px;cursor:pointer;background:var(--green);color:var(--green-ink);box-shadow:0 1px 2px rgba(0,0,0,.06);transition:opacity .15s,transform .12s}
+.btn:hover{transform:translateY(-1px)}
+.btn:active{transform:translateY(0)}
+.btn:disabled{opacity:.55;transform:none}
+.prod{background:var(--card);border:1.5px solid var(--border);border-radius:16px;padding:14px;display:flex;gap:13px;align-items:center;margin-bottom:10px;box-shadow:0 1px 2px rgba(0,0,0,.04);transition:border-color .15s,box-shadow .15s}
+.prod:hover{border-color:var(--green-soft);box-shadow:0 4px 14px rgba(0,0,0,.06)}
+.prod .ph{width:60px;height:60px;border-radius:12px;background:var(--green-soft);flex:none;display:grid;place-items:center;font-size:24px;overflow:hidden}
 .prod .ph img{width:100%;height:100%;object-fit:cover}
 .prod .grow{flex:1;min-width:0}
 .prod h4{font-size:15px;font-weight:700}
 .prod p{font-size:12.5px;color:var(--muted);margin-top:2px}
 .prod .price{font-family:var(--mono);font-weight:700;font-size:15px;color:var(--green)}
-.prod .del{color:#A1281C;font-size:12px;font-weight:600}
-.empty{text-align:center;color:var(--muted);font-size:14px;padding:40px 20px;line-height:1.6;background:var(--card);border:1px dashed var(--border);border-radius:16px}
-.locked{text-align:center;padding:36px 24px;background:linear-gradient(135deg,var(--green),var(--bg2));color:var(--green-ink);border-radius:20px}
+.prod .del{color:#A1281C;font-size:12px;font-weight:600;margin-top:4px}
+.empty{text-align:center;color:var(--muted);font-size:14px;padding:40px 20px;line-height:1.6;background:var(--card);border:1.5px dashed var(--border);border-radius:16px}
+.locked{text-align:center;padding:36px 24px;background:linear-gradient(135deg,#11221E,#0A5B52);color:#FFF8EC;border-radius:20px}
 .locked .ic{font-size:40px;margin-bottom:12px}
 .locked h2{font-family:var(--display);font-weight:800;font-size:22px;margin-bottom:8px}
 .locked p{font-size:14px;opacity:.9;line-height:1.55;margin-bottom:18px}
-.locked a{display:inline-block;background:var(--card);color:var(--green);font-weight:700;font-size:14px;padding:12px 22px;border-radius:14px}
+.locked a{display:inline-block;background:#FFF8EC;color:var(--teal-ink);font-weight:700;font-size:14px;padding:12px 22px;border-radius:12px}
 .modal{display:none;position:fixed;inset:0;background:rgba(20,18,12,.5);z-index:100;align-items:center;justify-content:center;padding:18px}
 .modal.on{display:flex}
-.modal .box{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:22px;max-width:420px;width:100%}
-.modal h3{font-family:var(--display);font-weight:800;font-size:19px;margin-bottom:16px}
+.modal .box{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:22px;max-width:420px;width:100%;box-shadow:0 24px 60px rgba(0,0,0,.28)}
+.modal h3{font-family:var(--display);font-weight:800;font-size:19px;margin-bottom:16px;letter-spacing:-.01em}
 .field{margin-bottom:14px}
-.field label{display:block;font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
-.field input,.field textarea{width:100%;padding:12px;border:1.5px solid var(--border);border-radius:11px;background:var(--bg2);color:var(--text)}
+.field label{display:block;font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.field input,.field textarea{width:100%;padding:12px;border:1.5px solid var(--border);border-radius:11px;background:var(--bg2);color:var(--text);transition:border-color .15s}
 .field input:focus,.field textarea:focus{outline:none;border-color:var(--green)}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .btn-ghost{background:var(--card);border:1.5px solid var(--border);color:var(--text)}
@@ -69,10 +77,10 @@ h1{font-family:var(--display);font-weight:800;font-size:26px;letter-spacing:-.02
 </head>
 <body>
 <script>
-(function(){var t=localStorage.getItem('bukeame_theme')||'light';document.documentElement.setAttribute('data-theme',t);
+(function(){var t=localStorage.getItem('bukeame_theme')||'dark';document.documentElement.setAttribute('data-theme',t);
 window.__setTheme=function(t){localStorage.setItem('bukeame_theme',t);document.documentElement.setAttribute('data-theme',t);
   document.querySelectorAll('.theme-tg button').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-theme-set')===t);});};
-document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('[data-theme-set]').forEach(function(b){b.addEventListener('click',function(){window.__setTheme(b.getAttribute('data-theme-set'));});});window.__setTheme(localStorage.getItem('bukeame_theme')||'light');});})();
+document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('[data-theme-set]').forEach(function(b){b.addEventListener('click',function(){window.__setTheme(b.getAttribute('data-theme-set'));});});window.__setTheme(localStorage.getItem('bukeame_theme')||'dark');});})();
 </script>
 <div style="height:12px;background:var(--awning)"></div>
 <div id="boot" class="bootload">Cargando…</div>
@@ -135,7 +143,7 @@ async function load(){
     return;
   }
   content.innerHTML=prods.map(function(p){
-    const photo=(p.photos&&p.photos[0])?'<img src="'+esc(p.photos[0].url)+'">':'📦';
+    const photo=(p.photos&&p.photos[0])?'<img src="'+esc(p.photos[0].url)+'" alt="'+esc(p.name)+'" loading="lazy" decoding="async" width="60" height="60">':'📦';
     return '<div class="prod"><div class="ph">'+photo+'</div><div class="grow"><h4>'+esc(p.name)+'</h4><p>'+(p.stock!=null?p.stock+' en inventario':'')+(p.description?(' · '+esc(p.description)):'')+'</p></div><div style="text-align:right"><div class="price">'+money(p.price_cents)+'</div><button class="del" data-id="'+esc(p.id)+'">Borrar</button></div></div>';
   }).join('');
   content.querySelectorAll('.del').forEach(function(b){
