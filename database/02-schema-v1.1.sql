@@ -18,7 +18,8 @@ DO $$ BEGIN
   CREATE TYPE addon_status AS ENUM ('active','cancelled');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN
-  CREATE TYPE giftcard_status AS ENUM ('active','redeemed','partial','expired','void');
+  -- 'pending' = comprada pero SIN pago confirmado → NO gastable hasta que el negocio confirme.
+  CREATE TYPE giftcard_status AS ENUM ('pending','active','redeemed','partial','expired','void');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN
   CREATE TYPE waitlist_offer_st AS ENUM ('none','offered','accepted','expired','declined');
@@ -131,7 +132,8 @@ CREATE TABLE gift_cards (
   code            text NOT NULL UNIQUE,            -- LM-GIFT-7K2P
   initial_cents   integer NOT NULL CHECK (initial_cents > 0),
   balance_cents   integer NOT NULL CHECK (balance_cents >= 0),
-  status          giftcard_status NOT NULL DEFAULT 'active',
+  -- fail-closed: una tarjeta nace 'pending' (no gastable) hasta confirmar el pago
+  status          giftcard_status NOT NULL DEFAULT 'pending',
   purchaser_name  text,
   purchaser_email citext,
   recipient_name  text,

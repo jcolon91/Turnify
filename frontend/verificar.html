@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Verifica tu email — Bukéame</title>
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#0E8074">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230E8074'/%3E%3Ctext x='16' y='22' font-family='Arial,sans-serif' font-size='18' font-weight='800' text-anchor='middle' fill='%23fff'%3EB%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+--bg:#F1EFE5;--bg2:#F7F4EA;--card:#FFFFFF;--card-soft:#EDE9DB;--border:#E1DCCD;
+--text:#17150F;--muted:#5E594B;--muted2:#B3AD9C;--green:#0E8074;--green-ink:#FFFFFF;
+--green-soft:#E3EFE9;--green-glow:rgba(14,128,116,.45);
+--awning:repeating-linear-gradient(90deg,#0E8074 0 26px,#0A5B52 26px 28px,#F8F5EA 28px 54px,#E7E2D1 54px 56px);
+--display:"Bricolage Grotesque",sans-serif;--body:"Instrument Sans",sans-serif;--mono:"Spline Sans Mono",monospace}
+html[data-theme="dark"]{
+--bg:#0B1A13;--bg2:#0E2218;--card:#12251B;--card-soft:rgba(255,255,255,.05);--border:rgba(255,255,255,.1);
+--text:#ECEAE0;--muted:#8AA197;--muted2:#5d6f66;--green:#36E27B;--green-ink:#08160F;
+--green-soft:rgba(54,226,123,.12);--green-glow:rgba(54,226,123,.3);
+--awning:repeating-linear-gradient(90deg,#36E27B 0 26px,#0d6b46 26px 28px,#0E2218 28px 54px,#10241A 54px 56px)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--body);color:var(--text);background:var(--bg);min-height:100vh;display:flex;flex-direction:column}
+a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer;border:0}
+.awning{height:12px;background:var(--awning)}
+.theme-tg{display:inline-flex;background:var(--card-soft);border:1px solid var(--border);border-radius:11px;padding:3px}
+.theme-tg button{font:700 12.5px 'Instrument Sans',sans-serif;padding:6px 13px;border-radius:8px;cursor:pointer;border:0;background:transparent;color:var(--muted)}
+.theme-tg button.on{background:var(--green);color:var(--green-ink)}
+.topbar{display:flex;justify-content:flex-end;padding:9px 16px 0}
+.stage{flex:1;display:grid;place-items:center;padding:30px 16px 50px}
+.box{width:100%;max-width:420px;text-align:center}
+.logo{font-family:var(--display);font-weight:800;font-size:28px;letter-spacing:-.02em;margin-bottom:22px}
+.logo i{font-style:normal;color:var(--green)}
+.card{background:var(--card);border:1px solid var(--border);border-radius:22px;padding:30px 24px;box-shadow:0 22px 44px -24px rgba(23,21,15,.25)}
+html[data-theme="dark"] .card{box-shadow:0 22px 44px -24px rgba(0,0,0,.6)}
+.ic{width:60px;height:60px;border-radius:50%;display:grid;place-items:center;margin:0 auto 16px;background:var(--green-soft)}
+.ic svg{width:30px;height:30px;color:var(--green)}
+.spin{width:30px;height:30px;border:3px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:rot .8s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+h1{font-family:var(--display);font-weight:800;font-size:22px;letter-spacing:-.01em;margin-bottom:8px}
+p{font-size:14.5px;color:var(--muted);line-height:1.6;margin-bottom:6px}
+.trial{display:inline-block;margin:12px 0 2px;font-family:var(--mono);font-size:12px;font-weight:700;background:var(--green-soft);color:var(--green);border:1px solid var(--green-glow);border-radius:99px;padding:6px 13px}
+.cta{display:inline-block;width:100%;background:var(--green);color:var(--green-ink);font-weight:800;font-size:15px;padding:14px;border-radius:14px;margin-top:18px}
+.foot{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:20px 0 36px}
+</style>
+</head>
+<body>
+<script>
+(function(){var t=localStorage.getItem('bukeame_theme')||'dark';document.documentElement.setAttribute('data-theme',t);
+window.__setTheme=function(t){localStorage.setItem('bukeame_theme',t);document.documentElement.setAttribute('data-theme',t);
+  document.querySelectorAll('.theme-tg button').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-theme-set')===t);});};
+document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('[data-theme-set]').forEach(function(b){b.addEventListener('click',function(){window.__setTheme(b.getAttribute('data-theme-set'));});});window.__setTheme(localStorage.getItem('bukeame_theme')||'dark');});})();
+</script>
+<div class="awning"></div>
+<div class="topbar"><div class="theme-tg"><button type="button" data-theme-set="light">Claro</button><button type="button" data-theme-set="dark">Oscuro</button></div></div>
+
+<div class="stage">
+  <div class="box">
+    <div class="logo">Buk<i>é</i>ame</div>
+    <div class="card" id="card">
+      <div class="ic"><div class="spin"></div></div>
+      <h1>Verificando…</h1>
+      <p>Un momento, estamos confirmando tu email.</p>
+    </div>
+  </div>
+</div>
+<div class="foot">Hecho con Bukéame · bukeame.com</div>
+
+<script>
+const API='/api';
+function esc(s){return (s==null?'':String(s)).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+const CHECK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+const CROSS='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+
+function render(html){ document.getElementById('card').innerHTML = html; }
+function ok(trial){
+  render('<div class="ic">'+CHECK+'</div>'+
+    '<h1>¡Email verificado!</h1>'+
+    '<p>Tu cuenta de Bukéame quedó confirmada.</p>'+
+    (trial?'<div class="trial">Prueba Pro de 15 días activada</div>':'')+
+    '<a class="cta" href="panel.html">Ir a mi panel</a>');
+}
+function fail(msg){
+  render('<div class="ic" style="background:rgba(192,57,43,.12)"><span style="color:#C0392B">'+CROSS+'</span></div>'+
+    '<h1>No se pudo verificar</h1>'+
+    '<p>'+esc(msg||'El enlace no es válido o ya expiró.')+'</p>'+
+    '<a class="cta" href="panel.html">Ir a mi panel</a>'+
+    '<p style="margin-top:12px;font-size:13px">Desde el panel puedes pedir un enlace nuevo.</p>');
+}
+
+(async function(){
+  const token = new URLSearchParams(location.search).get('token');
+  if(!token){ fail('Enlace inválido: falta el token.'); return; }
+  try{
+    const r = await fetch(API+'/auth/verify-email', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ token })
+    });
+    let data={}; try{ data = await r.json(); }catch(e){}
+    if(r.ok && data.email_verified) ok(!!data.trial_granted);
+    else fail(data.error);
+  }catch(e){ fail('No pudimos conectar. Intenta de nuevo.'); }
+})();
+</script>
+</body>
+</html>

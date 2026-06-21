@@ -39,6 +39,8 @@ const {
   EVOLUTION_INSTANCE = 'turnify',
   RESEND_API_KEY,           // emails (opcional)
   EMAIL_FROM = 'Bukeame <citas@bukeame.com>',
+  GOOGLE_CLIENT_ID,         // login social Google (opcional)
+  APPLE_CLIENT_ID,          // login social Apple — service ID / bundle id (opcional)
   NODE_ENV = 'production',
 } = process.env;
 
@@ -116,6 +118,10 @@ app.use((req, res, next) =>
 
 app.use(rateLimit({ windowMs: 60_000, max: 300, standardHeaders: true, legacyHeaders: false }));
 const authLimiter   = rateLimit({ windowMs: 15 * 60_000, max: 20,  message: { error: 'Demasiados intentos. Espera 15 minutos.' } });
+// Lockout por cuenta: keyed por email (o IP si no hay email) para frenar fuerza bruta dirigida.
+const loginLimiter  = rateLimit({ windowMs: 15 * 60_000, max: 8, keyGenerator: (req) => (req.body && req.body.email) ? ('em:' + String(req.body.email).toLowerCase().trim()) : req.ip, message: { error: 'Demasiados intentos para esta cuenta. Espera 15 minutos.' } });
+// Refresh con su propio cubo, separado de login, para que rotar no consuma intentos de login.
+const refreshLimiter = rateLimit({ windowMs: 15 * 60_000, max: 60, message: { error: 'Demasiados intentos. Espera 15 minutos.' } });
 const publicLimiter = rateLimit({ windowMs: 60_000,      max: 60,  message: { error: 'Vas muy rápido. Intenta en un minuto.' } });
 // Endpoints de ticket por código (ver/cancelar/ref ATH): límite duro para que
 // nadie pueda enumerar/brute-forcear códigos de confirmación de otros clientes.
@@ -198,6 +204,20 @@ async function issueRefresh(userId, req) {
   return token;
 }
 
+// Genera y envía un email de verificación (invalida los enlaces previos sin usar).
+async function sendVerificationEmail(user) {
+  const token = crypto.randomBytes(32).toString('base64url');
+  const exp = new Date(Date.now() + 24 * 3600 * 1000); // 24 horas
+  await db.query(`UPDATE email_verifications SET used_at = now() WHERE user_id = $1 AND used_at IS NULL`, [user.id]);
+  await db.query(`INSERT INTO email_verifications (user_id, token_hash, expires_at) VALUES ($1,$2,$3)`,
+    [user.id, sha256(token), exp]);
+  const link = `https://bukeame.com/verificar.html?token=${token}`;
+  try {
+    const e = emailVerify(user.full_name, link);
+    sendEmail(user.email, e.subject, e.text, e.html).catch(err => console.error('verify email:', err.message));
+  } catch (err) { console.error('verify email build:', err.message); }
+}
+
 const authRequired = asyncH(async (req, res, next) => {
   const h = req.headers.authorization || '';
   if (!h.startsWith('Bearer ')) return bad(res, 'Token requerido', 401);
@@ -250,19 +270,18 @@ app.post('/api/auth/register', authLimiter, asyncH(async (req, res) => {
     throw e;
   }
   const refresh = await issueRefresh(user.id, req);
-  // Email de bienvenida (no bloquea el registro si Resend falla)
-  try {
-    const w = emailWelcome(user.full_name);
-    sendEmail(user.email, w.subject, w.text, w.html).catch(e => console.error('welcome email:', e.message));
-  } catch (e) { console.error('welcome email build:', e.message); }
+  // Email de verificación (da la bienvenida y pide verificar). No bloquea el registro si Resend falla.
+  await sendVerificationEmail(user);
+  user.email_verified = false;
   res.status(201).json({ user, access_token: signAccess(user), refresh_token: refresh });
 }));
 
-app.post('/api/auth/login', authLimiter, asyncH(async (req, res) => {
+app.post('/api/auth/login', authLimiter, loginLimiter, asyncH(async (req, res) => {
   const { email, password } = req.body || {};
   if (!isEmail(email) || !isStr(password, 100)) return bad(res, 'Credenciales inválidas', 401);
   const { rows } = await db.query(
-    `SELECT id, full_name, email, password_hash, is_platform_admin
+    `SELECT id, full_name, email, password_hash, is_platform_admin,
+            email_verified_at IS NOT NULL AS email_verified
        FROM users WHERE email = $1 AND deleted_at IS NULL`, [email.toLowerCase()]);
   const u = rows[0];
   if (!u || !u.password_hash || !(await bcrypt.compare(password, u.password_hash)))
@@ -285,6 +304,8 @@ app.post('/api/auth/forgot-password', authLimiter, asyncH(async (req, res) => {
   if (u) {
     const token = crypto.randomBytes(48).toString('base64url');
     const exp = new Date(Date.now() + 3600 * 1000); // 1 hora
+    // Invalida cualquier enlace de reset previo sin usar (solo el último queda válido)
+    await db.query(`UPDATE password_resets SET used_at = now() WHERE user_id = $1 AND used_at IS NULL`, [u.id]);
     await db.query(
       `INSERT INTO password_resets (user_id, token_hash, expires_at) VALUES ($1,$2,$3)`,
       [u.id, sha256(token), exp]);
@@ -316,16 +337,22 @@ app.post('/api/auth/reset-password', authLimiter, asyncH(async (req, res) => {
   return res.json({ ok: true, message: 'Contraseña actualizada. Ya puedes entrar.' });
 }));
 
-app.post('/api/auth/refresh', authLimiter, asyncH(async (req, res) => {
+app.post('/api/auth/refresh', refreshLimiter, asyncH(async (req, res) => {
   const { refresh_token } = req.body || {};
   if (!isStr(refresh_token, 200)) return bad(res, 'Refresh token requerido', 401);
+  // Buscar SIN el filtro revoked_at para detectar reúso de un token ya rotado.
   const { rows } = await db.query(
-    `SELECT rt.id, rt.user_id, u.full_name, u.is_platform_admin
+    `SELECT rt.id, rt.user_id, rt.revoked_at, u.full_name, u.is_platform_admin
        FROM refresh_tokens rt JOIN users u ON u.id = rt.user_id
-      WHERE rt.token_hash = $1 AND rt.revoked_at IS NULL AND rt.expires_at > now()
+      WHERE rt.token_hash = $1 AND rt.expires_at > now()
         AND u.deleted_at IS NULL`, [sha256(refresh_token)]);
   const t = rows[0];
   if (!t) return bad(res, 'Sesión expirada, entra de nuevo', 401);
+  // Reúso de un token ya revocado = señal de robo: revocar TODAS las sesiones del usuario.
+  if (t.revoked_at) {
+    await db.query(`UPDATE refresh_tokens SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL`, [t.user_id]);
+    return bad(res, 'Sesión inválida, vuelve a entrar', 401);
+  }
   // Rotación: el viejo muere, nace uno nuevo
   await db.query(`UPDATE refresh_tokens SET revoked_at = now() WHERE id = $1`, [t.id]);
   const refresh = await issueRefresh(t.user_id, req);
@@ -337,6 +364,162 @@ app.post('/api/auth/logout', authRequired, asyncH(async (req, res) => {
   if (isStr(refresh_token, 200))
     await db.query(`UPDATE refresh_tokens SET revoked_at = now() WHERE token_hash = $1`, [sha256(refresh_token)]);
   res.json({ ok: true });
+}));
+
+// Datos frescos del usuario autenticado (incluye email_verified para el banner del panel)
+app.get('/api/auth/me', authRequired, asyncH(async (req, res) => {
+  const { rows } = await db.query(
+    `SELECT id, full_name, email, is_platform_admin, email_verified_at IS NOT NULL AS email_verified
+       FROM users WHERE id = $1 AND deleted_at IS NULL`, [req.user.id]);
+  if (!rows[0]) return bad(res, 'No encontrado', 404);
+  res.json({ user: rows[0] });
+}));
+
+// Verificar email con el token del correo. Activa el trial Pro pendiente del referido.
+app.post('/api/auth/verify-email', authLimiter, asyncH(async (req, res) => {
+  const { token } = req.body || {};
+  if (!isStr(token, 200)) return bad(res, 'Enlace inválido', 400);
+  const { rows } = await db.query(
+    `SELECT id, user_id FROM email_verifications
+      WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now()`, [sha256(token)]);
+  const ev = rows[0];
+  if (!ev) return bad(res, 'El enlace expiró o ya fue usado. Pide uno nuevo desde tu panel.', 400);
+  await db.query(`UPDATE email_verifications SET used_at = now() WHERE id = $1`, [ev.id]);
+  await db.query(`UPDATE users SET email_verified_at = COALESCE(email_verified_at, now()) WHERE id = $1`, [ev.user_id]);
+  // Activa el trial Pro pendiente: negocio con referido, en free y sin trial usado aún.
+  const up = await db.query(
+    `UPDATE subscriptions s
+        SET plan_code = 'pro', status = 'trialing', trial_ends_at = now() + interval '15 days'
+       FROM businesses b
+      WHERE b.id = s.business_id AND b.owner_user_id = $1 AND b.referred_by_business IS NOT NULL
+        AND s.plan_code = 'free' AND s.trial_ends_at IS NULL
+      RETURNING s.business_id`, [ev.user_id]);
+  res.json({ ok: true, email_verified: true, trial_granted: !!up.rows[0] });
+}));
+
+// Reenviar el email de verificación (si la cuenta aún no está verificada)
+app.post('/api/auth/resend-verification', authLimiter, authRequired, asyncH(async (req, res) => {
+  const { rows } = await db.query(`SELECT id, full_name, email, email_verified_at FROM users WHERE id = $1`, [req.user.id]);
+  const u = rows[0];
+  if (u && !u.email_verified_at) await sendVerificationEmail(u);
+  res.json({ ok: true, message: 'Si tu email no estaba verificado, te enviamos un nuevo enlace.' });
+}));
+
+// ----------------------------------------------------------------------------
+// LOGIN SOCIAL (Google / Apple)
+//  El proveedor ya verificó el email → marcamos email_verified_at = now().
+//  Upsert por email o por *_sub. password_hash queda NULL (no aplica).
+//  Mismo retorno que /login: { user, access_token, refresh_token }.
+// ----------------------------------------------------------------------------
+
+// Upsert de usuario social + emisión de tokens. Reusa signAccess / issueRefresh.
+async function socialLoginUpsert(req, res, { provider, sub, email, name }) {
+  const subCol = provider === 'google' ? 'google_sub' : 'apple_sub';
+  const emailLc = email.toLowerCase();
+  // Busca por *_sub o por email (para enlazar una cuenta existente al proveedor social).
+  const found = await db.query(
+    `SELECT id, full_name, email, is_platform_admin FROM users
+      WHERE (${subCol} = $1 OR email = $2) AND deleted_at IS NULL
+      ORDER BY (${subCol} = $1) DESC LIMIT 1`, [sub, emailLc]);
+  let user;
+  if (found.rows[0]) {
+    // Enlaza el sub + provider y marca el email como verificado (el proveedor ya lo hizo).
+    const upd = await db.query(
+      `UPDATE users
+          SET ${subCol} = $2,
+              auth_provider = COALESCE(auth_provider, $3),
+              full_name = COALESCE(full_name, $4),
+              email_verified_at = COALESCE(email_verified_at, now()),
+              last_login_at = now()
+        WHERE id = $1
+      RETURNING id, full_name, email, is_platform_admin,
+                email_verified_at IS NOT NULL AS email_verified`,
+      [found.rows[0].id, sub, provider, name || null]);
+    user = upd.rows[0];
+  } else {
+    try {
+      const ins = await db.query(
+        `INSERT INTO users (full_name, email, password_hash, auth_provider, ${subCol}, email_verified_at, last_login_at)
+         VALUES ($1,$2,NULL,$3,$4,now(),now())
+         RETURNING id, full_name, email, is_platform_admin,
+                   email_verified_at IS NOT NULL AS email_verified`,
+        [name || email.split('@')[0], emailLc, provider, sub]);
+      user = ins.rows[0];
+    } catch (e) {
+      if (e.code === '23505') return bad(res, 'No pudimos iniciar sesión con esos datos. Intenta con tu correo y contraseña.', 409);
+      throw e;
+    }
+  }
+  const refresh = await issueRefresh(user.id, req);
+  res.json({ user, access_token: signAccess(user), refresh_token: refresh });
+}
+
+// Config pública: el front muestra los botones solo si vienen los client_id.
+app.get('/api/auth/config', (_req, res) => {
+  res.json({ google_client_id: GOOGLE_CLIENT_ID || null, apple_client_id: APPLE_CLIENT_ID || null });
+});
+
+// Google: verifica el id_token contra tokeninfo (sin SDK, vía fetch).
+app.post('/api/auth/google', authLimiter, asyncH(async (req, res) => {
+  if (!GOOGLE_CLIENT_ID) return bad(res, 'Login con Google no disponible', 503);
+  const { id_token } = req.body || {};
+  if (!isStr(id_token, 5000)) return bad(res, 'id_token requerido');
+
+  let info;
+  try {
+    const r = await fetch('https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(id_token));
+    if (!r.ok) return bad(res, 'No pudimos verificar tu sesión de Google', 401);
+    info = await r.json();
+  } catch { return bad(res, 'No pudimos verificar tu sesión de Google', 401); }
+
+  if (info.aud !== GOOGLE_CLIENT_ID) return bad(res, 'Token de Google no válido para esta app', 401);
+  const emailVerified = info.email_verified === true || info.email_verified === 'true';
+  if (!info.email || !emailVerified || !info.sub) return bad(res, 'Tu cuenta de Google no tiene un email verificado', 401);
+  if (!isEmail(info.email)) return bad(res, 'Email de Google inválido', 401);
+
+  return socialLoginUpsert(req, res, { provider: 'google', sub: String(info.sub), email: info.email, name: info.name });
+}));
+
+// Apple: verifica el JWT con el JWKS de Apple (RS256 por kid), aud + iss.
+app.post('/api/auth/apple', authLimiter, asyncH(async (req, res) => {
+  if (!APPLE_CLIENT_ID) return bad(res, 'Login con Apple no disponible', 503);
+  const { id_token } = req.body || {};
+  if (!isStr(id_token, 5000)) return bad(res, 'id_token requerido');
+
+  // Cabecera del JWT para saber qué kid usar.
+  let kid;
+  try {
+    const hdr = JSON.parse(Buffer.from(id_token.split('.')[0], 'base64url').toString('utf8'));
+    kid = hdr.kid;
+    if (hdr.alg !== 'RS256' || !kid) return bad(res, 'Token de Apple no válido', 401);
+  } catch { return bad(res, 'Token de Apple no válido', 401); }
+
+  // JWKS de Apple → clave pública (PEM) del kid correspondiente.
+  let pem;
+  try {
+    const r = await fetch('https://appleid.apple.com/auth/keys');
+    if (!r.ok) return bad(res, 'No pudimos verificar tu sesión de Apple', 401);
+    const { keys } = await r.json();
+    const jwk = (keys || []).find(k => k.kid === kid);
+    if (!jwk) return bad(res, 'No pudimos verificar tu sesión de Apple', 401);
+    pem = crypto.createPublicKey({ key: jwk, format: 'jwk' }).export({ type: 'spki', format: 'pem' });
+  } catch { return bad(res, 'No pudimos verificar tu sesión de Apple', 401); }
+
+  let claims;
+  try {
+    claims = jwt.verify(id_token, pem, {
+      algorithms: ['RS256'],
+      audience: APPLE_CLIENT_ID,
+      issuer: 'https://appleid.apple.com',
+    });
+  } catch { return bad(res, 'Token de Apple no válido o expirado', 401); }
+
+  if (!claims.sub) return bad(res, 'Token de Apple sin identificador', 401);
+  // Apple solo manda el email la primera vez; permitimos enlazar por sub.
+  const email = claims.email && isEmail(claims.email) ? claims.email : null;
+  if (!email) return bad(res, 'Tu cuenta de Apple no compartió un email; usa tu correo y contraseña.', 401);
+
+  return socialLoginUpsert(req, res, { provider: 'apple', sub: String(claims.sub), email, name: null });
 }));
 
 // ============================================================================
@@ -382,9 +565,12 @@ app.post('/api/businesses', authRequired, asyncH(async (req, res) => {
     const biz = rows[0];
 
     // Suscripción inicial:
-    //  · Con referido válido → 15 días de prueba del plan Pro (trialing)
-    //  · Sin referido        → plan free normal
-    if (referrer) {
+    //  · Con referido válido Y email verificado → 15 días de prueba Pro (trialing)
+    //  · Si aún no verificó → nace free; el trial se activa al verificar el email
+    //    (POST /api/auth/verify-email). Corta el abuso de trials por multicuenta.
+    //  · Sin referido → plan free normal
+    const uv = await client.query(`SELECT email_verified_at FROM users WHERE id = $1`, [req.user.id]);
+    if (referrer && uv.rows[0] && uv.rows[0].email_verified_at) {
       await client.query(
         `INSERT INTO subscriptions (business_id, plan_code, status, trial_ends_at)
          VALUES ($1, 'pro', 'trialing', now() + interval '15 days')`, [biz.id]);
@@ -494,7 +680,7 @@ app.post('/api/businesses/me/logo', authRequired, businessScope,
     const filename = `${req.business.id}-${Date.now()}.webp`;
     const filepath = path.join(LOGO_DIR, filename);
     try {
-      await sharp(req.file.buffer)
+      await sharp(req.file.buffer, { limitInputPixels: 24000000, failOn: 'error' })
         .resize(800, 800, { fit: 'cover', position: 'centre' })
         .webp({ quality: 85 })
         .toFile(filepath);
@@ -536,7 +722,7 @@ app.post('/api/businesses/me/cover', authRequired, businessScope,
     const filename = `${req.business.id}-${Date.now()}.webp`;
     const filepath = path.join(COVER_DIR, filename);
     try {
-      await sharp(req.file.buffer)
+      await sharp(req.file.buffer, { limitInputPixels: 24000000, failOn: 'error' })
         .resize(1600, 400, { fit: 'cover', position: 'centre' })
         .webp({ quality: 84 })
         .toFile(filepath);
@@ -573,17 +759,16 @@ app.post('/api/businesses/me/portfolio', authRequired, businessScope,
   }),
   asyncH(async (req, res) => {
     if (!req.file) return bad(res, 'No se recibió ninguna imagen');
-    // Tope de 12 fotos por negocio
-    const c = await db.query(
-      `SELECT count(*)::int n, COALESCE(max(sort_order), 0) AS maxo
-         FROM gallery_photos WHERE business_id = $1`, [req.business.id]);
-    if (c.rows[0].n >= PORTFOLIO_MAX)
+    // Pre-chequeo barato (evita procesar si ya está lleno). El guard REAL contra
+    // carreras es el INSERT condicional de abajo.
+    const pre = await db.query(`SELECT count(*)::int n FROM gallery_photos WHERE business_id = $1`, [req.business.id]);
+    if (pre.rows[0].n >= PORTFOLIO_MAX)
       return bad(res, `El portafolio permite un máximo de ${PORTFOLIO_MAX} fotos. Borra alguna antes de subir más.`, 409);
 
     const filename = `${req.business.id}-${crypto.randomUUID()}.webp`;
     const filepath = path.join(PORTFOLIO_DIR, filename);
     try {
-      await sharp(req.file.buffer)
+      await sharp(req.file.buffer, { limitInputPixels: 24000000, failOn: 'error' })
         .resize(1200, 800, { fit: 'cover', position: 'centre' })
         .webp({ quality: 82 })
         .toFile(filepath);
@@ -591,11 +776,17 @@ app.post('/api/businesses/me/portfolio', authRequired, businessScope,
       return bad(res, 'La imagen no se pudo procesar. Prueba con otra.');
     }
     const url = `/uploads/portfolio/${filename}`;
-    const sortOrder = c.rows[0].maxo + 1;
+    // INSERT condicional ATÓMICO: solo inserta si aún hay menos de PORTFOLIO_MAX (anti-TOCTOU).
     const { rows } = await db.query(
       `INSERT INTO gallery_photos (business_id, url, sort_order)
-       VALUES ($1, $2, $3) RETURNING id, url, sort_order`,
-      [req.business.id, url, sortOrder]);
+       SELECT $1, $2, COALESCE((SELECT MAX(sort_order) + 1 FROM gallery_photos WHERE business_id = $1), 1)
+        WHERE (SELECT count(*) FROM gallery_photos WHERE business_id = $1) < $3
+       RETURNING id, url, sort_order`,
+      [req.business.id, url, PORTFOLIO_MAX]);
+    if (!rows[0]) {                          // otra subida concurrente llenó el cupo
+      safeUnlinkUpload(url, PORTFOLIO_DIR);  // borra el archivo recién escrito
+      return bad(res, `El portafolio permite un máximo de ${PORTFOLIO_MAX} fotos. Borra alguna antes de subir más.`, 409);
+    }
     await audit(req, 'business.portfolio.add', 'business', req.business.id, {});
     res.status(201).json({ photo: rows[0] });
   }));
@@ -661,6 +852,10 @@ app.post('/api/blocks', authRequired, businessScope, asyncH(async (req, res) => 
   const { date, all_day, start_time, end_time, staff_id, reason } = req.body || {};
   if (!isDate(date)) return bad(res, 'Fecha requerida');
   if (staff_id && !isUuid(staff_id)) return bad(res, 'Profesional inválido');
+  if (staff_id) {   // el profesional debe ser de ESTE negocio (aislamiento multi-tenant)
+    const ok = await db.query(`SELECT 1 FROM staff WHERE id = $1 AND business_id = $2 AND deleted_at IS NULL`, [staff_id, req.business.id]);
+    if (!ok.rows[0]) return bad(res, 'Profesional no encontrado', 404);
+  }
 
   let startsAt, endsAt;
   if (all_day) {
@@ -966,7 +1161,8 @@ app.get('/api/public/search', publicLimiter, asyncH(async (req, res) => {
        FROM businesses b
        LEFT JOIN pr_municipalities m ON m.id = b.municipality_id
       WHERE ${where.join(' AND ')}
-      ORDER BY b.is_featured DESC, ${rank} DESC NULLS LAST, b.rating_count DESC
+      ORDER BY (EXISTS (SELECT 1 FROM featured_listings fl WHERE fl.business_id = b.id AND fl.ends_at > now())) DESC,
+               ${rank} DESC NULLS LAST, b.rating_count DESC
       LIMIT 30`, vals);
   res.json({ results: rows });
 }));
@@ -997,10 +1193,14 @@ app.get('/api/public/:slug', publicLimiter, asyncH(async (req, res) => {
     db.query(`SELECT r.rating, r.comment, r.business_reply, r.created_at, c.full_name
               FROM reviews r JOIN clients c ON c.id = r.client_id
               WHERE r.business_id = $1 AND r.is_published ORDER BY r.created_at DESC LIMIT 10`, [biz.id]),
-    // Métodos de pago que el negocio activó (resiliente si la migración 07 aún no corre)
-    db.query(`SELECT provider FROM payment_providers
-              WHERE business_id = $1 AND is_enabled = true AND status = 'connected'`, [biz.id])
-      .catch(() => ({ rows: [] })),
+    // Métodos de pago que el negocio activó (resiliente si la migración 07/11 aún no corre).
+    // Traemos también account_ref + config para armar lo PÚBLICO del checkout.
+    db.query(`SELECT provider, account_ref, COALESCE(config, '{}'::jsonb) AS config
+                FROM payment_providers
+               WHERE business_id = $1 AND is_enabled = true AND status = 'connected'`, [biz.id])
+      .catch(() => db.query(`SELECT provider, account_ref FROM payment_providers
+               WHERE business_id = $1 AND is_enabled = true AND status = 'connected'`, [biz.id])
+        .catch(() => ({ rows: [] }))),
     // Productos activos del negocio con sus fotos (resiliente si las tablas aún no existen)
     db.query(`SELECT p.id, p.name, p.description, p.price_cents, p.stock, p.variants,
                      COALESCE(
@@ -1016,9 +1216,29 @@ app.get('/api/public/:slug', publicLimiter, asyncH(async (req, res) => {
               WHERE business_id = $1 ORDER BY sort_order`, [biz.id])
       .catch(() => ({ rows: [] })),
   ]);
+  // Datos PÚBLICOS para cobrar (solo métodos activos + conectados). El public_token
+  // de ATH es público por diseño (va en el botón client-side); es seguro exponerlo.
+  // NUNCA hay secretos aquí (ni privateToken de ATH, ni llaves de Stripe).
+  const byProv = {};
+  for (const r of payMethods.rows) byProv[r.provider] = r;
+  const athRow = byProv['ath_movil'];
+  const ppRow  = byProv['paypal'];
+  const stRow  = byProv['stripe'];
+  const payment_config = {
+    ath: athRow ? {
+      mode: (athRow.config && athRow.config.ath_mode) || 'manual',
+      public_token: (athRow.config && athRow.config.ath_public_token) || null,
+      phone: athRow.account_ref || null,
+    } : null,
+    paypal: ppRow ? {
+      handle: (ppRow.config && ppRow.config.paypal_handle) || ppRow.account_ref || null,
+    } : null,
+    stripe: { connected: !!stRow },
+  };
   res.json({
     business: biz, services: services.rows, staff: staff.rows, hours: hours.rows, reviews: reviews.rows,
     payment_methods: payMethods.rows.map(r => r.provider),
+    payment_config,
     products: products.rows,
     gallery: gallery.rows,
   });
@@ -1053,6 +1273,9 @@ app.get('/api/public/:slug/availability', publicLimiter, asyncH(async (req, res)
 
   let slots;
   if (isUuid(staff_id)) {
+    // El staff debe pertenecer a ESTE negocio (no filtrar ocupación de otro tenant)
+    const ok = await db.query(`SELECT 1 FROM staff WHERE id = $1 AND business_id = $2 AND deleted_at IS NULL`, [staff_id, biz.id]);
+    if (!ok.rows[0]) return bad(res, 'Profesional no encontrado', 404);
     slots = await staffDaySlots(biz, staff_id, date, dur);
   } else {
     const ids = await eligibleStaff(biz.id, refService, date);
@@ -1272,6 +1495,34 @@ app.post('/api/public/appointments/:code/cancel', codeLimiter, asyncH(async (req
   await notify(a.business_id, 'cancellation', '❌ Cita cancelada',
     `${a.full_name} canceló ${a.service_name}`, { appointment_id: a.id });
   res.json({ ok: true });
+}));
+
+// Confirmación ATH Móvil AUTO (botón client-side con el publicToken del negocio): el cobro ya
+// ocurrió DIRECTO hacia la cuenta ATH del negocio. Aquí registramos la referencia, marcamos el
+// depósito 'paid' y la cita 'confirmed'. Idempotente. Bukéame no toca el dinero.
+app.post('/api/public/:slug/appointments/:code/ath/confirm', codeLimiter, asyncH(async (req, res) => {
+  const { reference } = req.body || {};
+  if (!isStr(reference, 60)) return bad(res, 'Referencia requerida');
+  // La cita debe pertenecer al negocio del slug (aislamiento multi-tenant).
+  const { rows } = await db.query(
+    `SELECT a.id, a.business_id, a.service_name, a.status,
+            p.id AS payment_id, p.status AS pay_status
+       FROM appointments a
+       JOIN businesses b ON b.id = a.business_id AND b.slug = $1 AND b.deleted_at IS NULL
+       LEFT JOIN payments p ON p.appointment_id = a.id AND p.kind = 'deposit' AND p.method = 'ath_movil'
+      WHERE a.confirmation_code = $2`, [req.params.slug, req.params.code.toUpperCase()]);
+  const a = rows[0];
+  if (!a) return bad(res, 'Cita no encontrada', 404);
+  // Idempotencia: si ya está pagada/confirmada, responder ok sin re-procesar.
+  if (a.pay_status === 'paid' || a.status === 'confirmed')
+    return res.json({ ok: true, status: 'confirmed', already: true });
+  if (a.payment_id)
+    await db.query(`UPDATE payments SET status = 'paid', paid_at = now(), external_ref = $2 WHERE id = $1`,
+      [a.payment_id, reference.trim()]);
+  await db.query(`UPDATE appointments SET status = 'confirmed' WHERE id = $1 AND status = 'pending_deposit'`, [a.id]);
+  await notify(a.business_id, 'payment', 'Pago ATH Móvil recibido',
+    `Ref ${reference.trim()} · ${a.service_name}`, { appointment_id: a.id });
+  res.json({ ok: true, status: 'confirmed' });
 }));
 
 // ============================================================================
@@ -1662,6 +1913,22 @@ function emailReset(name, link) {
   return { subject, text, html };
 }
 
+function emailVerify(name, link) {
+  const first = (name || '').trim().split(' ')[0] || 'Hola';
+  const subject = 'Verifica tu email — Bukeame';
+  const text = `Hola ${first},\n\nGracias por crear tu cuenta en Bukeame. Verifica tu email para activar tu cuenta (y tu prueba Pro si te refirieron). Abre este enlace (válido por 24 horas):\n\n${link}\n\nSi no creaste esta cuenta, ignora este correo.\n\n— El equipo de Bukeame`;
+  const html = emailShell(`
+    <tr><td style="padding:28px 30px 30px 30px">
+      <h1 style="margin:0 0 12px 0;font-size:22px;font-weight:800;color:#17150F;line-height:1.3;letter-spacing:-.01em">Hola ${first}, verifica tu email</h1>
+      <p style="margin:0 0 22px 0;font-size:15px;color:#5E594B;line-height:1.6">Confirma tu correo para activar tu cuenta de Bukeame. Si un negocio te refirió, al verificar se activa tu prueba de 15 días del plan Pro.</p>
+      <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="border-radius:12px;background:#0E8074">
+        <a href="${link}" style="display:inline-block;background:#0E8074;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:13px 26px;border-radius:12px">Verificar mi email</a>
+      </td></tr></table>
+      <p style="margin:22px 0 0 0;font-size:13px;color:#7A7464;line-height:1.6;padding-top:18px;border-top:1px solid #EFEADC">Este enlace es válido por 24 horas. Si no creaste esta cuenta, ignora este correo.</p>
+    </td></tr>`, { preheader: 'Verifica tu email para activar tu cuenta de Bukeame.' });
+  return { subject, text, html };
+}
+
 // Email HTML elegante para confirmaciones y recordatorios de cita
 function emailAppt(template, ctx) {
   const { biz, appt } = ctx;
@@ -1788,6 +2055,26 @@ async function dispatchMessages() {
 
 setInterval(() => { queueReminders().catch(e => console.error('reminders:', e.message)); }, 60_000);
 setInterval(() => { dispatchMessages().catch(e => console.error('dispatch:', e.message)); }, 20_000);
+
+// ============================================================================
+//  MIGRACIÓN 11 (idempotente, al arranque)
+//  · payment_providers.config jsonb → lo PÚBLICO de cada método (modo ATH,
+//    publicToken ATH, handle PayPal, stripe_account_id). NUNCA secretos.
+//  · users: auth_provider / google_sub / apple_sub para login social, con
+//    índices únicos PARCIALES (no chocan con cuentas sin proveedor social).
+//    password_hash ya es nullable (registro social sin contraseña).
+// ============================================================================
+async function migrate11() {
+  await db.query(`ALTER TABLE payment_providers ADD COLUMN IF NOT EXISTS config jsonb NOT NULL DEFAULT '{}'::jsonb`);
+  await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_provider text`);
+  await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS google_sub text`);
+  await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS apple_sub text`);
+  await db.query(`ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL`).catch(() => {});
+  await db.query(`CREATE UNIQUE INDEX IF NOT EXISTS users_google_sub_uk ON users (google_sub) WHERE google_sub IS NOT NULL`);
+  await db.query(`CREATE UNIQUE INDEX IF NOT EXISTS users_apple_sub_uk  ON users (apple_sub)  WHERE apple_sub  IS NOT NULL`);
+}
+migrate11().then(() => console.log('  ✓ migración 11 aplicada (config jsonb + auth social)'))
+           .catch(e => console.error('⚠ migración 11:', e.message));
 
 // ============================================================================
 //  MÓDULOS v1.1 (revenue + fidelización)

@@ -201,6 +201,10 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
 <div id="boot" class="bootload">Cargando tu panel…</div>
 
 <div id="app" style="display:none">
+<div id="verifyBanner" style="display:none;align-items:center;gap:12px;flex-wrap:wrap;justify-content:center;background:var(--green-soft);border-bottom:1px solid var(--border);padding:11px 16px;font-size:13.5px;color:var(--green)">
+  <span>Verifica tu email para activar tu prueba Pro y todas las funciones.</span>
+  <button id="verifyResend" class="btn btn-teal btn-sm" type="button">Reenviar correo</button>
+</div>
   <div class="mobnav" id="mobnav"></div>
   <div class="shell">
     <aside class="side">
@@ -495,6 +499,7 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
         <div class="tophead"><div><h1>Pagos</h1><p>Conecta tus cuentas y elige cómo cobras. El dinero llega directo a ti.</p></div></div>
         <div class="alert" id="payAlert"></div>
         <div id="paymentsList"></div>
+        <div id="pendingGifts"></div>
         <p style="font-size:12.5px;color:var(--ink2);margin-top:14px;line-height:1.6">Stripe cubre tarjetas, Apple Pay, Google Pay y Klarna en una sola conexión. PayPal y ATH Móvil van aparte. El efectivo lo marcas tú al cobrar en persona.</p>
       </section>
 
@@ -986,6 +991,32 @@ async function boot(){
   try { buildMobnav(); } catch(e){ console.error('buildMobnav', e); }
   try { loadDashboard(); } catch(e){ console.error('loadDashboard', e); }
   try { loadNotifCount(); } catch(e){ console.error('loadNotifCount', e); }
+  try { checkVerify(); } catch(e){ console.error('checkVerify', e); }
+  // Vuelta del OAuth de Stripe Connect: ?stripe=ok → ir a Pagos y avisar
+  try {
+    var sp = new URLSearchParams(location.search);
+    if(sp.get('stripe')==='ok'){
+      history.replaceState(null,'',location.pathname);
+      switchView('pagos');
+      setTimeout(function(){ showAlert('payAlert','Stripe conectado. Ya puedes cobrar con tarjeta.', true); }, 300);
+    }
+  } catch(e){ console.error('stripeReturn', e); }
+}
+
+// Banner de verificación de email (al verificar se activa el trial del referido)
+async function checkVerify(){
+  const r = await api('GET','/auth/me');
+  if(!r.ok || !r.data.user || r.data.user.email_verified) return;
+  const b = document.getElementById('verifyBanner');
+  if(!b) return;
+  b.style.display='flex';
+  const btn = document.getElementById('verifyResend');
+  if(btn) btn.onclick = async function(){
+    btn.disabled=true; btn.textContent='Enviando…';
+    const r2 = await api('POST','/auth/resend-verification');
+    btn.textContent = r2.ok ? 'Correo enviado' : 'Reintentar';
+    if(!r2.ok) btn.disabled=false;
+  };
 }
 
 async function loadOnboardingOptions(){
@@ -1674,6 +1705,30 @@ async function loadPayments(){
   const ath = r.data.ath_phone;
   list.innerHTML = r.data.providers.map(function(p){ return payCard(p, ath); }).join('');
   wirePayments();
+  loadPendingGifts();
+}
+// Gift cards compradas pero PENDIENTES de pago: el negocio las confirma al recibir el dinero.
+async function loadPendingGifts(){
+  const box = document.getElementById('pendingGifts');
+  if(!box) return;
+  const r = await api('GET','/gift-cards');
+  if(!r.ok){ box.innerHTML=''; return; }   // 403 si el negocio no tiene el add-on gift_cards
+  const cards = (r.data.gift_cards||[]).filter(function(g){ return g.status==='pending'; });
+  if(!cards.length){ box.innerHTML=''; return; }
+  box.innerHTML = '<div class="seclabel" style="margin-top:18px">Gift cards pendientes de pago</div>'+
+    '<p style="font-size:12.5px;color:var(--ink2);margin:0 0 10px;line-height:1.6">Confirma cuando recibas el pago del cliente. Hasta entonces la tarjeta no se puede usar.</p>'+
+    cards.map(function(g){
+      return '<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">'+
+        '<div style="min-width:0"><b>'+esc(g.code)+'</b> <span class="pill" style="background:#FDF0DC;color:#9A5B12;border-color:transparent">Pendiente</span>'+
+        '<div style="font-size:12px;color:var(--ink2);margin-top:2px">'+money(g.initial_cents)+(g.purchaser_name?(' · '+esc(g.purchaser_name)):'')+'</div></div>'+
+        '<button class="btn btn-teal btn-sm gift-confirm" data-code="'+esc(g.code)+'">Confirmar pago</button></div>';
+    }).join('');
+  box.querySelectorAll('.gift-confirm').forEach(function(b){ b.onclick = async function(){
+    b.disabled=true;
+    const r = await api('POST','/gift-cards/'+encodeURIComponent(b.dataset.code)+'/confirm');
+    if(r.ok){ showAlert('payAlert','Gift card activada.', true); loadPendingGifts(); }
+    else { showAlert('payAlert', r.data.error||'No se pudo confirmar.', false); b.disabled=false; }
+  };});
 }
 function payBadge(s){
   if(s==='connected') return '<span class="pill" style="background:var(--teal-soft);color:var(--teal-ink);border-color:transparent">Conectado</span>';
@@ -1686,8 +1741,26 @@ function payCard(p, ath){
     act = '<label style="display:flex;gap:7px;align-items:center;font-size:13px;cursor:pointer"><input type="checkbox" data-toggle="'+p.provider+'" '+(p.is_enabled?'checked':'')+'> Mostrar a clientes</label>'+
           '<button class="btn btn-ghost btn-sm pay-disc" data-p="'+p.provider+'">Desconectar</button>';
   } else if(p.provider==='ath_movil'){
-    act = '<input type="tel" id="athInput" placeholder="787-555-1234" value="'+(ath?esc(ath):'')+'" style="padding:9px 12px;border:1.5px solid var(--line);border-radius:10px;font-size:13px;max-width:160px">'+
-          '<button class="btn btn-teal btn-sm pay-conn" data-p="ath_movil">Conectar</button>';
+    act = '<div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;width:100%;max-width:320px">'+
+            '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end;width:100%">'+
+              '<input type="tel" id="athInput" placeholder="787-555-1234" value="'+(ath?esc(ath):'')+'" style="padding:9px 12px;border:1.5px solid var(--line);border-radius:10px;font-size:13px;max-width:160px">'+
+              '<button class="btn btn-teal btn-sm pay-conn" data-p="ath_movil">Conectar</button>'+
+            '</div>'+
+            '<label style="display:flex;gap:7px;align-items:center;font-size:12.5px;cursor:pointer;align-self:flex-start"><input type="checkbox" id="athAutoToggle"> Automatizar cobros (avanzado)</label>'+
+            '<div id="athAutoBox" style="display:none;width:100%">'+
+              '<input type="text" id="athPublicToken" placeholder="Public Token (de tu app ATH Business)" autocomplete="off" style="padding:9px 12px;border:1.5px solid var(--line);border-radius:10px;font-size:13px;width:100%;box-sizing:border-box">'+
+              '<p style="font-size:11.5px;color:var(--ink2);margin:6px 0 0;line-height:1.55">El Public Token no es secreto: se usa en el botón de cobro. Nunca pongas aquí tu Private Token. Los reembolsos se hacen en tu app ATH Business.</p>'+
+            '</div>'+
+          '</div>';
+  } else if(p.provider==='paypal'){
+    act = '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end;max-width:320px">'+
+            '<input type="text" id="paypalInput" placeholder="Tu usuario de PayPal.me (o email)" autocomplete="off" style="padding:9px 12px;border:1.5px solid var(--line);border-radius:10px;font-size:13px;max-width:220px">'+
+            '<button class="btn btn-teal btn-sm pay-conn" data-p="paypal">Conectar</button>'+
+          '</div>';
+  } else if(p.provider==='stripe'){
+    act = p.platform_ready
+      ? '<button class="btn btn-teal btn-sm pay-stripe">Conectar con Stripe</button>'
+      : '<span style="font-size:12px;color:var(--ink2)">Disponible pronto</span>';
   } else if(p.provider==='cash'){
     act = '<button class="btn btn-teal btn-sm pay-conn" data-p="cash">Activar</button>';
   } else if(p.external && !p.platform_ready){
@@ -1701,13 +1774,41 @@ function payCard(p, ath){
     '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+act+'</div></div>';
 }
 function wirePayments(){
+  // ATH Móvil: toggle de modo automático (Public Token)
+  var athToggle = document.getElementById('athAutoToggle');
+  if(athToggle){ athToggle.onchange = function(){
+    var box = document.getElementById('athAutoBox');
+    if(box) box.style.display = athToggle.checked ? 'block' : 'none';
+  }; }
   document.querySelectorAll('.pay-conn').forEach(function(b){ b.onclick = async function(){
     const provider = b.dataset.p; const body = {};
-    if(provider==='ath_movil'){ const v=(document.getElementById('athInput').value||'').trim(); if(!v){ showAlert('payAlert','Pon tu número de ATH Móvil.', false); return; } body.ath_phone=v; }
+    if(provider==='ath_movil'){
+      const v=(document.getElementById('athInput').value||'').trim();
+      if(!v){ showAlert('payAlert','Pon tu número de ATH Móvil.', false); return; }
+      body.ath_phone=v;
+      const tog=document.getElementById('athAutoToggle');
+      if(tog && tog.checked){
+        const tk=(document.getElementById('athPublicToken').value||'').trim();
+        if(!tk){ showAlert('payAlert','Pon tu Public Token o desactiva la automatización.', false); return; }
+        body.ath_public_token=tk;   // modo auto (el Public Token NO es secreto)
+      }
+    }
+    if(provider==='paypal'){
+      const h=(document.getElementById('paypalInput').value||'').trim();
+      if(!h){ showAlert('payAlert','Pon tu usuario de PayPal.me o tu email.', false); return; }
+      body.paypal_handle=h;
+    }
     b.disabled=true;
     const r = await api('POST','/payments/providers/'+provider+'/connect', body);
     if(r.ok){ showAlert('payAlert','Listo, método conectado.', true); loadPayments(); }
     else { showAlert('payAlert', r.data.error||'No se pudo conectar.', false); b.disabled=false; }
+  };});
+  // Stripe Connect: pedir la URL OAuth y redirigir
+  document.querySelectorAll('.pay-stripe').forEach(function(b){ b.onclick = async function(){
+    b.disabled=true;
+    const r = await api('GET','/payments/stripe/connect');
+    if(r.ok && r.data && r.data.url){ location.href = r.data.url; }
+    else { showAlert('payAlert', (r.data&&r.data.error)||'No se pudo iniciar la conexión con Stripe.', false); b.disabled=false; }
   };});
   document.querySelectorAll('.pay-disc').forEach(function(b){ b.onclick = async function(){
     const r = await api('POST','/payments/providers/'+b.dataset.p+'/disconnect');

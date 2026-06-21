@@ -76,6 +76,16 @@ html[data-theme="dark"] .tabs button.on{background:var(--green);color:var(--gree
 html[data-theme="dark"] .alert.err{background:rgba(225,75,60,.14);color:#FF9A8E;border-color:rgba(225,75,60,.35)}
 .alert.ok{display:block;background:var(--green-soft);color:var(--green);border:1px solid var(--green-glow)}
 .cta:disabled{opacity:.6;cursor:not-allowed}
+.social{display:none;flex-direction:column;gap:9px;margin-bottom:4px}
+.social.on{display:flex}
+.social-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;font-weight:700;font-size:14.5px;padding:13px;border-radius:14px;border:1.5px solid var(--border);background:var(--card);color:var(--text);transition:border-color .18s ease,background .18s ease}
+.social-btn:hover{border-color:var(--green)}
+.social-btn:disabled{opacity:.6;cursor:not-allowed}
+.social-btn .ic-svg{flex:none}
+#googleBtnHost{display:flex;justify-content:center}
+#googleBtnHost > div{width:100%!important}
+.sep{display:flex;align-items:center;gap:12px;margin:16px 0;color:var(--muted2);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.sep::before,.sep::after{content:"";flex:1;height:1px;background:var(--border)}
 </style>
 </head>
 <body>
@@ -94,6 +104,16 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
     <div class="tag">Tu turno, sin llamadas</div>
 
     <div class="card">
+      <!-- LOGIN SOCIAL -->
+      <div class="social" id="socialBox">
+        <div id="googleBtnHost"></div>
+        <button type="button" class="social-btn" id="appleBtn" style="display:none">
+          <svg class="ic-svg" viewBox="0 0 24 24" width="1.15em" height="1.15em" fill="currentColor" aria-hidden="true"><path d="M16.36 12.78c.02 2.5 2.2 3.34 2.22 3.35-.02.06-.35 1.2-1.15 2.37-.69 1.02-1.41 2.03-2.55 2.05-1.11.02-1.47-.66-2.74-.66-1.27 0-1.67.64-2.72.68-1.1.04-1.93-1.1-2.63-2.11-1.42-2.07-2.51-5.84-1.05-8.39.72-1.26 2.02-2.06 3.42-2.08 1.07-.02 2.09.72 2.74.72.66 0 1.89-.89 3.19-.76.55.02 2.08.22 3.06 1.67-.08.05-1.83 1.07-1.81 3.19zM14.29 5.4c.58-.7.97-1.68.86-2.65-.83.03-1.85.55-2.45 1.25-.54.62-1.01 1.61-.88 2.56.93.07 1.88-.47 2.47-1.16z"/></svg>
+          Continuar con Apple
+        </button>
+        <div class="sep">o</div>
+      </div>
+
       <div class="tabs">
         <button class="on" data-p="entrar">Entrar</button>
         <button data-p="crear">Crear cuenta</button>
@@ -241,6 +261,108 @@ document.getElementById('forgotLink').addEventListener('click', async (e)=>{
     link.textContent = '¿Olvidaste tu contraseña?';
   }
 });
+
+// ── LOGIN SOCIAL (Google / Apple) ─────────────────────────────────────────
+// Carga un script externo una sola vez y resuelve cuando está listo.
+function loadScript(src){
+  return new Promise((resolve, reject)=>{
+    if(document.querySelector('script[src="'+src+'"]')){ resolve(); return; }
+    const s = document.createElement('script');
+    s.src = src; s.async = true; s.defer = true;
+    s.onload = ()=>resolve();
+    s.onerror = ()=>reject(new Error('No se pudo cargar el conector. Revisa tu conexión.'));
+    document.head.appendChild(s);
+  });
+}
+
+// Muestra el mensaje en el alert de la pestaña activa (login o registro).
+function socialAlert(msg, ok){
+  const activePane = document.querySelector('.pane.on');
+  const id = (activePane && activePane.id === 'crear') ? 'regAlert' : 'loginAlert';
+  showAlert(id, msg, ok);
+}
+
+// Inicia sesión con el id_token de un proveedor social.
+async function socialLogin(provider, idToken){
+  try{
+    const data = await apiPost('/auth/' + provider, { id_token: idToken });
+    socialAlert('¡Bienvenido! Entrando…', true);
+    saveSessionAndGo(data);
+  }catch(err){
+    socialAlert(err.message, false);
+  }
+}
+
+(async function initSocial(){
+  let cfg;
+  try{
+    const r = await fetch(API + '/auth/config');
+    cfg = await r.json();
+  }catch(e){ return; } // sin config, no mostramos botones sociales
+  if(!cfg || (!cfg.google_client_id && !cfg.apple_client_id)) return;
+
+  let shown = false;
+
+  // ── Google Identity Services ──
+  if(cfg.google_client_id){
+    try{
+      await loadScript('https://accounts.google.com/gsi/client');
+      if(window.google && google.accounts && google.accounts.id){
+        google.accounts.id.initialize({
+          client_id: cfg.google_client_id,
+          callback: (resp)=>{ if(resp && resp.credential) socialLogin('google', resp.credential); }
+        });
+        const host = document.getElementById('googleBtnHost');
+        const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+        google.accounts.id.renderButton(host, {
+          theme: dark ? 'filled_black' : 'outline',
+          size: 'large',
+          shape: 'pill',
+          width: 360,
+          text: 'continue_with',
+          locale: 'es'
+        });
+        shown = true;
+      }
+    }catch(e){ /* silencioso: el login normal sigue disponible */ }
+  }
+
+  // ── Apple Sign In ──
+  if(cfg.apple_client_id){
+    try{
+      await loadScript('https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js');
+      if(window.AppleID && AppleID.auth){
+        AppleID.auth.init({
+          clientId: cfg.apple_client_id,
+          scope: 'name email',
+          redirectURI: location.origin + '/acceso.html',
+          usePopup: true
+        });
+        const appleBtn = document.getElementById('appleBtn');
+        appleBtn.style.display = 'flex';
+        appleBtn.addEventListener('click', async ()=>{
+          appleBtn.disabled = true;
+          try{
+            const res = await AppleID.auth.signIn();
+            const idToken = res && res.authorization && res.authorization.id_token;
+            if(idToken) await socialLogin('apple', idToken);
+            else socialAlert('No se pudo completar el inicio con Apple.', false);
+          }catch(err){
+            // El usuario canceló o hubo un error; no rompemos la página.
+            if(err && err.error && err.error !== 'popup_closed_by_user' && err.error !== 'user_cancelled_authorize'){
+              socialAlert('No se pudo iniciar sesión con Apple.', false);
+            }
+          }finally{
+            appleBtn.disabled = false;
+          }
+        });
+        shown = true;
+      }
+    }catch(e){ /* silencioso */ }
+  }
+
+  if(shown) document.getElementById('socialBox').classList.add('on');
+})();
 </script>
 </body>
 </html>

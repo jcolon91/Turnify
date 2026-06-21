@@ -391,22 +391,27 @@ module.exports.mount = function (app, ctx) {
     }
     const expires = new Date(); expires.setFullYear(expires.getFullYear() + 2); // 2 años
 
+    // SEGURIDAD: la tarjeta nace 'pending' (NO gastable). El pago lo cobra el negocio
+    // por sus métodos (ATH/efectivo/…); recién al CONFIRMARLO se vuelve 'active' y
+    // gastable (POST /api/gift-cards/:code/confirm). Espeja el flujo de add-ons: sin
+    // pago confirmado no se concede la función paga. Fijamos 'pending' explícito (no
+    // dependemos sólo del DEFAULT) para fallar cerrado aunque el DEFAULT no esté migrado.
     const { rows } = await db.query(
-      `INSERT INTO gift_cards (business_id, code, initial_cents, balance_cents,
+      `INSERT INTO gift_cards (business_id, code, initial_cents, balance_cents, status,
           purchaser_name, purchaser_email, recipient_name, recipient_email, message, expires_at)
-       VALUES ($1,$2,$3,$3,$4,$5,$6,$7,$8,$9)
-       RETURNING code, initial_cents, expires_at`,
+       VALUES ($1,$2,$3,$3,'pending',$4,$5,$6,$7,$8,$9)
+       RETURNING code, initial_cents, status, expires_at`,
       [biz.id, code, amount_cents, purchaser_name.trim(), purchaser_email.toLowerCase(),
        isStr(recipient_name, 120) ? recipient_name.trim() : null,
        isEmail(recipient_email) ? recipient_email.toLowerCase() : null,
        isStr(message, 300) ? message.trim() : null, expires]);
 
-    await notify(biz.id, 'giftcard', 'Gift card vendida',
-      `$${(amount_cents / 100).toFixed(2)} · ${purchaser_name.trim()}`, { code });
+    await notify(biz.id, 'giftcard', 'Gift card por confirmar',
+      `$${(amount_cents / 100).toFixed(2)} · ${purchaser_name.trim()} · confirma el pago para activarla`, { code });
 
     res.status(201).json({
       gift_card: rows[0],
-      note: 'El pago se procesa por los métodos del negocio. La tarjeta se activa al confirmarse.',
+      note: 'Te enviamos el código. El negocio lo activará al confirmar tu pago.',
     });
   }));
 
@@ -427,6 +432,8 @@ module.exports.mount = function (app, ctx) {
       `SELECT code, initial_cents, balance_cents, status, purchaser_name, recipient_name,
               expires_at, created_at
          FROM gift_cards WHERE business_id = $1 ORDER BY created_at DESC LIMIT 100`, [req.business.id]);
+    // outstanding/sold sólo cuentan tarjetas ya pagadas: 'pending' (sin pago confirmado)
+    // queda excluido, así no inflamos "vendido" con tarjetas que aún no se cobraron.
     const totals = await db.query(
       `SELECT COALESCE(sum(balance_cents),0)::int outstanding,
               COALESCE(sum(initial_cents),0)::int sold
@@ -434,11 +441,37 @@ module.exports.mount = function (app, ctx) {
     res.json({ gift_cards: rows, ...totals.rows[0] });
   }));
 
-  // negocio: anular una gift card (fraude, error)
+  // negocio: confirmar el pago de una gift card 'pending' → la activa (gastable).
+  // Mientras el cobro es manual (ATH/efectivo), el negocio confirma al recibir el
+  // dinero. Espeja el flujo de add-ons: sin pago confirmado NO se concede la función.
+  // Opcional: payment_id para dejar el vínculo de auditoría (debe ser del MISMO negocio).
+  app.post('/api/gift-cards/:code/confirm', authRequired, businessScope, requireGiftAddon, asyncH(async (req, res) => {
+    const { payment_id } = req.body || {};
+    // si nos pasan un pago, debe pertenecer a ESTE negocio (anti cross-tenant)
+    if (payment_id != null) {
+      if (!isUuid(payment_id)) return bad(res, 'payment_id inválido');
+      const p = await db.query(
+        `SELECT 1 FROM payments WHERE id = $1 AND business_id = $2`, [payment_id, req.business.id]);
+      if (!p.rows[0]) return bad(res, 'Pago no encontrado', 404);
+    }
+    const { rows } = await db.query(
+      `UPDATE gift_cards
+          SET status = 'active', payment_id = COALESCE($3, payment_id)
+        WHERE business_id = $1 AND code = $2 AND status = 'pending'
+        RETURNING code, initial_cents, balance_cents, status`,
+      [req.business.id, req.params.code.toUpperCase(), payment_id != null ? payment_id : null]);
+    if (!rows[0]) return bad(res, 'Gift card no encontrada o ya confirmada', 404);
+    await audit(req, 'giftcard.confirm', 'gift_card', null, { code: req.params.code, payment_id: payment_id || null });
+    await notify(req.business.id, 'giftcard', 'Gift card activada',
+      `La gift card ${rows[0].code} ya está activa.`, { code: rows[0].code });
+    res.json({ ok: true, gift_card: rows[0] });
+  }));
+
+  // negocio: anular una gift card (fraude, error, o 'pending' que nunca se pagó)
   app.post('/api/gift-cards/:code/void', authRequired, businessScope, requireGiftAddon, asyncH(async (req, res) => {
     const { rows } = await db.query(
       `UPDATE gift_cards SET status = 'void', balance_cents = 0
-        WHERE business_id = $1 AND code = $2 AND status IN ('active','partial')
+        WHERE business_id = $1 AND code = $2 AND status IN ('pending','active','partial')
         RETURNING code`, [req.business.id, req.params.code.toUpperCase()]);
     if (!rows[0]) return bad(res, 'Gift card no encontrada o ya usada', 404);
     await audit(req, 'giftcard.void', 'gift_card', null, { code: req.params.code });

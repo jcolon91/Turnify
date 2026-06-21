@@ -13,7 +13,7 @@
 
 module.exports.mount = function (app, ctx) {
   const { db, authRequired, businessScope, h } = ctx;
-  const { asyncH, bad, audit } = h;
+  const { asyncH, bad, audit, isUuid } = h;
 
   const PAID_PLANS = new Set(['pro', 'studio', 'team', 'grande', 'ilimitado']);
   const isPaid = (b) => PAID_PLANS.has(b.plan_code);
@@ -221,6 +221,7 @@ module.exports.mount = function (app, ctx) {
   }));
 
   app.delete('/api/accounting/expenses/:id', authRequired, businessScope, asyncH(async (req, res) => {
+    if (!isUuid(req.params.id)) return bad(res, 'ID inválido');
     if (!isPaid(req.business)) return bad(res, 'Disponible desde el plan Pro.', 403);
     const { rowCount } = await db.query(
       `DELETE FROM expenses WHERE id = $1 AND business_id = $2`,

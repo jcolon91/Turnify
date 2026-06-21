@@ -177,9 +177,22 @@ input,select,textarea{font:inherit}
 .btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;font-weight:700;font-size:16px;padding:15px;border-radius:14px;cursor:pointer}
 .btn-teal{background:var(--green);color:var(--green-ink)}
 .btn:disabled{opacity:.55;cursor:not-allowed}
+/* ── Métodos de pago del depósito ── */
+.paybtn{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--card);border:1.5px solid var(--line);color:var(--ink);font-weight:700;font-size:15px;padding:14px 16px;border-radius:14px;margin-bottom:10px;cursor:pointer}
+.paybtn:active{transform:scale(.99)}
+.paybtn .pmico{flex:0 0 26px;width:26px;height:26px;display:grid;place-items:center;color:var(--teal-ink)}
+.paybtn .pmico svg{width:24px;height:24px}
+.paybtn .pmtxt{flex:1;min-width:0}
+.paybtn .pmtxt small{display:block;font-weight:500;font-size:12px;color:var(--ink2);margin-top:1px}
+.paybtn.soon{opacity:.6;cursor:default}
+.paybtn .soonbadge{font-size:11px;font-weight:700;background:var(--card-soft);color:var(--ink2);padding:3px 9px;border-radius:99px}
+#athWidget{margin-bottom:10px}
+.pay-or{text-align:center;font-size:12px;color:var(--ink2);margin:6px 0 12px;text-transform:uppercase;letter-spacing:.06em}
+.pay-skip{display:block;width:100%;text-align:center;font-size:13px;font-weight:600;color:var(--ink2);margin-top:6px;padding:10px;cursor:pointer}
 .alert{display:none;font-size:13px;font-weight:600;padding:12px 14px;border-radius:12px;margin-bottom:14px;line-height:1.5}
 .alert.err{display:block;background:#FCE8E6;color:#A1281C;border:1px solid #F3C0BA}
 html[data-theme="dark"] .alert.err{background:rgba(255,90,70,.14);color:#FFB3A8;border-color:rgba(255,90,70,.3)}
+.alert.ok{display:block;background:var(--green-soft);color:var(--teal-ink);border:1px solid var(--line)}
 
 .view{display:none}.view.on{display:block}
 .backbtn{font-size:13px;color:var(--ink2);font-weight:600;margin-bottom:4px;display:inline-flex;align-items:center;gap:5px;cursor:pointer}
@@ -473,10 +486,18 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
       <button class="btn btn-teal" id="confirmBtn">Confirmar reserva →</button>
     </section>
 
+    <section class="view" id="stepPay">
+      <div class="seclabel">Asegura tu cita con un depósito</div>
+      <div class="summary" id="paySummary"></div>
+      <div class="alert" id="payAlert"></div>
+      <div id="payMethods"></div>
+      <p style="font-size:12.5px;color:var(--ink2);text-align:center;margin-top:14px">El depósito va directo al negocio. Tu cita queda reservada mientras tanto.</p>
+    </section>
+
     <section class="view" id="stepOk">
       <div class="success">
         <div class="check"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-        <h2>¡Reserva confirmada!</h2>
+        <h2 id="okTitle">¡Reserva confirmada!</h2>
         <p id="okDetail"></p>
         <div class="code" id="okCode"></div>
         <p style="font-size:13px">Guarda este código. Recibirás un recordatorio por WhatsApp.</p>
@@ -541,6 +562,7 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
         <h2>¡Gift card creada!</h2>
         <p id="giftOkDetail"></p>
         <div class="code" id="giftOkCode"></div>
+        <p id="giftOkNote" style="font-size:13px;color:var(--muted);margin-top:12px">Guarda este código. El negocio lo activará al confirmar tu pago.</p>
         <button class="btn btn-teal" id="giftOkClose" style="margin-top:18px">Listo</button>
       </div>
     </section>
@@ -590,7 +612,7 @@ const DOW = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
 const DOW_FULL = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
 const MON = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 
-const state = { biz:null, services:[], staff:[], hours:[], reviews:[], products:[], gallery:[], cart:[], fulfillment:'pickup', service:null, selectedServices:[], staffId:null, date:null, slot:null };
+const state = { biz:null, services:[], staff:[], hours:[], reviews:[], products:[], gallery:[], cart:[], fulfillment:'pickup', service:null, selectedServices:[], staffId:null, date:null, slot:null, payment_methods:[], payment_config:{} };
 
 // Iconos SVG profesionales (líneas limpias, sin emojis)
 const ICONS = {
@@ -600,6 +622,9 @@ const ICONS = {
   clock: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   dollar: '<svg viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   doc: '<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  phone2: '<svg viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="2.5"/><line x1="11" y1="18" x2="13" y2="18" stroke-linecap="round"/></svg>',
+  card: '<svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2.5"/><line x1="2" y1="10" x2="22" y2="10"/></svg>',
+  paypal: '<svg viewBox="0 0 24 24"><path d="M7.5 21l1.6-9.5h4.2c2.8 0 4.7-1.4 5.1-4 .4-2.6-1.1-4-3.9-4H8.9L6 21z" stroke-linecap="round" stroke-linejoin="round"/></svg>',
 };
 
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
@@ -634,6 +659,7 @@ async function boot(){
     state.hours = data.hours||[];
     state.reviews = data.reviews||[];
     state.payment_methods = data.payment_methods||[];
+    state.payment_config = data.payment_config||{};
     state.products = data.products||[];
     state.gallery = data.gallery||[];
     renderProfile();
@@ -1065,19 +1091,181 @@ document.getElementById('confirmBtn').onclick = async function(){
       return;
     }
     var appt = data.appointment || data;
-    var when = new Date(state.startIso);
-    document.getElementById('okDetail').textContent =
-      state.selectedServices.map(function(s){ return s.name; }).join(' + ')+' · '+when.toLocaleDateString('es-PR',{weekday:'long',day:'numeric',month:'long'})+' a las '+when.toLocaleTimeString('es-PR',{hour:'numeric',minute:'2-digit'});
-    document.getElementById('okCode').textContent = appt.confirmation_code || '—';
-    document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('on'); });
-    document.getElementById('stepOk').classList.add('on');
-    document.querySelectorAll('.step-dot').forEach(function(d){ d.classList.add('on'); });
-    document.querySelector('.bookmodal-body').scrollTop = 0;
+    state.appt = appt;
+    // Depósito requerido: usar el del backend si viene, si no, sumar el de los servicios elegidos
+    var depFromSvc = state.selectedServices.reduce(function(t,x){ return t + (x.deposit_cents||0); }, 0);
+    var depCents = (appt.deposit_cents!=null ? appt.deposit_cents : depFromSvc) || 0;
+    state.depCents = depCents;
+    if(depCents>0){
+      renderPayStep(appt, depCents);
+      document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('on'); });
+      document.getElementById('stepPay').classList.add('on');
+      document.querySelectorAll('.step-dot').forEach(function(d){ d.classList.add('on'); });
+      document.querySelector('.bookmodal-body').scrollTop = 0;
+    } else {
+      showOkStep(appt);
+    }
   }catch(e){
     showAlert('formAlert','Error de conexión. Intenta de nuevo.');
     btn.disabled=false; btn.textContent='Confirmar reserva →';
   }
 };
+
+// ═══════════ DEPÓSITO / COBRO (métodos del negocio, dinero directo al negocio) ═══════════
+// Usa state.payment_config del payload de /api/public/:slug:
+//   { ath:{mode,public_token,phone}, paypal:{handle}, stripe:{connected} }
+// El dinero va DIRECTO al negocio. Bukéame nunca custodia secretos ni el privateToken de ATH.
+
+function showOkStep(appt){
+  var when = new Date(state.startIso);
+  document.getElementById('okTitle').textContent = '¡Reserva confirmada!';
+  document.getElementById('okDetail').textContent =
+    state.selectedServices.map(function(s){ return s.name; }).join(' + ')+' · '+when.toLocaleDateString('es-PR',{weekday:'long',day:'numeric',month:'long'})+' a las '+when.toLocaleTimeString('es-PR',{hour:'numeric',minute:'2-digit'});
+  document.getElementById('okCode').textContent = (appt&&appt.confirmation_code) || (state.appt&&state.appt.confirmation_code) || '—';
+  document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('on'); });
+  document.getElementById('stepOk').classList.add('on');
+  document.querySelectorAll('.step-dot').forEach(function(d){ d.classList.add('on'); });
+  document.querySelector('.bookmodal-body').scrollTop = 0;
+}
+
+function renderPayStep(appt, depCents){
+  clearAlert('payAlert');
+  var code = (appt && appt.confirmation_code) || '';
+  var when = new Date(state.startIso);
+  document.getElementById('paySummary').innerHTML =
+    '<div class="row"><span>Cita</span><b>'+esc(state.selectedServices.map(function(s){ return s.name; }).join(' + '))+'</b></div>'+
+    '<div class="row"><span>Código</span><b>'+esc(code||'—')+'</b></div>'+
+    '<div class="row"><span>'+when.toLocaleDateString('es-PR',{weekday:'long',day:'numeric',month:'long'})+'</span><b>'+when.toLocaleTimeString('es-PR',{hour:'numeric',minute:'2-digit'})+'</b></div>'+
+    '<div class="row tot"><span>Depósito</span><b>'+money(depCents)+'</b></div>';
+
+  var cfg = state.payment_config || {};
+  var ath = cfg.ath || {};
+  var paypal = cfg.paypal || {};
+  var stripe = cfg.stripe || {};
+  var dollars = (depCents/100).toFixed(2);
+  var host = document.getElementById('payMethods');
+  host.innerHTML = '';
+  var hasAny = false;
+
+  // ── ATH Móvil AUTO: botón oficial client-side hacia la cuenta del negocio ──
+  if(ath && ath.mode==='auto' && ath.public_token){
+    hasAny = true;
+    var w = document.createElement('div'); w.id='athWidget';
+    // Contenedor oficial del botón ATH Móvil
+    w.innerHTML = '<div id="ATHMovil_Checkout_Button"></div>';
+    host.appendChild(w);
+    loadAthMovilButton(ath.public_token, depCents, code, appt);
+  }
+
+  // ── ATH Móvil MANUAL: teléfono + referencia (flujo actual EXACTO) ──
+  if(ath && ath.mode==='manual' && ath.phone){
+    hasAny = true;
+    var man = document.createElement('div');
+    man.innerHTML =
+      '<div class="paybtn" style="cursor:default;align-items:flex-start"><span class="pmico">'+ICONS.phone2+'</span>'+
+      '<span class="pmtxt">Paga por ATH Móvil al <b>'+esc(ath.phone)+'</b>'+
+      '<small>Luego escribe el número de referencia para confirmar.</small></span></div>'+
+      '<div class="field"><label>Número de referencia ATH</label><input id="athRef" placeholder="Ej. 123456789"></div>'+
+      '<button class="btn btn-teal" id="athManualBtn">Confirmar depósito →</button>';
+    host.appendChild(man);
+    document.getElementById('athManualBtn').onclick = function(){
+      var ref = (document.getElementById('athRef').value||'').trim();
+      if(!ref){ showAlert('payAlert','Escribe el número de referencia.'); return; }
+      submitAthConfirm(code, ref, this);
+    };
+  }
+
+  // ── PayPal: abre paypal.me/<handle>/<monto> en pestaña nueva ──
+  if(paypal && paypal.handle){
+    hasAny = true;
+    var pp = document.createElement('button');
+    pp.className='paybtn'; pp.type='button';
+    pp.innerHTML = '<span class="pmico">'+ICONS.paypal+'</span><span class="pmtxt">Pagar con PayPal<small>Se abre PayPal en una pestaña nueva</small></span>';
+    pp.onclick = function(){
+      var url = 'https://www.paypal.com/paypalme/'+encodeURIComponent(paypal.handle)+'/'+encodeURIComponent(dollars);
+      window.open(url, '_blank', 'noopener');
+    };
+    host.appendChild(pp);
+  }
+
+  // ── Stripe (tarjeta): procesamiento aún no cableado → "Próximamente" ──
+  if(stripe && stripe.connected){
+    hasAny = true;
+    var sb = document.createElement('div');
+    sb.className='paybtn soon';
+    sb.innerHTML = '<span class="pmico">'+ICONS.card+'</span><span class="pmtxt">Pagar con tarjeta<small>Tarjeta · Apple Pay · Google Pay</small></span><span class="soonbadge">Próximamente</span>';
+    host.appendChild(sb);
+  }
+
+  // ── Saltar el depósito (la cita ya quedó reservada) ──
+  var skip = document.createElement('div');
+  skip.className='pay-skip';
+  skip.textContent = hasAny ? 'Pagar el depósito más tarde' : 'Continuar';
+  skip.onclick = function(){ showOkStep(state.appt); };
+  host.appendChild(skip);
+
+  if(!hasAny){
+    document.querySelector('#stepPay .seclabel').textContent = 'Reserva confirmada';
+  }
+}
+
+// POST /api/public/:slug/appointments/:code/ath/confirm {reference}
+async function submitAthConfirm(code, reference, btnEl){
+  clearAlert('payAlert');
+  if(btnEl){ btnEl.disabled=true; btnEl.textContent='Confirmando…'; }
+  var res = await api('POST', '/public/'+encodeURIComponent(SLUG)+'/appointments/'+encodeURIComponent(code)+'/ath/confirm', { reference: reference });
+  if(res.ok){
+    showAlert('payAlert','Pago confirmado. ¡Tu cita está asegurada!');
+    document.getElementById('payAlert').className='alert ok';
+    setTimeout(function(){ showOkStep(state.appt); }, 1100);
+  } else {
+    if(btnEl){ btnEl.disabled=false; btnEl.textContent='Confirmar depósito →'; }
+    showAlert('payAlert', (res.data && res.data.error) || 'No pudimos confirmar el pago. Intenta de nuevo.');
+  }
+}
+
+// Carga el botón oficial de ATH Móvil (athmovil-javascript-api).
+// NOTA: la URL del SDK y la forma del objeto ATHM_Checkout/callbacks siguen la
+// athmovil-javascript-api y deben confirmarse contra los docs vigentes de ATH.
+// El publicToken NO es secreto (se usa client-side). El privateToken NUNCA va en el front.
+var __athLoaded = false;
+function loadAthMovilButton(publicToken, depCents, code, appt){
+  var total = +(depCents/100).toFixed(2);
+  // Objeto global que el SDK de ATH lee para construir el botón
+  window.ATHM_Checkout = {
+    env: 'production',
+    publicToken: publicToken,
+    timeout: 600,
+    theme: 'btn',
+    lang: 'es',
+    total: total,
+    subtotal: total,
+    tax: 0.00,
+    metadata1: code || '',
+    metadata2: (appt && appt.id) ? String(appt.id) : '',
+    items: [{ name: 'Depósito de cita', description: code||'', quantity: '1', price: total.toFixed(2), tax: '0.00', metadata: code||'' }]
+  };
+  // Callbacks globales que invoca el SDK de ATH
+  window.authorizationATHM = function(response){
+    try{
+      var ref = (response && (response.referenceNumber || response.ecommerceId || response.reference)) || '';
+      if(ref){ submitAthConfirm(code, ref, null); }
+      else { showAlert('payAlert','Pago recibido. Verificando…'); document.getElementById('payAlert').className='alert ok'; }
+    }catch(e){ showAlert('payAlert','Pago recibido, pero no pudimos leer la referencia.'); }
+  };
+  window.cancelATHM = function(){ showAlert('payAlert','Cancelaste el pago. Tu cita sigue reservada; puedes pagar el depósito más tarde.'); };
+  window.expiredATHM = function(){ showAlert('payAlert','El pago expiró. Intenta de nuevo o paga el depósito más tarde.'); };
+  if(__athLoaded){
+    if(typeof window.loadButtonATHM==='function'){ try{ window.loadButtonATHM(); }catch(e){} }
+    return;
+  }
+  var s = document.createElement('script');
+  s.src = 'https://www.athmovil.com/api/js/v3/athmovilV3.js';
+  s.async = true;
+  s.onload = function(){ __athLoaded = true; };
+  s.onerror = function(){ showAlert('payAlert','No se pudo cargar ATH Móvil. Usa otro método o paga el depósito más tarde.'); };
+  document.body.appendChild(s);
+}
 
 // ═══════════ TIENDA (productos + carrito) ═══════════
 function parseVariants(v){
@@ -1245,6 +1433,8 @@ document.getElementById('giftBtn').onclick = async function(){
   document.getElementById('giftOkDetail').textContent = 'Gift card de '+money(Math.round(amt*100))+(to?(' para '+to):'')+'.';
   var code = res.data.code || res.data.gift_card_id || (res.data.gift_card && (res.data.gift_card.code||res.data.gift_card.id)) || '';
   document.getElementById('giftOkCode').textContent = code || '✓';
+  var note = res.data.note || (res.data.gift_card && res.data.gift_card.note) || '';
+  document.getElementById('giftOkNote').textContent = note || 'Guarda este código. El negocio lo activará al confirmar tu pago.';
   document.getElementById('giftForm').style.display='none';
   document.getElementById('giftOk').style.display='block';
 };

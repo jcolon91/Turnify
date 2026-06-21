@@ -70,6 +70,16 @@ h1{font-family:var(--display);font-weight:800;font-size:26px;letter-spacing:-.02
 .statebadge.completed{background:#E5F6EC;color:#15803D}
 .statebadge.no_show{background:#FBE3DC;color:#A33A24}
 .bizname{font-family:var(--display);font-weight:800;font-size:20px;text-align:center;margin-bottom:4px}
+.field input.lefty{text-align:left;letter-spacing:normal;text-transform:none;font-family:var(--body);font-weight:500}
+.paybtn{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--bg2);border:1.5px solid var(--border);color:var(--text);font-weight:700;font-size:15px;padding:13px 15px;border-radius:14px;margin-bottom:10px;cursor:pointer}
+.paybtn:active{transform:translateY(1px)}
+.paybtn .pmico{flex:0 0 24px;width:24px;height:24px;display:grid;place-items:center;color:var(--green)}
+.paybtn .pmico svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2}
+.paybtn .pmtxt{flex:1;min-width:0}
+.paybtn .pmtxt small{display:block;font-weight:500;font-size:12px;color:var(--muted);margin-top:1px}
+.paybtn.soon{opacity:.6;cursor:default}
+.paybtn .soonbadge{font-size:11px;font-weight:700;background:var(--card-soft);color:var(--muted);padding:3px 9px;border-radius:99px}
+#ATHMovil_Checkout_Button{margin-bottom:10px}
 .view{display:none}.view.on{display:block}
 .foot{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:24px 0 40px}
 </style>
@@ -109,6 +119,13 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
         <div class="row"><span>Precio</span><b id="dPrice"></b></div>
         <div class="row" id="dAddrRow" style="display:none"><span>Dirección</span><b id="dAddr"></b></div>
       </div>
+    </div>
+    <!-- Depósito pendiente: cobro con los métodos del negocio (dinero directo al negocio) -->
+    <div class="card" id="depCard" style="display:none">
+      <div style="font-family:var(--display);font-weight:800;font-size:18px;text-align:center;margin-bottom:4px">Asegura tu cita</div>
+      <p class="sub" style="margin-bottom:14px">Falta el depósito de <b id="depAmt"></b>. Va directo al negocio.</p>
+      <div class="alert" id="payAlert"></div>
+      <div id="payMethods"></div>
     </div>
     <div class="alert" id="cancelAlert"></div>
     <button class="btn btn-danger" id="cancelBtn" style="margin-bottom:10px">Cancelar mi cita</button>
@@ -169,6 +186,8 @@ function renderDetail(a){
   // mostrar botón cancelar solo si la cita está activa
   const active = (st==='confirmed' || st==='pending_deposit');
   document.getElementById('cancelBtn').style.display = active ? 'flex' : 'none';
+  // Cobro del depósito si la cita está en pending_deposit y el negocio tiene métodos
+  renderDeposit(a, st);
   clearAlert('cancelAlert');
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));
   document.getElementById('detail').classList.add('on');
@@ -195,6 +214,130 @@ document.getElementById('cancelBtn').onclick = async function(){
     showAlert('cancelAlert','Error de conexión.', false);
   }
 };
+
+// ═══════════ DEPÓSITO / COBRO (métodos del negocio, dinero directo al negocio) ═══════════
+// Bukéame nunca custodia secretos ni el privateToken de ATH.
+const PAYICONS = {
+  phone2: '<svg viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="2.5"/><line x1="11" y1="18" x2="13" y2="18" stroke-linecap="round"/></svg>',
+  card: '<svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2.5"/><line x1="2" y1="10" x2="22" y2="10"/></svg>',
+  paypal: '<svg viewBox="0 0 24 24"><path d="M7.5 21l1.6-9.5h4.2c2.8 0 4.7-1.4 5.1-4 .4-2.6-1.1-4-3.9-4H8.9L6 21z" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+};
+
+async function api(method, path, body){
+  try{
+    const opt = { method:method, headers:{} };
+    if(body!==undefined){ opt.headers['Content-Type']='application/json'; opt.body=JSON.stringify(body); }
+    const r = await fetch(API+path, opt);
+    let data = null; try{ data = await r.json(); }catch(e){ data = null; }
+    return { ok:r.ok, status:r.status, data:data||{} };
+  }catch(e){ return { ok:false, status:0, data:{} }; }
+}
+
+function renderDeposit(a, st){
+  const card = document.getElementById('depCard');
+  const host = document.getElementById('payMethods');
+  host.innerHTML = '';
+  const slug = a.business_slug || a.slug || (a.business && a.business.slug) || '';
+  const depCents = (a.deposit_cents!=null ? a.deposit_cents : (a.deposit_amount_cents||0)) || 0;
+  const cfg = a.payment_config || (a.business && a.business.payment_config) || {};
+  if(st!=='pending_deposit' || depCents<=0 || !slug){ card.style.display='none'; return; }
+  document.getElementById('depAmt').textContent = money(depCents);
+  card.style.display='block';
+  clearAlert('payAlert');
+
+  const ath = cfg.ath || {};
+  const paypal = cfg.paypal || {};
+  const stripe = cfg.stripe || {};
+  const dollars = (depCents/100).toFixed(2);
+  let hasAny = false;
+
+  // ATH Móvil AUTO: botón oficial client-side hacia la cuenta del negocio
+  if(ath && ath.mode==='auto' && ath.public_token){
+    hasAny = true;
+    const w = document.createElement('div'); w.innerHTML = '<div id="ATHMovil_Checkout_Button"></div>';
+    host.appendChild(w);
+    loadAthMovilButton(slug, ath.public_token, depCents, currentCode, a);
+  }
+  // ATH Móvil MANUAL: teléfono + referencia
+  if(ath && ath.mode==='manual' && ath.phone){
+    hasAny = true;
+    const man = document.createElement('div');
+    man.innerHTML =
+      '<div class="paybtn" style="cursor:default;align-items:flex-start"><span class="pmico">'+PAYICONS.phone2+'</span>'+
+      '<span class="pmtxt">Paga por ATH Móvil al <b>'+esc(ath.phone)+'</b><small>Luego escribe el número de referencia.</small></span></div>'+
+      '<div class="field"><label>Número de referencia ATH</label><input id="athRef" class="lefty" placeholder="Ej. 123456789"></div>'+
+      '<button class="btn btn-teal" id="athManualBtn">Confirmar depósito →</button>';
+    host.appendChild(man);
+    document.getElementById('athManualBtn').onclick = function(){
+      const ref = (document.getElementById('athRef').value||'').trim();
+      if(!ref){ showAlert('payAlert','Escribe el número de referencia.',false); return; }
+      submitAthConfirm(slug, currentCode, ref, this);
+    };
+  }
+  // PayPal: paypal.me/<handle>/<monto>
+  if(paypal && paypal.handle){
+    hasAny = true;
+    const pp = document.createElement('button');
+    pp.className='paybtn'; pp.type='button';
+    pp.innerHTML = '<span class="pmico">'+PAYICONS.paypal+'</span><span class="pmtxt">Pagar con PayPal<small>Se abre en una pestaña nueva</small></span>';
+    pp.onclick = function(){
+      const url = 'https://www.paypal.com/paypalme/'+encodeURIComponent(paypal.handle)+'/'+encodeURIComponent(dollars);
+      window.open(url, '_blank', 'noopener');
+    };
+    host.appendChild(pp);
+  }
+  // Stripe (tarjeta): "Próximamente"
+  if(stripe && stripe.connected){
+    hasAny = true;
+    const sb = document.createElement('div');
+    sb.className='paybtn soon';
+    sb.innerHTML = '<span class="pmico">'+PAYICONS.card+'</span><span class="pmtxt">Pagar con tarjeta<small>Tarjeta · Apple Pay · Google Pay</small></span><span class="soonbadge">Próximamente</span>';
+    host.appendChild(sb);
+  }
+  if(!hasAny){ card.style.display='none'; }
+}
+
+async function submitAthConfirm(slug, code, reference, btnEl){
+  clearAlert('payAlert');
+  if(btnEl){ btnEl.disabled=true; btnEl.textContent='Confirmando…'; }
+  const res = await api('POST', '/public/'+encodeURIComponent(slug)+'/appointments/'+encodeURIComponent(code)+'/ath/confirm', { reference: reference });
+  if(res.ok){
+    showAlert('payAlert','Pago confirmado. ¡Tu cita está asegurada!', true);
+    setTimeout(lookup, 1100);
+  } else {
+    if(btnEl){ btnEl.disabled=false; btnEl.textContent='Confirmar depósito →'; }
+    showAlert('payAlert', (res.data && res.data.error) || 'No pudimos confirmar el pago. Intenta de nuevo.', false);
+  }
+}
+
+// Botón oficial de ATH Móvil (athmovil-javascript-api). El publicToken NO es secreto.
+// La URL del SDK y el objeto ATHM_Checkout/callbacks deben confirmarse contra los docs vigentes de ATH.
+let __athLoaded = false;
+function loadAthMovilButton(slug, publicToken, depCents, code, appt){
+  const total = +(depCents/100).toFixed(2);
+  window.ATHM_Checkout = {
+    env: 'production', publicToken: publicToken, timeout: 600, theme: 'btn', lang: 'es',
+    total: total, subtotal: total, tax: 0.00,
+    metadata1: code || '', metadata2: (appt && appt.id) ? String(appt.id) : '',
+    items: [{ name: 'Depósito de cita', description: code||'', quantity: '1', price: total.toFixed(2), tax: '0.00', metadata: code||'' }]
+  };
+  window.authorizationATHM = function(response){
+    try{
+      const ref = (response && (response.referenceNumber || response.ecommerceId || response.reference)) || '';
+      if(ref){ submitAthConfirm(slug, code, ref, null); }
+      else { showAlert('payAlert','Pago recibido. Verificando…', true); }
+    }catch(e){ showAlert('payAlert','Pago recibido, pero no pudimos leer la referencia.', false); }
+  };
+  window.cancelATHM = function(){ showAlert('payAlert','Cancelaste el pago. Tu cita sigue reservada.', false); };
+  window.expiredATHM = function(){ showAlert('payAlert','El pago expiró. Intenta de nuevo.', false); };
+  if(__athLoaded){ if(typeof window.loadButtonATHM==='function'){ try{ window.loadButtonATHM(); }catch(e){} } return; }
+  const s = document.createElement('script');
+  s.src = 'https://www.athmovil.com/api/js/v3/athmovilV3.js';
+  s.async = true;
+  s.onload = function(){ __athLoaded = true; };
+  s.onerror = function(){ showAlert('payAlert','No se pudo cargar ATH Móvil. Usa otro método.', false); };
+  document.body.appendChild(s);
+}
 
 document.getElementById('anotherBtn').onclick = function(){
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));
