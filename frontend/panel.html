@@ -500,7 +500,7 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
         <div class="alert" id="payAlert"></div>
         <div id="paymentsList"></div>
         <div id="pendingGifts"></div>
-        <p style="font-size:12.5px;color:var(--ink2);margin-top:14px;line-height:1.6">Stripe cubre tarjetas, Apple Pay, Google Pay y Klarna en una sola conexión. PayPal y ATH Móvil van aparte. El efectivo lo marcas tú al cobrar en persona.</p>
+        <p style="font-size:12.5px;color:var(--ink2);margin-top:14px;line-height:1.6">Cada método va <b>directo a tu cuenta</b>: ATH Móvil (tu teléfono, o tu Public Token para cobro automático), PayPal (tu usuario de PayPal.me), Stripe (tu Payment Link — créalo en tu panel de Stripe con "el cliente elige el monto"), y el efectivo lo marcas al cobrar en persona.</p>
       </section>
 
       <section class="view" id="view-cuenta">
@@ -845,8 +845,33 @@ async function loadStaff(){
     return;
   }
   list.innerHTML = staff.map(function(s){
-    return '<div class="svc"><div class="grow"><h4>'+esc(s.display_name)+'</h4><p>'+(s.bio?esc(s.bio):'Profesional')+'</p></div><button class="del" data-id="'+esc(s.id)+'">Quitar</button></div>';
+    var av = s.avatar_url
+      ? '<img src="'+esc(s.avatar_url)+'" alt="" style="width:46px;height:46px;border-radius:50%;object-fit:cover;flex:none">'
+      : '<div style="width:46px;height:46px;border-radius:50%;background:var(--green-soft);color:var(--green);display:grid;place-items:center;font-family:var(--display);font-weight:800;flex:none">'+esc((s.display_name||'?').charAt(0).toUpperCase())+'</div>';
+    return '<div class="svc">'+av+'<div class="grow"><h4>'+esc(s.display_name)+'</h4><p>'+(s.bio?esc(s.bio):'Profesional')+'</p></div>'+
+      '<button class="btn btn-ghost btn-sm st-photo" data-id="'+esc(s.id)+'">Foto</button>'+
+      '<button class="del" data-id="'+esc(s.id)+'">Quitar</button></div>';
   }).join('');
+  // Subir/cambiar foto del profesional (FormData, sin forzar Content-Type JSON)
+  list.querySelectorAll('.st-photo').forEach(function(b){
+    b.onclick = function(){
+      var inp = document.createElement('input');
+      inp.type = 'file'; inp.accept = 'image/*';
+      inp.onchange = async function(){
+        if(!inp.files || !inp.files[0]) return;
+        var fd = new FormData(); fd.append('photo', inp.files[0]);
+        b.disabled = true; b.textContent = '…';
+        var ok = false, msg = 'No se pudo subir la foto.';
+        try {
+          var resp = await fetch(API + '/staff/' + b.dataset.id + '/photo', { method:'POST', headers:{ 'Authorization':'Bearer ' + token }, body: fd });
+          ok = resp.ok; if(!ok){ try{ var d = await resp.json(); msg = d.error || msg; }catch(e){} }
+        } catch(e) {}
+        b.disabled = false; b.textContent = 'Foto';
+        if(ok) loadStaff(); else alert(msg);
+      };
+      inp.click();
+    };
+  });
   list.querySelectorAll('.del').forEach(function(b){
     b.onclick = async function(){
       if(!confirm('¿Quitar este profesional?')) return;
@@ -1740,6 +1765,8 @@ function payCard(p, ath){
   if(p.status==='connected'){
     act = '<label style="display:flex;gap:7px;align-items:center;font-size:13px;cursor:pointer"><input type="checkbox" data-toggle="'+p.provider+'" '+(p.is_enabled?'checked':'')+'> Mostrar a clientes</label>'+
           '<button class="btn btn-ghost btn-sm pay-disc" data-p="'+p.provider+'">Desconectar</button>';
+  } else if(p.plan_locked){
+    act = '<span style="font-size:12px;color:var(--ink2)">Disponible desde el plan Pro</span>';
   } else if(p.provider==='ath_movil'){
     act = '<div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;width:100%;max-width:320px">'+
             '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end;width:100%">'+
@@ -1758,9 +1785,10 @@ function payCard(p, ath){
             '<button class="btn btn-teal btn-sm pay-conn" data-p="paypal">Conectar</button>'+
           '</div>';
   } else if(p.provider==='stripe'){
-    act = p.platform_ready
-      ? '<button class="btn btn-teal btn-sm pay-stripe">Conectar con Stripe</button>'
-      : '<span style="font-size:12px;color:var(--ink2)">Disponible pronto</span>';
+    act = '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end;max-width:340px">'+
+            '<input type="text" id="stripeInput" placeholder="Tu Payment Link de Stripe (https://buy.stripe.com/…)" autocomplete="off" style="padding:9px 12px;border:1.5px solid var(--line);border-radius:10px;font-size:13px;max-width:240px">'+
+            '<button class="btn btn-teal btn-sm pay-conn" data-p="stripe">Conectar</button>'+
+          '</div>';
   } else if(p.provider==='cash'){
     act = '<button class="btn btn-teal btn-sm pay-conn" data-p="cash">Activar</button>';
   } else if(p.external && !p.platform_ready){
@@ -1797,6 +1825,11 @@ function wirePayments(){
       const h=(document.getElementById('paypalInput').value||'').trim();
       if(!h){ showAlert('payAlert','Pon tu usuario de PayPal.me o tu email.', false); return; }
       body.paypal_handle=h;
+    }
+    if(provider==='stripe'){
+      const l=(document.getElementById('stripeInput').value||'').trim();
+      if(!l){ showAlert('payAlert','Pega tu Payment Link de Stripe.', false); return; }
+      body.stripe_link=l;
     }
     b.disabled=true;
     const r = await api('POST','/payments/providers/'+provider+'/connect', body);

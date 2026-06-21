@@ -149,7 +149,7 @@ CREATE TABLE IF NOT EXISTS ath_events (
   status       text NOT NULL,
   received_at  timestamptz NOT NULL DEFAULT now()
 );
-GRANT SELECT, INSERT, UPDATE, DELETE ON ath_events TO turnify_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ath_events TO bukeame_user;
 ```
 
 ---
@@ -421,7 +421,7 @@ opción avanzada (opt-in) — NO migrar a todos.** Razonamiento:
 ## PARTE 8 — Dónde toca cada cosa en el código actual
 
 - `database/09-schema-ath-movil.sql` → `secret_enc bytea` en `payment_providers` + tabla
-  `ath_events`; `GRANT ... TO turnify_user`.
+  `ath_events`; `GRANT ... TO bukeame_user`.
 - `backend/module-payments.js` → ampliar `POST /providers/ath_movil/connect` (modo auto con
   validación + cifrado); añadir el cliente HTTP de ATH (o `module-ath.js`).
 - `backend/server.js` → endpoints públicos `.../ath/start` y `.../ath/status`; en el booking,

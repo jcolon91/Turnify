@@ -10,14 +10,14 @@ Esta guía instala Bukéame en el mismo VPS donde corre Wifnix, **completamente 
 
 | | Wifnix | Bukéame |
 |---|---|---|
-| Carpeta | `/var/www/wifnix` | `/var/www/turnify` |
-| Proceso PM2 | `wifnix-api` | `turnify-api` |
+| Carpeta | `/var/www/wifnix` | `/var/www/bukeame` |
+| Proceso PM2 | `wifnix-api` | `bukeame-api` |
 | Puerto | `:3000` | `:3001` |
-| Base de datos | `wifnix` | `turnify` |
-| Usuario DB | (el de Wifnix) | `turnify_user` |
+| Base de datos | `wifnix` | `bukeame` |
+| Usuario DB | (el de Wifnix) | `bukeame_user` |
 | Nginx | (server block Wifnix) | server block aparte |
 
-El usuario `turnify_user` **no tiene permisos** sobre la base de datos de Wifnix. Pared a nivel de motor.
+El usuario `bukeame_user` **no tiene permisos** sobre la base de datos de Wifnix. Pared a nivel de motor.
 
 ---
 
@@ -48,11 +48,11 @@ Dentro de psql:
 
 ```sql
 -- Crear usuario y base de datos de Bukéame
-CREATE USER turnify_user WITH PASSWORD 'PON_UN_PASSWORD_FUERTE_AQUI';
-CREATE DATABASE turnify OWNER turnify_user;
+CREATE USER bukeame_user WITH PASSWORD 'PON_UN_PASSWORD_FUERTE_AQUI';
+CREATE DATABASE bukeame OWNER bukeame_user;
 
 -- Asegurar que NO tiene acceso a la base de Wifnix
-REVOKE ALL ON DATABASE wifnix FROM turnify_user;
+REVOKE ALL ON DATABASE wifnix FROM bukeame_user;
 
 \q
 ```
@@ -63,9 +63,9 @@ REVOKE ALL ON DATABASE wifnix FROM turnify_user;
 
 ```bash
 cd /var/www
-sudo git clone https://github.com/jcolon91/Bukeame.git turnify
-sudo chown -R $USER:$USER /var/www/turnify
-cd /var/www/turnify
+sudo git clone https://github.com/jcolon91/Bukeame.git bukeame
+sudo chown -R $USER:$USER /var/www/bukeame
+cd /var/www/bukeame
 ```
 
 > Si prefieres tu método de `wget` por archivo (como en Wifnix), también sirve — pero `git clone` es más limpio para la primera instalación.
@@ -75,15 +75,15 @@ cd /var/www/turnify
 ## 3. Cargar los esquemas de la base de datos
 
 ```bash
-cd /var/www/turnify/database
-psql -U turnify_user -d turnify -f 01-schema-base.sql
-psql -U turnify_user -d turnify -f 02-schema-v1.1.sql
+cd /var/www/bukeame/database
+psql -U bukeame_user -d bukeame -f 01-schema-base.sql
+psql -U bukeame_user -d bukeame -f 02-schema-v1.1.sql
 ```
 
 Verifica que cargó (debe mostrar ~40 tablas):
 
 ```bash
-psql -U turnify_user -d turnify -c "\dt" | wc -l
+psql -U bukeame_user -d bukeame -c "\dt" | wc -l
 ```
 
 ---
@@ -91,7 +91,7 @@ psql -U turnify_user -d turnify -c "\dt" | wc -l
 ## 4. Configurar el backend
 
 ```bash
-cd /var/www/turnify/backend
+cd /var/www/bukeame/backend
 npm install --production
 
 # Crear el .env desde la plantilla
@@ -110,13 +110,13 @@ En el `.env`, llena:
 ## 5. Validar y arrancar con PM2
 
 ```bash
-cd /var/www/turnify/backend
+cd /var/www/bukeame/backend
 
 # Validar sintaxis primero (tu paso de siempre)
 node --check server.js
 
 # Arrancar con PM2 (límite de memoria por seguridad)
-pm2 start server.js --name turnify-api --max-memory-restart 300M
+pm2 start server.js --name bukeame-api --max-memory-restart 300M
 pm2 save
 ```
 
@@ -127,7 +127,7 @@ pm2 list
 curl http://localhost:3001/api/health
 ```
 
-Debe responder: `{"ok":true,"service":"turnify-api",...}`
+Debe responder: `{"ok":true,"service":"bukeame-api",...}`
 
 ---
 
@@ -147,7 +147,7 @@ server {
     server_name bukeame.com www.bukeame.com;
 
     # Frontend (HTML estático)
-    root /var/www/turnify/frontend;
+    root /var/www/bukeame/frontend;
     index index.html;
 
     location / {
@@ -191,14 +191,14 @@ Certbot configura HTTPS automáticamente y renueva solo.
 Cuando haya cambios en el código:
 
 ```bash
-cd /var/www/turnify
+cd /var/www/bukeame
 git pull origin main
 
 # Si cambió el backend:
 cd backend
 npm install --production        # solo si cambiaron dependencias
 node --check server.js
-pm2 restart turnify-api
+pm2 restart bukeame-api
 
 # Si cambió el frontend: nada que hacer, Nginx ya sirve los HTML nuevos
 # Si cambió la base de datos: corre el nuevo .sql con psql
@@ -209,13 +209,13 @@ pm2 restart turnify-api
 ## Comandos útiles
 
 ```bash
-pm2 logs turnify-api           # ver logs en vivo
-pm2 restart turnify-api        # reiniciar
-pm2 stop turnify-api           # detener
+pm2 logs bukeame-api           # ver logs en vivo
+pm2 restart bukeame-api        # reiniciar
+pm2 stop bukeame-api           # detener
 pm2 monit                      # monitor de recursos
 
 # Ver conexiones a la base de datos
-sudo -u postgres psql -d turnify -c "SELECT count(*) FROM pg_stat_activity WHERE datname='turnify';"
+sudo -u postgres psql -d bukeame -c "SELECT count(*) FROM pg_stat_activity WHERE datname='bukeame';"
 ```
 
 ---
@@ -224,7 +224,7 @@ sudo -u postgres psql -d turnify -c "SELECT count(*) FROM pg_stat_activity WHERE
 
 **El API no responde:**
 ```bash
-pm2 logs turnify-api --lines 50
+pm2 logs bukeame-api --lines 50
 ```
 
 **Error de conexión a la base de datos:**
@@ -232,7 +232,7 @@ pm2 logs turnify-api --lines 50
 - Confirma que PostgreSQL corre: `sudo systemctl status postgresql`
 
 **Nginx da 502:**
-- El backend probablemente está caído: `pm2 list` y `pm2 restart turnify-api`
+- El backend probablemente está caído: `pm2 list` y `pm2 restart bukeame-api`
 
 **Puerto 3001 ocupado:**
 - Cambia `PORT` en `.env` a otro (ej. 3002) y actualiza el `proxy_pass` en Nginx.

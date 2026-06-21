@@ -1,6 +1,6 @@
 -- ============================================================================
 --  BUKEAME — Migración: métodos de pago por negocio (fundación)
---  Idempotente. Correr: sudo -u postgres psql -d turnify -f database/07-schema-payments.sql
+--  Idempotente. Correr: sudo -u postgres psql -d bukeame -f database/07-schema-payments.sql
 -- ----------------------------------------------------------------------------
 --  Cada negocio conecta SUS propias cuentas y recibe el dinero directo
 --  (Bukeame no toca el dinero). Un solo Stripe Connect cubre tarjetas + Apple Pay
@@ -41,7 +41,7 @@ DO $$ BEGIN
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON payment_providers TO turnify_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON payment_providers TO bukeame_user;
 
 COMMIT;
 

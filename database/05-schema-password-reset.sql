@@ -11,4 +11,4 @@ CREATE TABLE IF NOT EXISTS password_resets (
 CREATE INDEX IF NOT EXISTS idx_pwreset_token ON password_resets(token_hash);
 CREATE INDEX IF NOT EXISTS idx_pwreset_user  ON password_resets(user_id);
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON password_resets TO turnify_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON password_resets TO bukeame_user;

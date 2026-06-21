@@ -36,10 +36,9 @@ module.exports.mount = function (app, ctx) {
   // ¿La PLATAFORMA (Bukeame) ya tiene las credenciales para este proveedor?
   // Stripe sigue gateado (OAuth necesita el client_id + secret de la plataforma).
   // PayPal y ATH Móvil son ahora self-serve (el negocio pone su propio handle/teléfono).
-  const platformReady = (provider) => {
-    if (provider === 'stripe') return !!(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_CONNECT_CLIENT_ID);
-    return true; // paypal / ath_movil / cash no dependen de credenciales de plataforma
-  };
+  // Todos los métodos son self-serve (el negocio pone su propio handle/link/teléfono):
+  // ninguno depende de credenciales de plataforma de Bukéame.
+  const platformReady = () => true;
 
   // Nunca exponemos el account_ref completo, solo una pista
   const maskRef = (provider, ref) => {
@@ -52,6 +51,13 @@ module.exports.mount = function (app, ctx) {
   const isPaypalHandle = v =>
     typeof v === 'string' && (/^[A-Za-z0-9]{1,20}$/.test(v.trim())
       || (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim()) && v.trim().length <= 254));
+
+  // Stripe Payment Link del negocio: una URL https de Stripe (buy.stripe.com / *.stripe.com).
+  const isStripeLink = v => {
+    if (typeof v !== 'string' || v.length > 500) return false;
+    try { const u = new URL(v.trim()); return u.protocol === 'https:' && /(^|\.)stripe\.com$/.test(u.hostname); }
+    catch { return false; }
+  };
 
   // ── State firmado para el OAuth de Stripe (HMAC-SHA256 con JWT_SECRET) ──────
   // Lleva el business_id + un nonce + expiración corta; se valida al volver.
@@ -90,7 +96,10 @@ module.exports.mount = function (app, ctx) {
       ath_public_token: cfg.ath_public_token || null,   // público: va en el botón client-side
     };
     if (provider === 'paypal')  return { paypal_handle: cfg.paypal_handle || null };
-    if (provider === 'stripe')  return { stripe_connected: !!cfg.stripe_account_id };
+    if (provider === 'stripe')  return {
+      stripe_payment_link: cfg.stripe_payment_link || null,   // público: es para compartir
+      stripe_connected: !!(cfg.stripe_payment_link || cfg.stripe_account_id),
+    };
     return {};
   };
 
@@ -113,6 +122,7 @@ module.exports.mount = function (app, ctx) {
         account_hint: maskRef(p, r.account_ref),
         connected_at: r.connected_at,
         platform_ready: platformReady(p),   // si false, "Conectar" aún no está disponible
+        plan_locked: (p !== 'cash' && (req.business.plan_code || 'free') === 'free'), // GRATIS solo Efectivo
         config: publicConfig(p, r.config || {}),  // datos públicos para la UI
       };
     });
@@ -146,6 +156,11 @@ module.exports.mount = function (app, ctx) {
     const provider = req.params.provider;
     if (!PROVIDERS[provider]) return bad(res, 'Proveedor inválido', 404);
     await ensureRows(req.business.id);
+
+    // Gate por plan: el plan GRATIS solo puede activar Efectivo. ATH Móvil, PayPal y
+    // Stripe (cobros en línea) requieren plan Pro o superior.
+    if (provider !== 'cash' && (req.business.plan_code || 'free') === 'free')
+      return bad(res, 'Recibir pagos en línea (ATH Móvil, PayPal, Stripe) está disponible desde el plan Pro. Sube de plan para conectar tus cuentas.', 403);
 
     // Efectivo: no hay cuenta externa, se conecta al instante
     if (provider === 'cash') {
@@ -202,11 +217,21 @@ module.exports.mount = function (app, ctx) {
       return res.json({ ok: true, status: 'connected' });
     }
 
-    // Stripe: NO se conecta por aquí. Usa el flujo OAuth: GET /api/payments/stripe/connect.
+    // Stripe: self-serve con un Payment Link del negocio (creado en SU dashboard de Stripe,
+    // con "el cliente elige el monto"). El cliente paga ahí directo; Bukéame no toca el dinero
+    // ni necesita llaves. Igual que PayPal.me.
     if (provider === 'stripe') {
-      if (!platformReady('stripe'))
-        return bad(res, 'La conexión con Stripe estará disponible muy pronto — estamos terminando de configurarla.', 503);
-      return bad(res, 'Conecta Stripe con el botón "Conectar con Stripe" (OAuth).', 409);
+      const link = req.body?.stripe_link;
+      if (!isStripeLink(link)) return bad(res, 'Pega tu Payment Link de Stripe (empieza con https://buy.stripe.com/…)');
+      const clean = String(link).trim();
+      await db.query(
+        `UPDATE payment_providers
+            SET status='connected', is_enabled=true, account_ref=$2,
+                config = config || $3::jsonb, connected_at=now()
+          WHERE business_id = $1 AND provider = 'stripe'`,
+        [req.business.id, clean.slice(0, 40), JSON.stringify({ stripe_payment_link: clean })]);
+      await audit(req, 'payment.connect', 'payment_provider', null, { provider });
+      return res.json({ ok: true, status: 'connected' });
     }
 
     return bad(res, 'Proveedor inválido', 404);
@@ -231,8 +256,10 @@ module.exports.mount = function (app, ctx) {
 
   // ── GET /api/payments/stripe/connect — arma la URL OAuth y la devuelve ─────
   app.get('/api/payments/stripe/connect', authRequired, businessScope, asyncH(async (req, res) => {
-    if (!platformReady('stripe'))
-      return bad(res, 'La conexión con Stripe estará disponible muy pronto.', 503);
+    // OAuth Connect avanzado (OPCIONAL): solo si la plataforma tiene credenciales. El modo
+    // self-serve por Payment Link (POST /connect {stripe_link}) NO usa esto.
+    if (!(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_CONNECT_CLIENT_ID))
+      return bad(res, 'Conecta Stripe pegando tu Payment Link.', 409);
     await ensureRows(req.business.id);
     const state = signState(req.business.id);
     const params = new URLSearchParams({

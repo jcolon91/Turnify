@@ -1,6 +1,6 @@
 -- ============================================================================
 --  BUKEAME — Verificación de email (cierra el abuso de trial Pro por multicuenta)
---  Idempotente. Correr: sudo -u postgres psql -d turnify -f database/10-schema-email-verification.sql
+--  Idempotente. Correr: sudo -u postgres psql -d bukeame -f database/10-schema-email-verification.sql
 -- ----------------------------------------------------------------------------
 --  El trial Pro de 15 días por referido ahora se concede SOLO cuando el dueño
 --  verifica su email (POST /api/auth/verify-email). Un atacante con cuentas
@@ -26,8 +26,8 @@ CREATE INDEX IF NOT EXISTS idx_emailverif_token ON email_verifications(token_has
 CREATE INDEX IF NOT EXISTS idx_emailverif_user  ON email_verifications(user_id);
 
 -- Permisos para el rol de la app
-GRANT SELECT, INSERT, UPDATE, DELETE ON email_verifications TO turnify_user;
-GRANT SELECT, UPDATE ON users TO turnify_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON email_verifications TO bukeame_user;
+GRANT SELECT, UPDATE ON users TO bukeame_user;
 
 COMMIT;
 

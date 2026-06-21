@@ -114,40 +114,28 @@ module.exports.mount = function (app, ctx) {
       `SELECT plan_code FROM subscriptions WHERE business_id = $1`, [req.business.id]);
     if (!subQ.rows[0]) return bad(res, 'El negocio no tiene suscripción registrada', 404);
 
-    // Sin pago confirmado: registramos la solicitud y avisamos. Se activa con Stripe.
-    if (!SELF_SERVE_PAID) {
-      await audit(req, 'plan.request', 'business', req.business.id, { plan_code: planCode });
-      await notify(req.business.id, 'system', 'Solicitud de cambio de plan recibida',
-        `Pediste cambiar al plan "${planCode}". Se activa al confirmar el pago.`, { plan_code: planCode });
-      return res.status(402).json({ error: 'Pago pendiente — se activa con Stripe', pending: true });
-    }
-
-    // Self-serve activo: aplicar el cambio (misma lógica que el admin).
-    let rows;
+    // Bajar a 'free' (downgrade) NO requiere pago → aplica al instante.
     if (planCode === 'free') {
-      ({ rows } = await db.query(
+      const { rows } = await db.query(
         `UPDATE subscriptions
             SET plan_code = 'free', status = 'active',
                 current_period_start = now(), current_period_end = NULL,
                 cancel_at_period_end = false, trial_ends_at = NULL
           WHERE business_id = $1
           RETURNING plan_code`,
-        [req.business.id]));
-    } else {
-      ({ rows } = await db.query(
-        `UPDATE subscriptions
-            SET plan_code = $2::plan_code, status = 'active',
-                current_period_start = now(),
-                current_period_end = now() + interval '1 month',
-                cancel_at_period_end = false, trial_ends_at = NULL
-          WHERE business_id = $1
-          RETURNING plan_code`,
-        [req.business.id, planCode]));
+        [req.business.id]);
+      if (!rows[0]) return bad(res, 'El negocio no tiene suscripción registrada', 404);
+      await audit(req, 'plan.downgrade', 'business', req.business.id, { plan_code: 'free' });
+      return res.json({ ok: true, plan_code: rows[0].plan_code });
     }
-    if (!rows[0]) return bad(res, 'El negocio no tiene suscripción registrada', 404);
 
-    await audit(req, 'plan.selfserve', 'business', req.business.id, { plan_code: planCode });
-    res.json({ ok: true, plan_code: rows[0].plan_code });
+    // Subir a un plan DE PAGO NUNCA se aplica solo: requiere pago confirmado. Registramos
+    // la solicitud y avisamos; el plan se activa por admin/Stripe tras confirmar el cobro.
+    // (NO depende de SELF_SERVE_PAID — los planes nunca suben automáticos sin pago.)
+    await audit(req, 'plan.request', 'business', req.business.id, { plan_code: planCode });
+    await notify(req.business.id, 'system', 'Solicitud de cambio de plan recibida',
+      `Pediste cambiar al plan "${planCode}". Te lo activamos al confirmar el pago.`, { plan_code: planCode });
+    return res.status(402).json({ error: 'El cambio a un plan de pago se activa al confirmar el pago.', pending: true });
   }));
 
   // ──────────────────────────────────────────────────────────────────────────

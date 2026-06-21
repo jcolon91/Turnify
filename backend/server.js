@@ -1,14 +1,14 @@
 // ============================================================================
 //  BUKEAME API — server.js v1.0
-//  Express :3001 · PostgreSQL "turnify" · Aislado de wifnix-api (:3000) — totalmente aislado
+//  Express :3001 · PostgreSQL "bukeame" · Aislado de wifnix-api (:3000) — totalmente aislado
 // ----------------------------------------------------------------------------
 //  DEPLOY (VPS 2.24.70.107):
-//    mkdir -p /var/www/turnify && cd /var/www/turnify
+//    mkdir -p /var/www/bukeame && cd /var/www/bukeame
 //    wget <raw github>/server.js <raw>/package.json <raw>/.env.example
 //    cp .env.example .env && nano .env        # llena secretos
 //    npm install --omit=dev
 //    node --check server.js
-//    pm2 start server.js --name turnify-api --max-memory-restart 300M
+//    pm2 start server.js --name bukeame-api --max-memory-restart 300M
 //    pm2 save
 // ============================================================================
 
@@ -74,8 +74,10 @@ const UPLOAD_DIR = path.join(__dirname, 'uploads');
 const LOGO_DIR   = path.join(UPLOAD_DIR, 'logos');
 const COVER_DIR  = path.join(UPLOAD_DIR, 'covers');
 const PORTFOLIO_DIR = path.join(UPLOAD_DIR, 'portfolio');
+const STAFF_DIR  = path.join(UPLOAD_DIR, 'staff');
 try { fs.mkdirSync(LOGO_DIR, { recursive: true }); } catch (e) { /* ya existe */ }
 try { fs.mkdirSync(COVER_DIR, { recursive: true }); } catch (e) { /* ya existe */ }
+try { fs.mkdirSync(STAFF_DIR, { recursive: true }); } catch (e) { /* ya existe */ }
 try { fs.mkdirSync(PORTFOLIO_DIR, { recursive: true }); } catch (e) { /* ya existe */ }
 
 // Borra un archivo de /uploads de forma SEGURA. Toma solo el basename y verifica
@@ -945,6 +947,50 @@ app.delete('/api/staff/:id', authRequired, businessScope, asyncH(async (req, res
   res.json({ ok: true });
 }));
 
+// Subir/reemplazar la foto de un profesional (cuadrado 400x400 webp)
+app.post('/api/staff/:id/photo', authRequired, businessScope,
+  (req, res, next) => uploadLogo.single('photo')(req, res, (err) => {
+    if (err) return bad(res, err.message || 'Error al subir la foto');
+    next();
+  }),
+  asyncH(async (req, res) => {
+    if (!isUuid(req.params.id)) return bad(res, 'ID inválido');
+    if (!req.file) return bad(res, 'No se recibió ninguna imagen');
+    const st = await db.query(
+      `SELECT id, avatar_url FROM staff WHERE id = $1 AND business_id = $2 AND deleted_at IS NULL`,
+      [req.params.id, req.business.id]);
+    if (!st.rows[0]) return bad(res, 'Profesional no encontrado', 404);
+    const filename = `${req.params.id}-${Date.now()}.webp`;
+    const filepath = path.join(STAFF_DIR, filename);
+    try {
+      await sharp(req.file.buffer, { limitInputPixels: 24000000, failOn: 'error' })
+        .resize(400, 400, { fit: 'cover', position: 'centre' })
+        .webp({ quality: 85 })
+        .toFile(filepath);
+    } catch (e) {
+      return bad(res, 'La imagen no se pudo procesar. Prueba con otra.');
+    }
+    const url = `/uploads/staff/${filename}`;
+    safeUnlinkUpload(st.rows[0].avatar_url, STAFF_DIR);
+    const { rows } = await db.query(
+      `UPDATE staff SET avatar_url = $1 WHERE id = $2 AND business_id = $3 RETURNING id, avatar_url`,
+      [url, req.params.id, req.business.id]);
+    await audit(req, 'staff.photo', 'staff', req.params.id, {});
+    res.json({ staff: rows[0], avatar_url: url });
+  }));
+
+// Quitar la foto de un profesional
+app.delete('/api/staff/:id/photo', authRequired, businessScope, asyncH(async (req, res) => {
+  if (!isUuid(req.params.id)) return bad(res, 'ID inválido');
+  const st = await db.query(
+    `SELECT avatar_url FROM staff WHERE id = $1 AND business_id = $2`, [req.params.id, req.business.id]);
+  if (!st.rows[0]) return bad(res, 'Profesional no encontrado', 404);
+  safeUnlinkUpload(st.rows[0].avatar_url, STAFF_DIR);
+  await db.query(`UPDATE staff SET avatar_url = NULL WHERE id = $1 AND business_id = $2`,
+    [req.params.id, req.business.id]);
+  res.json({ ok: true });
+}));
+
 app.put('/api/staff/:id/hours', authRequired, businessScope, asyncH(async (req, res) => {
   if (!isUuid(req.params.id)) return bad(res, 'ID inválido');
   const own = await db.query(`SELECT 1 FROM staff WHERE id = $1 AND business_id = $2`, [req.params.id, req.business.id]);
@@ -1233,7 +1279,10 @@ app.get('/api/public/:slug', publicLimiter, asyncH(async (req, res) => {
     paypal: ppRow ? {
       handle: (ppRow.config && ppRow.config.paypal_handle) || ppRow.account_ref || null,
     } : null,
-    stripe: { connected: !!stRow },
+    stripe: stRow ? {
+      payment_link: (stRow.config && stRow.config.stripe_payment_link) || null,
+      connected: !!(stRow.config && (stRow.config.stripe_payment_link || stRow.config.stripe_account_id)),
+    } : { connected: false },
   };
   res.json({
     business: biz, services: services.rows, staff: staff.rows, hours: hours.rows, reviews: reviews.rows,

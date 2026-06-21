@@ -46,7 +46,7 @@ input,select,textarea{font:inherit}
 .wrap{max-width:640px;margin:0 auto;padding:0 18px}
 
 /* ───────── HERO (banner grande + logo centrado) ───────── */
-.hero{position:relative;min-height:340px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:60px 20px 40px;overflow:hidden}
+.hero{position:relative;min-height:420px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:78px 20px 48px;overflow:hidden}
 .hero-bg{position:absolute;inset:0;z-index:0}
 .hero-bg::after{content:'';position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.25) 0%,rgba(0,0,0,.45) 100%)}
 .hero-inner{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center}
@@ -55,13 +55,17 @@ input,select,textarea{font:inherit}
 .hero h1{font-family:var(--display);font-weight:800;font-size:32px;color:#fff;margin-top:18px;text-shadow:0 2px 12px rgba(0,0,0,.4);letter-spacing:-.02em}
 .hero .loc{font-size:14px;color:rgba(255,255,255,.92);margin-top:6px;text-shadow:0 1px 6px rgba(0,0,0,.4)}
 .hero .rating{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;font-weight:700;color:#fff;margin-top:10px;background:rgba(255,255,255,.18);padding:5px 13px;border-radius:99px;backdrop-filter:blur(6px)}
-.hero-cta{margin-top:22px;background:#fff;color:var(--ink);font-weight:700;font-size:16px;padding:14px 40px;border-radius:99px;box-shadow:0 6px 20px rgba(0,0,0,.25);letter-spacing:.01em}
+.hero-cta{margin-top:22px;background:#fff;color:#17150F;font-weight:700;font-size:16px;padding:14px 40px;border-radius:99px;box-shadow:0 6px 20px rgba(0,0,0,.25);letter-spacing:.01em}
 .hero-cta:active{transform:scale(.97)}
 
 /* Menú hamburguesa */
 .topnav{position:absolute;top:0;left:0;right:0;z-index:5;display:flex;align-items:center;justify-content:space-between;padding:16px 18px}
-.burger{width:42px;height:42px;border-radius:12px;background:rgba(0,0,0,.3);backdrop-filter:blur(6px);display:grid;place-items:center;gap:0}
-.burger span{display:block;width:20px;height:2px;background:#fff;margin:2.5px 0;border-radius:2px}
+.burger{width:44px;height:44px;border-radius:50%;background:rgba(0,0,0,.32);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.28);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;transition:background .15s}
+.burger:hover{background:rgba(0,0,0,.45)}
+.burger span{display:block;height:2.5px;background:#fff;border-radius:3px}
+.burger span:nth-child(1){width:19px}
+.burger span:nth-child(2){width:12px}
+.burger span:nth-child(3){width:19px}
 .topnav .share{width:42px;height:42px;border-radius:12px;background:rgba(0,0,0,.3);backdrop-filter:blur(6px);display:grid;place-items:center}
 .topnav .share svg{width:18px;height:18px;stroke:#fff;stroke-width:2;fill:none}
 
@@ -1188,12 +1192,13 @@ function renderPayStep(appt, depCents){
     host.appendChild(pp);
   }
 
-  // ── Stripe (tarjeta): procesamiento aún no cableado → "Próximamente" ──
-  if(stripe && stripe.connected){
+  // ── Stripe (tarjeta): abre el Payment Link del negocio (el cliente paga directo) ──
+  if(stripe && stripe.payment_link){
     hasAny = true;
     var sb = document.createElement('div');
-    sb.className='paybtn soon';
-    sb.innerHTML = '<span class="pmico">'+ICONS.card+'</span><span class="pmtxt">Pagar con tarjeta<small>Tarjeta · Apple Pay · Google Pay</small></span><span class="soonbadge">Próximamente</span>';
+    sb.className='paybtn';
+    sb.innerHTML = '<span class="pmico">'+ICONS.card+'</span><span class="pmtxt">Pagar con tarjeta<small>Tarjeta · Apple Pay · Google Pay</small></span>';
+    sb.onclick = function(){ window.open(stripe.payment_link, '_blank', 'noopener'); };
     host.appendChild(sb);
   }
 

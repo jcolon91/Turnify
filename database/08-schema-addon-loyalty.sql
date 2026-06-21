@@ -1,6 +1,6 @@
 -- ============================================================================
 --  BUKEAME — Migración: add-on de LEALTAD + aseguramiento del portafolio
---  Idempotente. Correr: sudo -u postgres psql -d turnify -f database/08-schema-addon-loyalty.sql
+--  Idempotente. Correr: sudo -u postgres psql -d bukeame -f database/08-schema-addon-loyalty.sql
 -- ----------------------------------------------------------------------------
 --  Añade 'loyalty' al catálogo de add-ons (Premios automáticos tras N visitas),
 --  asegura el índice del portafolio (gallery_photos) y otorga permisos.
@@ -20,9 +20,9 @@ ON CONFLICT (code) DO NOTHING;
 -- Portafolio: índice para listar fotos por negocio en orden
 CREATE INDEX IF NOT EXISTS idx_gallery_biz ON gallery_photos(business_id, sort_order);
 
--- Permisos para turnify_user sobre lo que tocamos
-GRANT SELECT, INSERT, UPDATE, DELETE ON addon_catalog TO turnify_user;
-GRANT SELECT, INSERT, UPDATE, DELETE ON gallery_photos TO turnify_user;
+-- Permisos para bukeame_user sobre lo que tocamos
+GRANT SELECT, INSERT, UPDATE, DELETE ON addon_catalog TO bukeame_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON gallery_photos TO bukeame_user;
 
 COMMIT;
 

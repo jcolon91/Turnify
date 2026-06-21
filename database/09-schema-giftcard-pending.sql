@@ -1,6 +1,6 @@
 -- ============================================================================
 --  BUKEAME — Migración: gift cards nacen 'pending' (cierra bypass de monetización)
---  Idempotente. Correr: sudo -u postgres psql -d turnify -f database/09-schema-giftcard-pending.sql
+--  Idempotente. Correr: sudo -u postgres psql -d bukeame -f database/09-schema-giftcard-pending.sql
 -- ----------------------------------------------------------------------------
 --  Antes: la tarjeta se creaba 'active' (DEFAULT) y era gastable AL INSTANTE sin
 --  pago confirmado → cualquiera podía acuñar y gastar gift cards gratis.
@@ -25,8 +25,8 @@ ALTER TABLE gift_cards ALTER COLUMN status SET DEFAULT 'pending';
 --    las queries siempre acotan por business_id; complementa idx_gift_biz parcial).
 CREATE INDEX IF NOT EXISTS idx_giftcards_biz_status ON gift_cards(business_id, status);
 
--- Permisos para turnify_user sobre lo que tocamos
-GRANT SELECT, INSERT, UPDATE, DELETE ON gift_cards TO turnify_user;
+-- Permisos para bukeame_user sobre lo que tocamos
+GRANT SELECT, INSERT, UPDATE, DELETE ON gift_cards TO bukeame_user;
 
 COMMIT;
 

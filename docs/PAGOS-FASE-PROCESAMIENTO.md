@@ -123,7 +123,7 @@ el coupon). Tope = precio del plan.
 - `payments` ya tiene `external_ref` (para el payment_intent / order id).
 - (Opcional) deprecar `businesses.stripe_account_id` en favor de `payment_providers.account_ref`,
   o mantenerlos sincronizados.
-- `GRANT ... TO turnify_user;`
+- `GRANT ... TO bukeame_user;`
 
 ---
 

@@ -1,13 +1,13 @@
 -- ============================================================================
 --  BUKEAME — Schema PostgreSQL v1.0
 --  SaaS de citas multi-tenant + marketplace (Puerto Rico first)
---  DB: turnify · VPS: 2.24.70.107 · Convive aislado de la DB "wifnix"
+--  DB: bukeame · VPS: 2.24.70.107 · Convive aislado de la DB "wifnix"
 -- ----------------------------------------------------------------------------
 --  DEPLOY (como postgres, una sola vez):
---    sudo -u postgres psql -c "CREATE USER turnify_user WITH PASSWORD 'CAMBIAME';"
---    sudo -u postgres psql -c "CREATE DATABASE turnify OWNER turnify_user;"
---    sudo -u postgres psql -d turnify -f 01-schema-base.sql
---  (los GRANTs para turnify_user están al final del archivo)
+--    sudo -u postgres psql -c "CREATE USER bukeame_user WITH PASSWORD 'CAMBIAME';"
+--    sudo -u postgres psql -c "CREATE DATABASE bukeame OWNER bukeame_user;"
+--    sudo -u postgres psql -d bukeame -f 01-schema-base.sql
+--  (los GRANTs para bukeame_user están al final del archivo)
 -- ============================================================================
 
 BEGIN;
@@ -649,15 +649,15 @@ INSERT INTO pr_municipalities (name, slug) VALUES
 ('Villalba','villalba'),('Yabucoa','yabucoa'),('Yauco','yauco');
 
 -- ============================================================================
--- 20. PERMISOS PARA turnify_user (aislado de la DB wifnix)
+-- 20. PERMISOS PARA bukeame_user (aislado de la DB wifnix)
 -- ============================================================================
-GRANT USAGE ON SCHEMA public TO turnify_user;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO turnify_user;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO turnify_user;
+GRANT USAGE ON SCHEMA public TO bukeame_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO bukeame_user;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO bukeame_user;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO turnify_user;
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO bukeame_user;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  GRANT USAGE, SELECT ON SEQUENCES TO turnify_user;
+  GRANT USAGE, SELECT ON SEQUENCES TO bukeame_user;
 
 COMMIT;
 

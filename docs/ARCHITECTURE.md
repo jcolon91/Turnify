@@ -83,7 +83,7 @@ Si asigna manualmente a alguien con una oferta automática pendiente, esa oferta
 
 ## Aislamiento en el servidor
 
-Bukéame convive con Wifnix en el mismo VPS pero totalmente separado: carpeta, proceso PM2, puerto, base de datos y usuario distintos. El usuario `turnify_user` no tiene permisos sobre la base de Wifnix. Ver [`DEPLOY.md`](DEPLOY.md).
+Bukéame convive con Wifnix en el mismo VPS pero totalmente separado: carpeta, proceso PM2, puerto, base de datos y usuario distintos. El usuario `bukeame_user` no tiene permisos sobre la base de Wifnix. Ver [`DEPLOY.md`](DEPLOY.md).
 
 ---
 

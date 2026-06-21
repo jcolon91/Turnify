@@ -1,6 +1,6 @@
 -- ============================================================================
 --  BUKEAME — Config de proveedores de pago + login social (Google / Apple)
---  Idempotente. Correr: sudo -u postgres psql -d turnify -f database/11-schema-pagos-login-social.sql
+--  Idempotente. Correr: sudo -u postgres psql -d bukeame -f database/11-schema-pagos-login-social.sql
 -- ----------------------------------------------------------------------------
 --  · payment_providers.config: jsonb por proveedor para guardar credenciales/
 --    ajustes NO sensibles (p. ej. publishableKey de Stripe, phone de ATH). NUNCA
@@ -25,8 +25,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_users_google ON users(google_sub) WHERE goo
 CREATE UNIQUE INDEX IF NOT EXISTS uq_users_apple  ON users(apple_sub)  WHERE apple_sub  IS NOT NULL;
 
 -- Permisos para el rol de la app
-GRANT SELECT, INSERT, UPDATE, DELETE ON payment_providers TO turnify_user;
-GRANT SELECT, UPDATE ON users TO turnify_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON payment_providers TO bukeame_user;
+GRANT SELECT, UPDATE ON users TO bukeame_user;
 
 COMMIT;
 

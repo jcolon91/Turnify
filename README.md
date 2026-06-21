@@ -79,12 +79,12 @@ npm install
 cp .env.example .env          # luego edita .env con tus valores
 
 # 2. Base de datos (PostgreSQL ya instalado y corriendo)
-createdb turnify
-psql -d turnify -f ../database/01-schema-base.sql
-psql -d turnify -f ../database/02-schema-v1.1.sql
+createdb bukeame
+psql -d bukeame -f ../database/01-schema-base.sql
+psql -d bukeame -f ../database/02-schema-v1.1.sql
 
 # 3. Arrancar
-node server.js                # o: pm2 start server.js --name turnify-api
+node server.js                # o: pm2 start server.js --name bukeame-api
 ```
 
 El API queda en `http://localhost:3001`. Verifica con:

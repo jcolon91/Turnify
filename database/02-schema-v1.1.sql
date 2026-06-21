@@ -3,7 +3,7 @@
 --  Aplica DESPUÉS del schema base. Añade: gift cards, lealtad, te-toca,
 --  lista de espera con oferta 30min, destacados, add-ons, trial 15d premium.
 -- ----------------------------------------------------------------------------
---  DEPLOY:  sudo -u postgres psql -d turnify -f 02-schema-v1.1.sql
+--  DEPLOY:  sudo -u postgres psql -d bukeame -f 02-schema-v1.1.sql
 -- ============================================================================
 
 BEGIN;
@@ -348,10 +348,10 @@ INSERT INTO preset_themes (name, accent, mode, sort_order) VALUES
 ('Rosa',        '#BE185D', 'light', 8);
 
 -- ============================================================================
--- 12. PERMISOS para turnify_user en las tablas nuevas
+-- 12. PERMISOS para bukeame_user en las tablas nuevas
 -- ============================================================================
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO turnify_user;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO turnify_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO bukeame_user;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO bukeame_user;
 
 COMMIT;
 

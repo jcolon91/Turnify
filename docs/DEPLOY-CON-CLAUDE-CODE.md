@@ -99,11 +99,11 @@ Una vez en la sesión de Claude Code (desde la terminal o ya controlando desde e
 >
 > Pasos:
 > 1. Primero corre estos comandos de diagnóstico de SOLO LECTURA y muéstrame la salida: `pm2 list`, `node -v && psql --version`, `ss -tlnp | grep -E ':(3000|3001|5432)'`, `sudo -u postgres psql -l`, `ls /etc/nginx/sites-enabled/`, `free -h`
-> 2. Clona el repositorio: `https://github.com/jcolon91/Bukeame.git` en `/var/www/turnify`
-> 3. Sigue exactamente la guía que está en `docs/DEPLOY.md` del repositorio. Esa guía tiene todos los pasos: crear la base de datos `turnify` con usuario `turnify_user` aislado, cargar los schemas, configurar el backend, arrancar con PM2 como `turnify-api` en el puerto 3001, y configurar Nginx para `bukeame.com`.
+> 2. Clona el repositorio: `https://github.com/jcolon91/Bukeame.git` en `/var/www/bukeame`
+> 3. Sigue exactamente la guía que está en `docs/DEPLOY.md` del repositorio. Esa guía tiene todos los pasos: crear la base de datos `bukeame` con usuario `bukeame_user` aislado, cargar los schemas, configurar el backend, arrancar con PM2 como `bukeame-api` en el puerto 3001, y configurar Nginx para `bukeame.com`.
 > 4. Para el archivo `.env`: genera secretos seguros para JWT_SECRET y JWT_REFRESH_SECRET con `openssl rand -base64 48`. Para las credenciales de Evolution (WhatsApp) y Resend (email), déjalas con placeholders y avísame cuáles necesito llenar después.
 > 5. Antes de cada comando que modifique algo, explícame qué vas a hacer. No ejecutes nada destructivo sin confirmarme.
-> 6. Reglas de aislamiento que NO puedes violar: usa la carpeta `/var/www/turnify` (no `/var/www/wifnix`), el proceso PM2 `turnify-api` (no `wifnix-api`), el puerto 3001 (Wifnix usa 3000), la base de datos `turnify` con usuario `turnify_user`, y asegúrate de correr `REVOKE ALL ON DATABASE wifnix FROM turnify_user` para que Bukéame nunca pueda tocar la base de datos de Wifnix.
+> 6. Reglas de aislamiento que NO puedes violar: usa la carpeta `/var/www/bukeame` (no `/var/www/wifnix`), el proceso PM2 `bukeame-api` (no `wifnix-api`), el puerto 3001 (Wifnix usa 3000), la base de datos `bukeame` con usuario `bukeame_user`, y asegúrate de correr `REVOKE ALL ON DATABASE wifnix FROM bukeame_user` para que Bukéame nunca pueda tocar la base de datos de Wifnix.
 > 7. Al final, verifica que todo corre con `curl http://localhost:3001/api/health` y muéstrame el resultado.
 >
 > Procede paso a paso, mostrándome la salida de cada comando.
@@ -149,11 +149,11 @@ Estas cosas Claude Code no las puede hacer solo (requieren tus cuentas externas)
 Claude Code mismo puede diagnosticar y arreglar. Pero si quieres parar todo:
 
 ```bash
-pm2 stop turnify-api      # detiene solo Bukéame, Wifnix sigue corriendo
+pm2 stop bukeame-api      # detiene solo Bukéame, Wifnix sigue corriendo
 ```
 
 Y si necesitas revisar qué pasó:
 
 ```bash
-pm2 logs turnify-api --lines 50
+pm2 logs bukeame-api --lines 50
 ```

@@ -3,7 +3,7 @@
 Runbook consolidado para subir todo a GitHub (repo `jcolon91/Bukeame`, rama `main`)
 y deployar al VPS. Sigue los pasos EN ORDEN. Da un solo comando a la vez en el server.
 
-Resumen de esta sesion: rebrand Turnify -> Bukeame (frontend 100% turnify-free),
+Resumen de esta sesion: rebrand Bukeame -> Bukeame (frontend 100% bukeame-free),
 rediseno completo (tema claro/oscuro en las 13 paginas), fundacion de metodos de
 pago de los negocios (tabla nueva + modulo + vista), 11 fixes de seguridad ya
 aplicados, y switch al dominio nuevo `bukeame.com`.
@@ -12,7 +12,7 @@ aplicados, y switch al dominio nuevo `bukeame.com`.
 
 ## 0. Antes de empezar (pre-checks)
 
-- [ ] Confirmar que el codigo local en `Turnify app/` ya esta sincronizado con
+- [ ] Confirmar que el codigo local en `Bukeame app/` ya esta sincronizado con
       produccion + todos los cambios de la sesion (lo esta).
 - [ ] `node --check` debe pasar en backend (server.js y los 6 modulos).
 - [ ] DNS de `bukeame.com` -> VPS: YA HECHO.
@@ -31,7 +31,7 @@ Subir SOLO lo que cambio, en su estructura de carpetas.
       module-admin.js, module-accounting.js, module-account.js,
       module-payments.js (NUEVO), package.json, .env.example
 - [ ] `frontend/` — las 13 paginas .html (rediseno aplicado a todas) +
-      `bukeame-banners.js` (renombrado desde turnify-banners.js)
+      `bukeame-banners.js` (renombrado desde bukeame-banners.js)
 - [ ] `database/` — incluir `07-schema-payments.sql` (NUEVA). Las 01-06 ya
       existen en el repo; subirlas no hace dano (idempotente al no re-correrlas).
 - [ ] `docs/` — ARCHITECTURE.md, DEPLOY.md, DEPLOY-CON-CLAUDE-CODE.md,
@@ -39,8 +39,8 @@ Subir SOLO lo que cambio, en su estructura de carpetas.
 - [ ] Raiz — README.md, .gitignore (solo si cambiaron)
 
 ### BORRAR / NO subir (importante)
-- [ ] NO subir `uploads/` — la copia local esta DESFASADA (dominio viejo
-      bukeamepr.com, sin vista de Clientes ni reset.html). El bueno vive en el
+- [ ] NO subir `uploads/` — la copia local esta DESFASADA (version vieja,
+      sin vista de Clientes ni reset.html). El bueno vive en el
       server. Borrarla del folder local antes de armar el upload.
 - [ ] NO subir la carpeta del diseno (`_diseno_ref` / "Diseno app citas
       servicios") — era temporal, solo fuente de mockups.
@@ -54,7 +54,7 @@ Subir SOLO lo que cambio, en su estructura de carpetas.
 
 Comando base:
 ```
-sudo -u postgres psql -d turnify -f /var/www/turnify/database/<archivo>.sql
+sudo -u postgres psql -d bukeame -f /var/www/bukeame/database/<archivo>.sql
 ```
 
 - [ ] **CRITICA / NUEVA: `07-schema-payments.sql`** — crea la tabla
@@ -63,11 +63,11 @@ sudo -u postgres psql -d turnify -f /var/www/turnify/database/<archivo>.sql
 - [ ] Antes de correr la 07, VERIFICAR que 04, 05 y 06 ya corrieron en el VPS
       (multiservice, password-reset, reminders). Si alguna falta, correrla
       primero, en orden numerico. Chequeo rapido:
-      `sudo -u postgres psql -d turnify -c "\dt"` y confirmar que existen las
+      `sudo -u postgres psql -d bukeame -c "\dt"` y confirmar que existen las
       tablas de esos schemas (ej. `password_resets`).
 - [ ] Tras crear la tabla nueva, dar permisos al usuario de la app:
-      `sudo -u postgres psql -d turnify -c "GRANT SELECT,INSERT,UPDATE,DELETE ON payment_providers TO turnify_user;"`
-      (`turnify_user` NO crea/altera tablas; por eso el DDL va como postgres.)
+      `sudo -u postgres psql -d bukeame -c "GRANT SELECT,INSERT,UPDATE,DELETE ON payment_providers TO bukeame_user;"`
+      (`bukeame_user` NO crea/altera tablas; por eso el DDL va como postgres.)
 
 ---
 
@@ -76,13 +76,13 @@ sudo -u postgres psql -d turnify -f /var/www/turnify/database/<archivo>.sql
 (DNS -> VPS y Resend ya estan hechos. Falta Nginx + SSL + .env.)
 
 - [ ] Nginx server_block para `bukeame.com`:
-      - `root /var/www/turnify/frontend;`
+      - `root /var/www/bukeame/frontend;`
       - `location /api` -> `proxy_pass http://localhost:3002;`
         (con los headers de proxy: Host, X-Real-IP, X-Forwarded-For/Proto).
       - `server_name bukeame.com www.bukeame.com;`
 - [ ] Recargar Nginx: `sudo nginx -t && sudo systemctl reload nginx`
 - [ ] Certbot (SSL): `sudo certbot --nginx -d bukeame.com -d www.bukeame.com`
-- [ ] Actualizar el `.env` del server (`/var/www/turnify/backend/.env`):
+- [ ] Actualizar el `.env` del server (`/var/www/bukeame/backend/.env`):
       - `CORS_ORIGINS=https://bukeame.com`
       - `EMAIL_FROM=Bukeame <citas@bukeame.com>`
       - Verificar que `JWT_SECRET` real (64 chars) sigue puesto y que
@@ -93,7 +93,7 @@ sudo -u postgres psql -d turnify -f /var/www/turnify/database/<archivo>.sql
 ## 4. Deploy (en el VPS, un comando a la vez)
 
 ```
-cd /var/www/turnify && git pull origin main
+cd /var/www/bukeame && git pull origin main
 ```
 - [ ] Si dice "local changes would be overwritten":
       `git checkout -- <archivo>` y volver a hacer pull.
@@ -104,12 +104,12 @@ cd backend && node --check server.js
 - [ ] Debe pasar sin errores antes de reiniciar.
 
 ```
-pm2 restart turnify-api
+pm2 restart bukeame-api
 ```
 
 - [ ] Frontend: recargar el sitio en INCOGNITO (Brave cachea agresivo).
-- [ ] NOTA: el rebrand cambio claves localStorage `turnify_*` -> `bukeame_*`,
-      asi que este deploy cierra sesiones UNA vez. Es esperado.
+- [ ] NOTA: las claves de localStorage son `bukeame_*` (el rebrand ya se aplicó;
+      no hay cambio de claves pendiente).
 
 ---
 
@@ -132,11 +132,11 @@ pm2 restart turnify-api
 
 ## 6. Nota sobre la infraestructura interna (NO cambiar)
 
-A proposito se MANTIENE como `turnify` (es interno/invisible; cambiarlo rompe el
+A proposito se MANTIENE como `bukeame` (es interno/invisible; cambiarlo rompe el
 server o cierra sesiones sin beneficio de marca):
-- DB `turnify`, usuario `turnify_user`
-- Proceso PM2 `turnify-api`
-- Directorio `/var/www/turnify`
+- DB `bukeame`, usuario `bukeame_user`
+- Proceso PM2 `bukeame-api`
+- Directorio `/var/www/bukeame`
 - `EVOLUTION_INSTANCE=turnify`
 - Puerto 3002
 
