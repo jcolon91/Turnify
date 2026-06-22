@@ -676,7 +676,7 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
 
         <div class="card">
           <div class="seclabel">Portafolio</div>
-          <p style="font-size:12.5px;color:var(--ink2);margin-bottom:12px">Muestra tu trabajo. Hasta 12 fotos. Se ven en tu página pública.</p>
+          <p style="font-size:12.5px;color:var(--ink2);margin-bottom:12px">Muestra tu trabajo. Hasta 8 fotos. Se ven en tu página pública.</p>
           <div class="alert" id="pfAlert"></div>
           <input type="file" id="pfFile" accept="image/jpeg,image/png,image/webp" style="display:none">
           <button class="btn btn-teal btn-sm" id="pfAddBtn" style="margin-bottom:14px">+ Añadir foto</button>
@@ -2354,7 +2354,7 @@ document.getElementById('locSaveBtn').onclick = async function(){
 };
 
 // ── Portafolio ─────────────────────────────────────────────────────────────
-const PF_MAX = 12;
+const PF_MAX = 8;
 async function loadPortfolio(){
   const grid = document.getElementById('pfGrid');
   const r = await api('GET','/businesses/me/portfolio');
@@ -2377,7 +2377,7 @@ async function loadPortfolio(){
     });
   }
   const addBtn = document.getElementById('pfAddBtn');
-  if(photos.length >= PF_MAX){ addBtn.disabled = true; addBtn.textContent = 'Máximo 12 fotos'; }
+  if(photos.length >= PF_MAX){ addBtn.disabled = true; addBtn.textContent = 'Máximo '+PF_MAX+' fotos'; }
   else { addBtn.disabled = false; addBtn.textContent = '+ Añadir foto'; }
 }
 document.getElementById('pfAddBtn').onclick = function(){ clearAlert('pfAlert'); document.getElementById('pfFile').click(); };
@@ -2395,7 +2395,7 @@ document.getElementById('pfFile').onchange = async function(){
     try { data = await res.json(); } catch(e){}
   } catch(e){ addBtn.disabled=false; addBtn.textContent='+ Añadir foto'; showAlert('pfAlert','No se pudo subir la foto.', false); return; }
   if(res.ok){ loadPortfolio(); }
-  else { addBtn.disabled=false; addBtn.textContent='+ Añadir foto'; showAlert('pfAlert', data.error || (res.status===409?'Llegaste al máximo de 12 fotos.':'No se pudo subir.'), false); }
+  else { addBtn.disabled=false; addBtn.textContent='+ Añadir foto'; showAlert('pfAlert', data.error || (res.status===409?'Llegaste al máximo de 8 fotos.':'No se pudo subir.'), false); }
 };
 
 function switchView(v){

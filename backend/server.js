@@ -1580,6 +1580,9 @@ app.get('/api/public/:slug', publicLimiter, asyncH(async (req, res) => {
                         WHERE r.product_id = p.id) AS rating_avg
                 FROM products p
                WHERE p.business_id = $1 AND p.is_active = true
+                 AND EXISTS (SELECT 1 FROM addons a
+                              WHERE a.business_id = $1 AND a.status = 'active'
+                                AND a.code IN ('store_10','store_25'))
                ORDER BY p.name`, [biz.id])
       .catch(() =>
         // Fallback si product_reviews aún no existe: trae productos sin el resumen,
