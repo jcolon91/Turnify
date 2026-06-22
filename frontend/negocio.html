@@ -379,6 +379,125 @@ html[data-theme="dark"] .alert.err{background:rgba(255,90,70,.14);color:#FFB3A8;
 /* Modo embed (widget.js abre negocio.html?embed=1 dentro de un iframe) */
 html[data-embed="1"] .topnav{display:none}
 html[data-embed="1"] .foot{display:none}
+
+/* ═══════════════════════════════════════════════════════════════
+   REDISEÑO ESTILO BOOKSY (adaptado a la marca Bukéame)
+   — galería hero horizontal, cabecera con rating, servicios con
+     "Populares", equipo con foto, reseñas con desglose de estrellas —
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Galería hero (scroll horizontal de fotos del negocio) ── */
+.bk-hero{position:relative;background:var(--bg2)}
+.bk-topnav{position:absolute;top:0;left:0;right:0;z-index:6;display:flex;align-items:center;justify-content:space-between;padding:14px 16px}
+.bk-topnav .theme-tg{background:rgba(0,0,0,.32);border-color:rgba(255,255,255,.25);backdrop-filter:blur(6px)}
+.bk-topnav .theme-tg button{color:rgba(255,255,255,.85)}
+.bk-topnav .theme-tg button.on{background:var(--green);color:var(--green-ink)}
+.bk-gallery{display:flex;gap:6px;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.bk-gallery::-webkit-scrollbar{display:none}
+.bk-shot{position:relative;flex:0 0 88%;scroll-snap-align:center;aspect-ratio:16/10;background:var(--card-soft);overflow:hidden}
+.bk-shot:only-child{flex-basis:100%}
+.bk-shot img{width:100%;height:100%;object-fit:cover;display:block}
+.bk-shot.bk-fallback{display:grid;place-items:center;
+  background:radial-gradient(120% 120% at 28% 22%,rgba(239,161,47,.45) 0,rgba(239,161,47,0) 46%),
+    radial-gradient(130% 130% at 78% 86%,rgba(8,40,33,.5) 0,rgba(8,40,33,0) 55%),
+    linear-gradient(140deg,#13A38F 0%,#0E8074 42%,#0A5B52 100%)}
+.bk-shot.bk-fallback span{font-family:var(--display);font-weight:800;font-size:84px;color:#fff;text-shadow:0 2px 14px rgba(0,0,0,.3)}
+html[data-theme="dark"] .bk-shot.bk-fallback{background:radial-gradient(120% 120% at 28% 22%,rgba(239,161,47,.4) 0,rgba(239,161,47,0) 46%),
+    radial-gradient(130% 130% at 78% 86%,rgba(0,0,0,.45) 0,rgba(0,0,0,0) 55%),
+    linear-gradient(140deg,#15A968 0%,#0E8074 44%,#0A6B49 100%)}
+@media(min-width:720px){.bk-shot{flex-basis:48%}}
+.bk-gallery .bk-count{position:absolute;right:14px;bottom:14px;z-index:3;background:rgba(0,0,0,.55);color:#fff;font-family:var(--mono);font-size:11px;font-weight:600;padding:5px 11px;border-radius:99px;backdrop-filter:blur(6px);pointer-events:none}
+
+/* ── Cabecera del negocio (tarjeta que monta sobre la galería) ── */
+.bk-head{max-width:640px;margin:-26px auto 0;position:relative;z-index:2;background:var(--card);border:1px solid var(--border);border-radius:20px 20px 0 0;padding:20px 18px 18px}
+@media(min-width:680px){.bk-head{border-radius:20px;margin-top:-40px}}
+@media(min-width:900px){.bk-head{max-width:980px;margin-top:-44px}}
+.bk-head .bk-logo{width:64px;height:64px;border-radius:16px;overflow:hidden;display:grid;place-items:center;font-family:var(--display);font-weight:800;font-size:26px;color:#fff;flex:none;
+  background:linear-gradient(140deg,#13A38F 0%,#0E8074 42%,#0A5B52 100%);box-shadow:0 4px 16px rgba(0,0,0,.18)}
+html[data-theme="dark"] .bk-head .bk-logo{background:linear-gradient(140deg,#15A968 0%,#0E8074 44%,#0A6B49 100%)}
+.bk-head .bk-logo img{width:100%;height:100%;object-fit:cover}
+.bk-head-top{display:flex;gap:14px;align-items:flex-start}
+.bk-head h1{font-family:var(--display);font-weight:800;font-size:25px;line-height:1.15;letter-spacing:-.02em;color:var(--text)}
+.bk-head .bk-loc{font-size:13.5px;color:var(--muted);margin-top:5px;display:flex;align-items:center;gap:5px}
+.bk-head .bk-loc svg{width:14px;height:14px;stroke:var(--muted);stroke-width:1.8;fill:none;flex:none}
+.bk-ratingline{display:flex;align-items:center;gap:8px;margin-top:9px;flex-wrap:wrap}
+.bk-ratingline .score{font-family:var(--display);font-weight:800;font-size:16px;color:var(--text)}
+.bk-ratingline .stars{color:var(--mango);font-size:15px;letter-spacing:1px}
+.bk-ratingline a{font-size:13px;font-weight:600;color:var(--green);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.bk-badges{display:flex;gap:7px;flex-wrap:wrap;margin-top:13px}
+.bk-badge{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--green);background:var(--green-soft);border-radius:99px;padding:5px 11px}
+.bk-badge svg{width:12px;height:12px;stroke:currentColor;stroke-width:2;fill:none}
+
+/* ── CTA lateral fijo (desktop) ── */
+.bk-booknow{display:none}
+@media(min-width:900px){
+  .bk-layout{max-width:980px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) 296px;gap:30px;align-items:start;padding:0 18px}
+  .bk-layout .wrap{max-width:none;margin:0;padding:0}
+  .bk-booknow{display:block;position:sticky;top:18px;background:var(--card);border:1px solid var(--border);border-radius:18px;padding:18px;margin-top:18px}
+  .bk-booknow b{font-family:var(--display);font-weight:800;font-size:17px;display:block;margin-bottom:4px}
+  .bk-booknow p{font-size:12.5px;color:var(--muted);margin-bottom:14px;line-height:1.5}
+  .bk-booknow .btn{font-size:15px;padding:14px}
+  .book-fab{display:none}
+}
+
+/* ── Servicios estilo Booksy (fila con duración, precio, botón) ── */
+.bk-svc{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:15px 16px;display:flex;align-items:center;gap:14px;margin-bottom:10px;transition:.15s}
+.bk-svc:hover{border-color:var(--green)}
+.bk-svc .bk-svc-main{flex:1;min-width:0}
+.bk-svc h4{font-size:15.5px;font-weight:700;color:var(--text)}
+.bk-svc .bk-svc-desc{font-size:12.5px;color:var(--muted);margin-top:4px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.bk-svc .bk-svc-meta{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
+.bk-svc .bk-dur{display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:11.5px;color:var(--muted);font-weight:600}
+.bk-svc .bk-dur svg{width:13px;height:13px;stroke:var(--muted);stroke-width:1.8;fill:none}
+.bk-svc .bk-price{font-family:var(--mono);font-weight:700;font-size:14px;color:var(--green)}
+.bk-svc .bk-dep{font-family:var(--mono);font-size:10.5px;color:var(--muted2)}
+.bk-svc .bk-svc-book{flex:none;align-self:center;background:var(--green-soft);color:var(--green);font-weight:700;font-size:13px;padding:10px 16px;border-radius:99px;white-space:nowrap;transition:.15s}
+.bk-svc .bk-svc-book:hover{background:var(--green);color:var(--green-ink)}
+.bk-svc .bk-svc-book:active{transform:scale(.97)}
+.bk-svc-cat{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:18px 0 11px}
+.bk-svc-cat:first-child{margin-top:0}
+.bk-seeall{display:inline-flex;align-items:center;gap:6px;margin-top:6px;background:none;color:var(--green);font-weight:700;font-size:13.5px;cursor:pointer;padding:6px 0}
+.bk-seeall svg{width:15px;height:15px;stroke:currentColor;stroke-width:2;fill:none;transition:transform .2s}
+.bk-seeall.open svg{transform:rotate(180deg)}
+
+/* ── Equipo estilo Booksy ── */
+.bk-staff-card{flex:none;width:128px;text-align:center;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px 10px}
+.bk-staff-card .av{width:72px;height:72px;border-radius:50%;margin:0 auto 11px;overflow:hidden;display:grid;place-items:center;font-family:var(--display);font-weight:800;color:#fff;font-size:26px;
+  background:linear-gradient(140deg,#13A38F 0%,#0E8074 42%,#0A5B52 100%)}
+html[data-theme="dark"] .bk-staff-card .av{background:linear-gradient(140deg,#15A968 0%,#0E8074 44%,#0A6B49 100%)}
+.bk-staff-card .av img{width:100%;height:100%;object-fit:cover}
+.bk-staff-card b{font-size:13.5px;display:block;color:var(--text)}
+.bk-staff-card .role{font-size:11.5px;color:var(--muted);margin-top:2px;display:block}
+.bk-staff-card .srate{font-size:11.5px;color:var(--mango);font-weight:700;margin-top:4px;display:inline-block}
+
+/* ── Reseñas: puntuación agregada + desglose de estrellas ── */
+.bk-rev-summary{display:flex;gap:18px;align-items:center;background:var(--card);border:1px solid var(--border);border-radius:18px;padding:18px;margin-bottom:16px;flex-wrap:wrap}
+.bk-rev-big{text-align:center;flex:none}
+.bk-rev-big .num{font-family:var(--display);font-weight:800;font-size:42px;line-height:1;color:var(--text)}
+.bk-rev-big .stars{color:var(--mango);font-size:15px;letter-spacing:1px;margin-top:5px}
+.bk-rev-big .cnt{font-size:12px;color:var(--muted);margin-top:5px}
+.bk-rev-bars{flex:1;min-width:170px}
+.bk-rev-bar{display:flex;align-items:center;gap:9px;margin-bottom:5px}
+.bk-rev-bar .lab{font-family:var(--mono);font-size:11px;color:var(--muted);width:30px;text-align:right}
+.bk-rev-bar .lab .st{color:var(--mango)}
+.bk-rev-bar .track{flex:1;height:7px;border-radius:99px;background:var(--card-soft);overflow:hidden}
+.bk-rev-bar .fill{height:100%;border-radius:99px;background:var(--mango)}
+.bk-rev-bar .n{font-family:var(--mono);font-size:11px;color:var(--muted2);width:22px}
+.bk-review{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:15px;margin-bottom:10px}
+.bk-review .top{display:flex;align-items:center;gap:11px;margin-bottom:8px}
+.bk-review .rav{width:38px;height:38px;border-radius:50%;flex:none;display:grid;place-items:center;font-family:var(--display);font-weight:800;font-size:16px;color:#fff;background:linear-gradient(140deg,#13A38F,#0A5B52)}
+html[data-theme="dark"] .bk-review .rav{background:linear-gradient(140deg,#15A968,#0A6B49)}
+.bk-review .who{font-weight:700;font-size:14px;color:var(--text)}
+.bk-review .meta-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:2px}
+.bk-review .stars{color:var(--mango);font-size:12.5px;letter-spacing:1px}
+.bk-review .date{font-family:var(--mono);font-size:11px;color:var(--muted2)}
+.bk-confirmed{display:inline-flex;align-items:center;gap:3px;font-family:var(--mono);font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--green);background:var(--green-soft);border-radius:99px;padding:3px 8px}
+.bk-confirmed svg{width:10px;height:10px;stroke:currentColor;stroke-width:2.6;fill:none}
+.bk-review .ctx{font-family:var(--mono);font-size:10.5px;color:var(--muted2);margin-top:1px}
+.bk-review .txt{font-size:13.5px;color:var(--muted);line-height:1.6;margin-top:8px}
+.bk-review .reply{margin-top:10px;padding:10px 12px;background:var(--green-soft);border-radius:11px;font-size:12.5px;color:var(--green);line-height:1.5}
+.bk-review .reply b{font-weight:700}
+.bk-rev-more{display:block;width:100%;text-align:center;margin-top:6px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;font-weight:700;font-size:13.5px;color:var(--green);cursor:pointer}
 </style>
 </head>
 <body>
@@ -398,25 +517,34 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
   <!-- Awning (marquesina, sello visual Bukéame) -->
   <div class="awning"></div>
 
-  <!-- HERO -->
-  <header class="hero">
-    <div class="hero-bg" id="heroBg"></div>
-    <nav class="topnav">
+  <!-- HERO estilo Booksy: galería horizontal + barra de navegación flotante -->
+  <header class="bk-hero">
+    <nav class="bk-topnav">
       <button class="burger" id="openDrawer"><span></span><span></span><span></span></button>
       <div style="display:flex;align-items:center;gap:10px">
         <div class="theme-tg"><button type="button" data-theme-set="light">Claro</button><button type="button" data-theme-set="dark">Oscuro</button></div>
         <button class="share" id="shareBtn" title="Compartir"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg></button>
       </div>
     </nav>
-    <div class="hero-inner">
-      <div class="hero-logo" id="bizLogo"></div>
-      <h1 id="bizName"></h1>
-      <div class="loc" id="bizMeta"></div>
-      <div class="rating" id="bizRating" style="display:none"></div>
-      <button class="hero-cta" id="heroBook">Reservar ahora</button>
-    </div>
+    <div class="bk-gallery" id="bkGallery"></div>
+    <!-- Compat: hero-bg conservado (oculto) para que BukeameBanners no falle -->
+    <div class="hero-bg" id="heroBg" style="display:none"></div>
   </header>
 
+  <!-- Cabecera del negocio (tarjeta sobre la galería) -->
+  <div class="bk-head">
+    <div class="bk-head-top">
+      <div class="bk-logo" id="bizLogo"></div>
+      <div style="flex:1;min-width:0">
+        <h1 id="bizName"></h1>
+        <div class="bk-loc" id="bizMeta"></div>
+        <div class="bk-ratingline" id="bizRating" style="display:none"></div>
+      </div>
+    </div>
+    <div class="bk-badges" id="bizBadges"></div>
+  </div>
+
+  <div class="bk-layout">
   <div class="wrap">
     <!-- SOBRE -->
     <section class="sec" id="sec-about" style="display:none">
@@ -491,11 +619,19 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
       <div class="sec-title">Políticas del lugar</div>
       <div id="policyList"></div>
     </section>
+  </div><!-- /.wrap -->
 
-    <div class="foot">Hecho con Bukéame · bukeame.com</div>
-  </div>
+  <!-- CTA fijo lateral (solo desktop; en móvil se usa el botón flotante de abajo) -->
+  <aside class="bk-booknow">
+    <b>Reserva tu cita</b>
+    <p>Elige servicio, profesional, día y hora en segundos.</p>
+    <button class="btn btn-teal" id="sideBook">Reservar ahora</button>
+  </aside>
+  </div><!-- /.bk-layout -->
 
-  <!-- Botón flotante reservar -->
+  <div class="foot">Hecho con Bukéame · bukeame.com</div>
+
+  <!-- Botón flotante reservar (móvil) -->
   <div class="book-fab">
     <button id="fabBook">Reservar ahora</button>
   </div>
@@ -609,10 +745,7 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
       <div class="summary" id="cartSummary"></div>
       <div class="alert" id="cartAlert"></div>
       <div class="seclabel" style="text-align:left">Entrega</div>
-      <div class="seg" id="fulfillSeg">
-        <button type="button" data-f="pickup" class="on">Recoger</button>
-        <button type="button" data-f="shipping">Envío</button>
-      </div>
+      <div style="font-size:13px;color:var(--muted);background:var(--card-soft);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:4px">Recoges tu pedido en el negocio.</div>
       <div class="field"><label>Tu nombre *</label><input id="oName" placeholder="Tu nombre completo"></div>
       <div class="field"><label>WhatsApp / Teléfono *</label><input id="oPhone" type="tel" placeholder="787-555-1234"></div>
       <div class="field"><label>Email (opcional)</label><input id="oEmail" type="email" placeholder="tu@correo.com"></div>
@@ -777,23 +910,35 @@ function renderProfile(){
   const meta = [];
   if(b.municipality) meta.push(b.municipality);
   if(b.address_line) meta.push(b.address_line);
-  document.getElementById('bizMeta').textContent = meta.join(' · ');
+  var metaEl = document.getElementById('bizMeta');
+  if(meta.length){ metaEl.innerHTML = ICONS.pin + '<span>'+esc(meta.join(' · '))+'</span>'; }
+  else { metaEl.style.display='none'; }
 
-  // Banner de fondo del hero
+  // Compat: BukeameBanners sigue aplicándose al heroBg oculto (no rompe nada).
   if(window.BukeameBanners){
     BukeameBanners.apply(document.getElementById('heroBg'), b.theme, b.cover_url||null, null);
   }
-  // Logo
+  // ── Galería hero estilo Booksy (cover + portafolio en scroll horizontal) ──
+  renderHeroGallery();
+  // Logo (cuadrado redondeado, estilo Booksy)
   const logo = document.getElementById('bizLogo');
   const initial = (b.name||'?').charAt(0).toUpperCase();
-  if(b.logo_url){ logo.classList.remove('no-logo'); logo.innerHTML = '<img src="'+esc(b.logo_url)+'" alt="" width="128" height="128" decoding="async">'; }
-  else { logo.classList.add('no-logo'); logo.textContent = initial; }
-  // Rating
+  if(b.logo_url){ logo.innerHTML = '<img src="'+esc(b.logo_url)+'" alt="" width="64" height="64" decoding="async">'; }
+  else { logo.textContent = initial; }
+  // Rating + enlace "N reseñas" (baja a la sección de reseñas)
   if(b.rating_count>0){
     const el = document.getElementById('bizRating');
-    el.style.display='inline-flex';
-    el.innerHTML = '★ '+Number(b.rating_avg).toFixed(1)+' · '+b.rating_count+' reseña'+(b.rating_count>1?'s':'');
+    el.style.display='flex';
+    const n = Math.round(Number(b.rating_avg));
+    const stars = '★★★★★'.slice(0,n) + '☆☆☆☆☆'.slice(0,5-n);
+    el.innerHTML = '<span class="score">'+Number(b.rating_avg).toFixed(1)+'</span>'+
+      '<span class="stars">'+stars+'</span>'+
+      '<a id="ratingToReviews">'+b.rating_count+' reseña'+(b.rating_count>1?'s':'')+'</a>';
+    var rtr = document.getElementById('ratingToReviews');
+    if(rtr) rtr.onclick = function(){ var s=document.getElementById('sec-reviews'); if(s && s.style.display!=='none') s.scrollIntoView({behavior:'smooth'}); };
   }
+  // ── Badges (amenidades/distintivos según datos del negocio) ──
+  renderBadges(b);
   // Drawer head
   const dl = document.getElementById('drawerLogo');
   if(b.logo_url){ dl.className=''; dl.innerHTML = '<img src="'+esc(b.logo_url)+'" alt="" width="46" height="46" loading="lazy" decoding="async" style="width:46px;height:46px;border-radius:50%;object-fit:cover">'; }
@@ -806,24 +951,24 @@ function renderProfile(){
     document.getElementById('sec-about').style.display='block';
   }
 
-  // ── Equipo ──
+  // ── Equipo (tarjetas con foto, nombre, rol/especialidad y rating) ──
   if(state.staff.length>0){
     document.getElementById('sec-staff').style.display='block';
     document.getElementById('staffGrid').innerHTML = state.staff.map(function(s){
-      var av = s.avatar_url ? '<img src="'+esc(s.avatar_url)+'" alt="" width="64" height="64" loading="lazy" decoding="async">' : (s.display_name||'?').charAt(0).toUpperCase();
-      var spec = (s.specialties && s.specialties.length) ? esc(s.specialties.slice(0,2).join(', ')) : (s.rating_count>0?('★ '+Number(s.rating_avg).toFixed(1)):'');
-      return '<div class="staff-card"><div class="av">'+av+'</div><b>'+esc(s.display_name)+'</b><span>'+spec+'</span></div>';
+      var av = s.avatar_url
+        ? '<img src="'+esc(s.avatar_url)+'" alt="" width="72" height="72" loading="lazy" decoding="async">'
+        : esc((s.display_name||'?').charAt(0).toUpperCase());
+      var role = (s.role || s.title || (s.specialties && s.specialties.length ? s.specialties.slice(0,2).join(', ') : ''));
+      var roleEl = role ? '<span class="role">'+esc(role)+'</span>' : '';
+      var rateEl = (s.rating_count>0) ? '<span class="srate">★ '+Number(s.rating_avg).toFixed(1)+'</span>' : '';
+      return '<div class="bk-staff-card"><div class="av">'+av+'</div><b>'+esc(s.display_name)+'</b>'+roleEl+rateEl+'</div>';
     }).join('');
   }
 
-  // ── Reseñas ──
+  // ── Reseñas: puntuación agregada + desglose de estrellas + tarjetas ──
   if(state.reviews.length>0){
     document.getElementById('sec-reviews').style.display='block';
-    document.getElementById('reviewList').innerHTML = state.reviews.map(function(r){
-      var stars = '★★★★★'.slice(0, r.rating) + '☆☆☆☆☆'.slice(0, 5-r.rating);
-      var reply = r.business_reply ? '<div class="reply"><b>Respuesta:</b> '+esc(r.business_reply)+'</div>' : '';
-      return '<div class="review"><div class="top"><span class="who">'+esc(r.full_name||'Cliente')+'</span><span class="stars">'+stars+'</span></div>'+(r.comment?'<div class="txt">'+esc(r.comment)+'</div>':'')+reply+'</div>';
-    }).join('');
+    renderReviews();
   }
 
   // ── Horario ──
@@ -846,26 +991,28 @@ function renderProfile(){
   if(b.phone) ci.push('<div class="inforow"><span class="ic">'+ICONS.phone+'</span><span class="lbl">Teléfono</span><span class="val"><a href="tel:'+esc(b.phone)+'" style="color:var(--teal-ink)">'+esc(b.phone)+'</a></span></div>');
   if(b.whatsapp) ci.push('<div class="inforow"><span class="ic">'+ICONS.chat+'</span><span class="lbl">WhatsApp</span><span class="val"><a href="https://wa.me/'+esc((b.whatsapp||'').replace(/\D/g,''))+'" style="color:var(--teal-ink)">'+esc(b.whatsapp)+'</a></span></div>');
   var hasGeo = typeof b.lat==='number' && typeof b.lng==='number' && isFinite(b.lat) && isFinite(b.lng);
-  if(b.address_line || b.municipality){
-    var addr = [b.address_line, b.municipality].filter(Boolean).join(', ');
-    if(hasGeo){
-      ci.push('<div class="inforow"><span class="ic">'+ICONS.pin+'</span><span class="lbl">Dirección</span><span class="val">'+esc(addr)+'</span></div>');
-    } else {
-      var maps = 'https://maps.google.com/?q='+encodeURIComponent(addr);
-      ci.push('<div class="inforow"><span class="ic">'+ICONS.pin+'</span><span class="lbl">Dirección</span><span class="val">'+esc(addr)+'<br><a class="map-link" href="'+maps+'" target="_blank" rel="noopener">Ver en el mapa →</a></span></div>');
-    }
+  var addr = [b.address_line, b.municipality].filter(Boolean).join(', ');
+  if(addr){
+    ci.push('<div class="inforow"><span class="ic">'+ICONS.pin+'</span><span class="lbl">Dirección</span><span class="val">'+esc(addr)+'</span></div>');
   }
+  var navic = '<svg viewBox="0 0 24 24"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>';
   if(hasGeo){
     var gmaps = 'https://www.google.com/maps/dir/?api=1&destination='+b.lat+','+b.lng;
     var amaps = 'https://maps.apple.com/?daddr='+b.lat+','+b.lng;
     var waze = 'https://waze.com/ul?ll='+b.lat+','+b.lng+'&navigate=yes';
-    var navic = '<svg viewBox="0 0 24 24"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>';
     ci.push('<div id="bizMap"></div>'+
       '<div style="font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:14px 0 8px">Cómo llegar</div>'+
       '<div class="dir-btns">'+
         '<a class="dir-btn" href="'+gmaps+'" target="_blank" rel="noopener">'+navic+'Google Maps</a>'+
         '<a class="dir-btn" href="'+amaps+'" target="_blank" rel="noopener">'+navic+'Apple Maps</a>'+
         '<a class="dir-btn" href="'+waze+'" target="_blank" rel="noopener">'+navic+'Waze</a>'+
+      '</div>');
+  } else if(addr){
+    // Sin pin: usa la dirección como búsqueda para abrir direcciones en Google Maps
+    var gsearch = 'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(addr);
+    ci.push('<div style="font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:14px 0 8px">Cómo llegar</div>'+
+      '<div class="dir-btns">'+
+        '<a class="dir-btn" href="'+gsearch+'" target="_blank" rel="noopener">'+navic+'Google Maps</a>'+
       '</div>');
   }
   document.getElementById('contactList').innerHTML = ci.join('') || '<p class="bio-text">Reserva en línea para ver los detalles.</p>';
@@ -878,6 +1025,19 @@ function renderProfile(){
 
   // ── Políticas ──
   var pol = [];
+  // Políticas que el negocio edita (business.policies = array de strings)
+  if(Array.isArray(b.policies)){
+    var items = b.policies.filter(function(p){ return typeof p==='string' && p.trim(); });
+    if(items.length){
+      pol.push('<ul style="list-style:none;margin:0 0 4px;padding:0;display:flex;flex-direction:column;gap:9px">'+
+        items.map(function(p){
+          return '<li style="display:flex;align-items:flex-start;gap:9px;font-size:13.5px;line-height:1.55;color:var(--text)">'+
+            '<span style="flex:none;width:6px;height:6px;border-radius:99px;background:var(--green);margin-top:7px"></span>'+
+            '<span>'+esc(p.trim())+'</span></li>';
+        }).join('')+
+      '</ul>');
+    }
+  }
   if(b.cancellation_hours>0) pol.push('<div class="inforow"><span class="ic">'+ICONS.clock+'</span><span class="lbl" style="min-width:0">Cancelación</span><span class="val">Cancela con al menos '+b.cancellation_hours+' hora'+(b.cancellation_hours>1?'s':'')+' de anticipación.</span></div>');
   if(b.deposit_default_cents>0) pol.push('<div class="inforow"><span class="ic">'+ICONS.dollar+'</span><span class="lbl" style="min-width:0">Depósito</span><span class="val">Algunos servicios requieren un depósito al reservar.</span></div>');
   if(b.no_show_policy) pol.push('<div class="inforow"><span class="ic">'+ICONS.doc+'</span><span class="lbl" style="min-width:0">No-show</span><span class="val">'+esc(b.no_show_policy)+'</span></div>');
@@ -892,6 +1052,111 @@ function renderProfile(){
   }
 }
 
+// ── Galería hero estilo Booksy: cover + fotos del portafolio en scroll horizontal ──
+function renderHeroGallery(){
+  var host = document.getElementById('bkGallery');
+  if(!host) return;
+  var b = state.biz || {};
+  var urls = [];
+  if(b.cover_url) urls.push(b.cover_url);
+  (state.gallery||[]).forEach(function(g){ if(g && g.url && urls.indexOf(g.url)<0) urls.push(g.url); });
+  urls = urls.slice(0,8);
+  if(urls.length===0){
+    // Sin fotos: degradado de marca con inicial del negocio
+    var initial = (b.name||'?').charAt(0).toUpperCase();
+    host.innerHTML = '<div class="bk-shot bk-fallback"><span>'+esc(initial)+'</span></div>';
+    return;
+  }
+  var slides = urls.map(function(u){
+    return '<div class="bk-shot"><img src="'+esc(u)+'" alt="" loading="lazy" decoding="async"></div>';
+  }).join('');
+  var count = urls.length>1 ? '<div class="bk-count">'+urls.length+' fotos</div>' : '';
+  host.innerHTML = slides + count;
+}
+
+// ── Badges/distintivos del negocio (según datos disponibles) ──
+function renderBadges(b){
+  var host = document.getElementById('bizBadges');
+  if(!host) return;
+  var badges = [];
+  var chk = '<svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  if(b.rating_count>0 && Number(b.rating_avg)>=4.5){
+    badges.push('<span class="bk-badge">'+chk+'Recomendado</span>');
+  }
+  if(state.reviews && state.reviews.length>0){
+    badges.push('<span class="bk-badge">'+chk+'Reseñas verificadas</span>');
+  }
+  // Pagos disponibles → distintivos
+  var pm = state.payment_methods || [];
+  if(pm.indexOf('stripe')>=0) badges.push('<span class="bk-badge">'+chk+'Acepta tarjeta</span>');
+  if(pm.indexOf('ath_movil')>=0) badges.push('<span class="bk-badge">'+chk+'ATH Móvil</span>');
+  if(b.accepts_online_booking!==false) badges.push('<span class="bk-badge">'+chk+'Reserva en línea</span>');
+  if(badges.length===0){ host.style.display='none'; return; }
+  host.innerHTML = badges.join('');
+}
+
+// ── Reseñas estilo Booksy: agregado + desglose de estrellas + tarjetas + ver más ──
+var REVIEWS_PAGE = 5;
+var __reviewsShown = REVIEWS_PAGE;
+function renderReviews(){
+  var b = state.biz || {};
+  var revs = state.reviews || [];
+  // Promedio: usa el del negocio si existe; si no, calcula de las reseñas cargadas
+  var avg, cnt;
+  if(b.rating_count>0){ avg = Number(b.rating_avg); cnt = b.rating_count; }
+  else { cnt = revs.length; avg = cnt ? (revs.reduce(function(s,r){ return s+(r.rating||0); },0)/cnt) : 0; }
+  // Desglose 5★..1★ a partir de las reseñas disponibles
+  var dist = {5:0,4:0,3:0,2:0,1:0};
+  revs.forEach(function(r){ var k=Math.max(1,Math.min(5,Math.round(r.rating||0))); dist[k]++; });
+  var distTotal = revs.length || 1;
+  var navg = Math.round(avg);
+  var avgStars = '★★★★★'.slice(0,navg) + '☆☆☆☆☆'.slice(0,5-navg);
+  var bars = [5,4,3,2,1].map(function(k){
+    var pct = Math.round((dist[k]/distTotal)*100);
+    return '<div class="bk-rev-bar"><span class="lab">'+k+'<span class="st">★</span></span>'+
+      '<span class="track"><span class="fill" style="width:'+pct+'%"></span></span>'+
+      '<span class="n">'+dist[k]+'</span></div>';
+  }).join('');
+  var summary = '<div class="bk-rev-summary">'+
+    '<div class="bk-rev-big"><div class="num">'+avg.toFixed(1)+'</div><div class="stars">'+avgStars+'</div>'+
+      '<div class="cnt">'+cnt+' reseña'+(cnt>1?'s':'')+'</div></div>'+
+    '<div class="bk-rev-bars">'+bars+'</div></div>';
+
+  var shown = revs.slice(0, __reviewsShown);
+  var cards = shown.map(function(r){
+    var nm = r.full_name || r.reviewer_name || 'Cliente';
+    var ini = esc(nm.charAt(0).toUpperCase());
+    var n = Math.max(0,Math.min(5,Math.round(r.rating||0)));
+    var stars = '★★★★★'.slice(0,n) + '☆☆☆☆☆'.slice(0,5-n);
+    var chk = '<svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    // "Cliente confirmado": si la reseña viene marcada como verificada, o si proviene de una cita real
+    var verified = (r.verified===true) || (r.appointment_id!=null) || (r.from_appointment===true) || (r.full_name!=null);
+    var confirmed = verified ? '<span class="bk-confirmed">'+chk+'Cliente confirmado</span>' : '';
+    var dateStr = (r.created_at) ? fmtReviewDate(r.created_at) : '';
+    var dateEl = dateStr ? '<span class="date">'+esc(dateStr)+'</span>' : '';
+    // Contexto: servicio / profesional si vienen en la reseña
+    var ctxParts = [];
+    if(r.service_name) ctxParts.push(r.service_name);
+    if(r.staff_name) ctxParts.push('con '+r.staff_name);
+    var ctx = ctxParts.length ? '<div class="ctx">'+esc(ctxParts.join(' · '))+'</div>' : '';
+    var reply = r.business_reply ? '<div class="reply"><b>Respuesta del negocio:</b> '+esc(r.business_reply)+'</div>' : '';
+    var txt = r.comment ? '<div class="txt">'+esc(r.comment)+'</div>' : '';
+    return '<div class="bk-review">'+
+      '<div class="top"><div class="rav">'+ini+'</div>'+
+        '<div style="flex:1;min-width:0"><div class="who">'+esc(nm)+'</div>'+
+          '<div class="meta-row"><span class="stars">'+stars+'</span>'+confirmed+dateEl+'</div>'+ctx+'</div></div>'+
+      txt + reply + '</div>';
+  }).join('');
+
+  var more = (revs.length > __reviewsShown)
+    ? '<button class="bk-rev-more" id="revMore">Ver más reseñas ('+(revs.length-__reviewsShown)+')</button>'
+    : '';
+
+  document.getElementById('reviewList').innerHTML = summary + cards + more;
+  var mb = document.getElementById('revMore');
+  if(mb) mb.onclick = function(){ __reviewsShown += REVIEWS_PAGE; renderReviews(); };
+}
+
 function fmtTime(t){
   // t viene como "HH:MM" o "HH:MM:SS"
   if(!t) return '';
@@ -900,7 +1165,11 @@ function fmtTime(t){
   return h12+':'+m+' '+ap;
 }
 
-// Preview de servicios en el perfil (mismos datos, abre modal al tocar)
+// Render de servicios.
+// — PERFIL (#svcPreview): estilo Booksy con "Populares" (top 3) + "ver todos",
+//   duración, precio en --mono/--green y botón "Reservar" por servicio.
+// — MODAL (#svcList): se conserva EXACTO el markup .svc con selección múltiple (toggle).
+var __svcExpanded = false;
 function renderServices(){
   var prev = document.getElementById('svcPreview');
   var list = document.getElementById('svcList');
@@ -909,20 +1178,61 @@ function renderServices(){
     list.innerHTML = prev.innerHTML;
     return;
   }
-  var html = state.services.map(function(s){
+
+  // ── Modal: markup .svc original (toggle de selección múltiple) — sin cambios ──
+  var modalHtml = state.services.map(function(s){
     var dep = s.deposit_cents>0 ? '<span style="color:var(--ink2)">'+money(s.deposit_cents)+' de depósito</span>' : '';
     return '<div class="svc" data-id="'+esc(s.id)+'"><div class="grow"><h4>'+esc(s.name)+'</h4><p>'+s.duration_min+' min'+(s.description?(' · '+esc(s.description)):'')+'</p></div><div class="price"><b>'+money(s.price_cents)+'</b>'+dep+'</div></div>';
   }).join('');
-  // En el perfil: tocar un servicio abre el modal y lo preselecciona
-  prev.innerHTML = html;
-  prev.querySelectorAll('.svc').forEach(function(el){
-    el.onclick = function(){ openBook(el.dataset.id); };
-  });
-  // En el modal: lista de servicios con selección MÚLTIPLE (toggle)
-  list.innerHTML = html;
+  list.innerHTML = modalHtml;
   list.querySelectorAll('.svc').forEach(function(el){
     el.onclick = function(){ toggleService(el.dataset.id); };
   });
+
+  // ── Perfil: filas estilo Booksy con botón "Reservar" por servicio ──
+  renderServicePreview();
+}
+
+function svcRowHtml(s){
+  var dep = s.deposit_cents>0 ? '<span class="bk-dep">'+money(s.deposit_cents)+' de depósito</span>' : '';
+  var clock = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  var desc = s.description ? '<div class="bk-svc-desc">'+esc(s.description)+'</div>' : '';
+  return '<div class="bk-svc">'+
+    '<div class="bk-svc-main">'+
+      '<h4>'+esc(s.name)+'</h4>'+desc+
+      '<div class="bk-svc-meta">'+
+        '<span class="bk-dur">'+clock+fmtDuration(s.duration_min)+'</span>'+
+        '<span class="bk-price">'+money(s.price_cents)+'</span>'+dep+
+      '</div>'+
+    '</div>'+
+    '<button class="bk-svc-book" data-book="'+esc(s.id)+'">Reservar</button>'+
+  '</div>';
+}
+
+function renderServicePreview(){
+  var prev = document.getElementById('svcPreview');
+  var svcs = state.services;
+  var html = '';
+  if(svcs.length>3){
+    var pop = svcs.slice(0,3).map(svcRowHtml).join('');
+    var rest = svcs.slice(3).map(svcRowHtml).join('');
+    var arrow = '<svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>';
+    html = '<div class="bk-svc-cat">Populares</div>'+pop;
+    if(__svcExpanded){
+      html += '<div class="bk-svc-cat">Todos los servicios</div>'+rest+
+        '<button class="bk-seeall open" id="svcToggle">Ver menos '+arrow+'</button>';
+    } else {
+      html += '<button class="bk-seeall" id="svcToggle">Ver todos los servicios ('+svcs.length+') '+arrow+'</button>';
+    }
+  } else {
+    html = svcs.map(svcRowHtml).join('');
+  }
+  prev.innerHTML = html;
+  prev.querySelectorAll('[data-book]').forEach(function(btn){
+    btn.onclick = function(ev){ ev.stopPropagation(); openBook(btn.getAttribute('data-book')); };
+  });
+  var tg = document.getElementById('svcToggle');
+  if(tg) tg.onclick = function(){ __svcExpanded = !__svcExpanded; renderServicePreview(); };
 }
 
 // Portafolio (galería) — render desde state.gallery [{url,caption}]
@@ -1031,8 +1341,11 @@ document.getElementById('svcContinue').onclick = function(){
   state.staffId=null; state.date=null; state.slot=null;
   goStep(2);
 };
-document.getElementById('heroBook').onclick = function(){ openBook(); };
-document.getElementById('fabBook').onclick = function(){ openBook(); };
+// Disparadores de reserva (CTA flotante móvil + CTA lateral desktop)
+['fabBook','sideBook','heroBook'].forEach(function(id){
+  var el = document.getElementById(id);
+  if(el) el.onclick = function(){ openBook(); };
+});
 document.getElementById('closeBook').onclick = closeBook;
 document.getElementById('okClose') && (document.getElementById('okClose').onclick = function(){ closeBook(); location.reload(); });
 
@@ -1720,14 +2033,7 @@ function closeSheet(id){ document.getElementById(id).classList.remove('on'); doc
 document.getElementById('cartFab').onclick = function(){ clearAlert('cartAlert'); document.getElementById('orderOk').style.display='none'; renderCart(); openSheet('cartSheet'); };
 document.getElementById('closeCart').onclick = function(){ closeSheet('cartSheet'); };
 
-// Selector de entrega (pickup / shipping)
-document.querySelectorAll('#fulfillSeg button').forEach(function(b){
-  b.onclick = function(){
-    document.querySelectorAll('#fulfillSeg button').forEach(function(x){ x.classList.remove('on'); });
-    b.classList.add('on');
-    state.fulfillment = b.getAttribute('data-f');
-  };
-});
+// Entrega: solo recogida en el negocio (sin envío). state.fulfillment queda 'pickup'.
 
 document.getElementById('orderBtn').onclick = async function(){
   clearAlert('cartAlert');

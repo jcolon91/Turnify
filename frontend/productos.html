@@ -222,7 +222,7 @@ async function load(){
   if(r.ok && r.data.limit===0){
     document.getElementById('addBtn').style.display='none';
     document.getElementById('storeBtn').style.display='none';
-    content.innerHTML='<div class="locked"><div class="ic">🛍️</div><h2>Activa tu tienda</h2><p>Vende productos directo a tus clientes. Disponible con el add-on de Tienda.</p><a href="panel.html">Ver planes</a></div>';
+    content.innerHTML='<div class="locked"><div class="ic">🛍️</div><h2>Activa tu tienda</h2><p>Vende productos directo a tus clientes. Disponible con el add-on de Tienda.</p><a href="panel.html#cuenta">Ver planes</a></div>';
     return;
   }
   STATE.products=(r.ok&&r.data.products)?r.data.products:[];

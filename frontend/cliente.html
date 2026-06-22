@@ -93,6 +93,21 @@ html[data-theme="dark"] .appt .alert.err{background:rgba(161,40,28,.16);color:#E
 .rvform textarea{width:100%;min-height:74px;resize:vertical;padding:12px;border:1.5px solid var(--border);border-radius:12px;background:var(--bg2);color:var(--text);font-size:14px;line-height:1.45;transition:border-color .12s,box-shadow .12s}
 .rvform textarea:focus{outline:none;border-color:var(--green);box-shadow:0 0 0 3px var(--green-soft)}
 .rvform .rvbtns{display:flex;gap:9px;margin-top:11px}
+/* order card */
+.appt .items{margin-top:13px;padding-top:13px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:9px}
+.appt .item{display:flex;gap:10px;align-items:baseline;font-size:13.5px}
+.appt .item .nm{flex:1;min-width:0;line-height:1.3}
+.appt .item .nm .vr{display:block;font-size:11.5px;color:var(--muted);margin-top:1px}
+.appt .item .qt{font-family:var(--mono);font-size:11.5px;font-weight:600;color:var(--muted);white-space:nowrap}
+.appt .item .pr{font-family:var(--mono);font-weight:600;font-size:13px;white-space:nowrap;color:var(--text)}
+.appt .ordtot{display:flex;align-items:baseline;justify-content:space-between;margin-top:13px;padding-top:13px;border-top:1px solid var(--border)}
+.appt .ordtot .lbl{font-family:var(--mono);font-size:9.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted2)}
+.appt .ordtot .amt{font-family:var(--mono);font-weight:700;font-size:18px;color:var(--green)}
+.statebadge.paid,.statebadge.fulfilled{background:#E5F6EC;color:#15803D}
+html[data-theme="dark"] .statebadge.paid,html[data-theme="dark"] .statebadge.fulfilled{background:rgba(54,226,123,.14);color:var(--green)}
+.statebadge.pending{background:#FBEFD8;color:#8a5a13}
+html[data-theme="dark"] .statebadge.pending{background:rgba(239,161,47,.18);color:#EFB85C}
+.statebadge.cancelled{background:var(--card-soft);color:var(--muted)}
 .empty{text-align:center;color:var(--muted);font-size:14px;padding:46px 26px;line-height:1.6;background:var(--card);border:1.5px dashed var(--border);border-radius:20px}
 .empty .ic{font-size:34px;display:block;margin-bottom:10px}
 .empty a{display:inline-block;margin-top:16px;background:var(--green);color:var(--green-ink);font-weight:700;font-size:14px;padding:12px 22px;border-radius:13px;box-shadow:0 6px 16px -9px var(--green-glow)}
@@ -122,6 +137,7 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
   <div class="tabs">
     <button type="button" id="tabUp" class="on" data-tab="up">Próximas<span class="cnt" id="cntUp"></span></button>
     <button type="button" id="tabPast" data-tab="past">Pasadas<span class="cnt" id="cntPast"></span></button>
+    <button type="button" id="tabOrders" data-tab="orders">Mis compras<span class="cnt" id="cntOrders"></span></button>
   </div>
   <div id="content"></div>
   <a href="panel.html" style="display:flex;align-items:center;gap:14px;margin-top:26px;background:var(--card-soft);border:1px solid var(--border);border-radius:16px;padding:16px 18px">
@@ -159,8 +175,9 @@ async function api(method,path,body){
   return {status:r.status,ok:r.ok,data};
 }
 
-let DATA={upcoming:[],past:[]};
+let DATA={upcoming:[],past:[],orders:[]};
 let TAB='up';
+let ORDERS_LOADED=false;
 
 function initial(name){ const s=(name||'').trim(); return s?s.charAt(0).toUpperCase():'B'; }
 
@@ -220,6 +237,36 @@ function pastCard(a){
   return cardShell(a,inner);
 }
 
+const ORDER_LABELS={pending:'Pendiente de pago',paid:'Pagada',fulfilled:'Entregada',cancelled:'Cancelada'};
+const FULFILL_LABELS={pickup:'Recogido',shipping:'Envío'};
+
+function orderCard(o){
+  const st=o.status||'pending';
+  const stLabel=ORDER_LABELS[st]||esc(st);
+  const items=Array.isArray(o.items)?o.items:[];
+  const slug=o.business_slug?('negocio.html?slug='+encodeURIComponent(o.business_slug)):null;
+  const bizName=esc(o.business_name||'Negocio');
+  const head='<div class="head">'+
+      '<span class="logo">'+esc(initial(o.business_name))+'</span>'+
+      '<div class="htxt"><div class="biz">'+(slug?('<a href="'+esc(slug)+'">'+bizName+'</a>'):bizName)+'</div>'+
+      '<div class="svc">'+esc(whenLabel(o.created_at))+'</div></div></div>';
+  const meta='<div class="meta">'+
+      '<div><span class="lbl">Estado</span><span class="statebadge '+esc(st)+'">'+esc(stLabel)+'</span></div>'+
+      '<div><span class="lbl">Entrega</span><span class="when">'+esc(FULFILL_LABELS[o.fulfillment]||o.fulfillment||'—')+'</span></div>'+
+    '</div>';
+  const itemsHtml='<div class="items">'+(items.length?items.map(function(it){
+      const qty=it.qty||1;
+      const variant=it.variant?('<span class="vr">'+esc(it.variant)+'</span>'):'';
+      return '<div class="item">'+
+        '<span class="nm">'+esc(it.name||'Producto')+variant+'</span>'+
+        '<span class="qt">×'+esc(qty)+'</span>'+
+        '<span class="pr">'+money((it.price_cents||0)*qty)+'</span>'+
+      '</div>';
+    }).join(''):'<div class="item"><span class="nm" style="color:var(--muted)">Sin detalle de productos.</span></div>')+'</div>';
+  const tot='<div class="ordtot"><span class="lbl">Total</span><span class="amt">'+money(o.total_cents)+'</span></div>';
+  return '<div class="appt">'+head+meta+itemsHtml+tot+'</div>';
+}
+
 function setAlert(card,msg,ok){
   const el=card.querySelector('[data-role="alert"]');
   if(!el)return;
@@ -230,10 +277,20 @@ function setAlert(card,msg,ok){
 function render(){
   document.getElementById('cntUp').textContent=DATA.upcoming.length?('('+DATA.upcoming.length+')'):'';
   document.getElementById('cntPast').textContent=DATA.past.length?('('+DATA.past.length+')'):'';
+  document.getElementById('cntOrders').textContent=DATA.orders.length?('('+DATA.orders.length+')'):'';
   document.getElementById('tabUp').classList.toggle('on',TAB==='up');
   document.getElementById('tabPast').classList.toggle('on',TAB==='past');
-  const list=TAB==='up'?DATA.upcoming:DATA.past;
+  document.getElementById('tabOrders').classList.toggle('on',TAB==='orders');
   const content=document.getElementById('content');
+  if(TAB==='orders'){
+    if(!DATA.orders.length){
+      content.innerHTML='<div class="empty"><span class="ic">🛍️</span>Aún no tienes compras.<br>Cuando compres en la tienda de un negocio, tus órdenes aparecerán aquí.<br><a href="buscar.html">Explorar negocios</a></div>';
+      return;
+    }
+    content.innerHTML=DATA.orders.map(orderCard).join('');
+    return;
+  }
+  const list=TAB==='up'?DATA.upcoming:DATA.past;
   if(!list.length){
     content.innerHTML=TAB==='up'
       ? '<div class="empty"><span class="ic">📅</span>No tienes citas próximas.<br>Encuentra un negocio y reserva tu espacio.<br><a href="buscar.html">Explorar negocios</a></div>'
@@ -306,18 +363,37 @@ async function load(){
   document.getElementById('boot').style.display='none';
   document.getElementById('app').style.display='block';
   if(!r.ok){
-    DATA={upcoming:[],past:[]};
+    DATA.upcoming=[]; DATA.past=[];
   }else{
-    DATA={
-      upcoming:Array.isArray(r.data.upcoming)?r.data.upcoming:[],
-      past:Array.isArray(r.data.past)?r.data.past:[]
-    };
+    DATA.upcoming=Array.isArray(r.data.upcoming)?r.data.upcoming:[];
+    DATA.past=Array.isArray(r.data.past)?r.data.past:[];
   }
   render();
 }
 
+async function loadOrders(){
+  const r=await api('GET','/me/orders');
+  ORDERS_LOADED=true;
+  DATA.orders=(r.ok&&Array.isArray(r.data.orders))?r.data.orders:[];
+  if(TAB==='orders') render(); else {
+    document.getElementById('cntOrders').textContent=DATA.orders.length?('('+DATA.orders.length+')'):'';
+  }
+}
+
 document.getElementById('tabUp').onclick=function(){ TAB='up'; render(); };
 document.getElementById('tabPast').onclick=function(){ TAB='past'; render(); };
+document.getElementById('tabOrders').onclick=function(){
+  TAB='orders';
+  if(!ORDERS_LOADED){
+    document.getElementById('content').innerHTML='<div class="empty">Cargando tus compras…</div>';
+    document.getElementById('tabUp').classList.remove('on');
+    document.getElementById('tabPast').classList.remove('on');
+    document.getElementById('tabOrders').classList.add('on');
+    loadOrders();
+  }else{
+    render();
+  }
+};
 document.getElementById('logoutBtn').onclick=function(){ localStorage.removeItem('bukeame_token'); location.href='acceso.html'; };
 
 // saludo con el nombre del usuario
@@ -333,6 +409,7 @@ document.getElementById('logoutBtn').onclick=function(){ localStorage.removeItem
 })();
 
 load();
+loadOrders();
 </script>
 </body>
 </html>

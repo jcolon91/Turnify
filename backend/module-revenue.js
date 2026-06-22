@@ -513,7 +513,8 @@ module.exports.mount = function (app, ctx) {
       `SELECT id, municipality_id, category_id, starts_at, ends_at
          FROM featured_listings
         WHERE business_id = $1 AND ends_at > now() ORDER BY ends_at DESC`, [req.business.id]);
-    res.json({ active: rows });
+    const wp = await db.query(`SELECT price_cents FROM addon_catalog WHERE code = 'featured'`);
+    res.json({ active: rows, week_price_cents: wp.rows[0] ? wp.rows[0].price_cents : 0 });
   }));
 
   app.post('/api/featured/purchase', authRequired, businessScope, asyncH(async (req, res) => {

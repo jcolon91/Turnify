@@ -758,6 +758,14 @@ app.patch('/api/businesses/me', authRequired, businessScope, asyncH(async (req, 
       return bad(res, `${k} inválido`);
     vals.push(v); sets.push(`${k} = $${vals.length}`);
   }
+  // policies: arreglo de strings que el negocio edita (cada uno <=200 chars, máx 20, saneados)
+  if (Array.isArray(req.body?.policies)) {
+    const policies = req.body.policies
+      .map(p => String(p == null ? '' : p).trim().slice(0, 200))
+      .filter(Boolean)
+      .slice(0, 20);
+    vals.push(JSON.stringify(policies)); sets.push(`policies = $${vals.length}::jsonb`);
+  }
   if (Array.isArray(req.body?.category_ids)) {
     await db.query(`DELETE FROM business_categories WHERE business_id = $1`, [req.business.id]);
     for (const cid of req.body.category_ids.slice(0, 5))
@@ -988,12 +996,17 @@ app.post('/api/blocks', authRequired, businessScope, asyncH(async (req, res) => 
 
 // Crear varios bloqueos de DÍA COMPLETO de una vez (Bukéame)
 app.post('/api/blocks/batch', authRequired, businessScope, asyncH(async (req, res) => {
-  const { dates, staff_id, reason } = req.body || {};
+  const { dates, staff_id, reason, start_time, end_time } = req.body || {};
+  const all_day = req.body?.all_day !== false;   // default true
   if (!Array.isArray(dates) || dates.length < 1 || dates.length > 60) {
     return bad(res, 'Debe enviar entre 1 y 60 fechas');
   }
   for (const d of dates) {
     if (!isDate(d)) return bad(res, `Fecha inválida: ${d}`);
+  }
+  if (!all_day) {
+    if (!isTime(start_time) || !isTime(end_time)) return bad(res, 'Horas inválidas');
+    if (end_time <= start_time) return bad(res, 'La hora de fin debe ser después del inicio');
   }
   if (staff_id && !isUuid(staff_id)) return bad(res, 'Profesional inválido');
   if (staff_id) {   // el profesional debe ser de ESTE negocio (aislamiento multi-tenant)
@@ -1010,25 +1023,37 @@ app.post('/api/blocks/batch', authRequired, businessScope, asyncH(async (req, re
     if (seen.has(date)) continue;   // evita duplicados dentro del mismo request
     seen.add(date);
 
-    // día completo: de 00:00 a 23:59:59 del día (hora de PR), igual que all_day
-    const startsAt = new Date(`${date}T00:00:00${TZ_OFFSET}`);
-    const endsAt   = new Date(`${date}T23:59:59${TZ_OFFSET}`);
+    // all_day → bloquea el día completo. Parcial: el negocio TRABAJA solo de
+    // start_time a end_time ese día, así que bloqueamos el RESTO del día:
+    // 00:00–start_time y end_time–23:59:59. Horas de PR.
+    let ranges;
+    if (all_day) {
+      ranges = [['00:00:00', '23:59:59']];
+    } else {
+      ranges = [];
+      if (start_time > '00:00') ranges.push(['00:00:00', `${start_time}:00`]);
+      if (end_time < '23:59')   ranges.push([`${end_time}:00`, '23:59:59']);
+    }
 
-    // Omite si ya existe el bloqueo exacto del día (mismo negocio, staff y rango)
-    const dup = await db.query(
-      `SELECT 1 FROM time_blocks
-        WHERE business_id = $1
-          AND staff_id IS NOT DISTINCT FROM $2
-          AND starts_at = $3 AND ends_at = $4`,
-      [req.business.id, sid, startsAt, endsAt]);
-    if (dup.rows[0]) continue;
+    for (const [s, e] of ranges) {
+      const startsAt = new Date(`${date}T${s}${TZ_OFFSET}`);
+      const endsAt   = new Date(`${date}T${e}${TZ_OFFSET}`);
+      // Omite si ya existe el bloqueo exacto (mismo negocio, staff y rango)
+      const dup = await db.query(
+        `SELECT 1 FROM time_blocks
+          WHERE business_id = $1
+            AND staff_id IS NOT DISTINCT FROM $2
+            AND starts_at = $3 AND ends_at = $4`,
+        [req.business.id, sid, startsAt, endsAt]);
+      if (dup.rows[0]) continue;
 
-    const { rows } = await db.query(
-      `INSERT INTO time_blocks (business_id, staff_id, starts_at, ends_at, reason)
-       VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-      [req.business.id, sid, startsAt, endsAt, cleanReason]);
-    await audit(req, 'block.create', 'time_block', rows[0].id);
-    created++;
+      const { rows } = await db.query(
+        `INSERT INTO time_blocks (business_id, staff_id, starts_at, ends_at, reason)
+         VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+        [req.business.id, sid, startsAt, endsAt, cleanReason]);
+      await audit(req, 'block.create', 'time_block', rows[0].id);
+      created++;
+    }
   }
 
   res.status(201).json({ created });
@@ -1508,6 +1533,7 @@ app.get('/api/public/:slug', publicLimiter, asyncH(async (req, res) => {
     `SELECT b.id, b.slug, b.name, b.bio, b.phone, b.whatsapp, b.address_line, b.lat, b.lng,
             b.logo_url, b.cover_url, b.theme, b.social, b.rating_avg, b.rating_count,
             b.cancellation_hours, b.no_show_policy, b.deposit_default_cents, b.booking_horizon_days,
+            b.policies,
             m.name AS municipality,
             (s.plan_code <> 'free' AND (p.features->>'deposits')::boolean) AS deposits_enabled
        FROM businesses b
@@ -2027,6 +2053,45 @@ app.get('/api/me/appointments', authRequired, asyncH(async (req, res) => {
   res.json({ upcoming, past });
 }));
 
+// Las órdenes (productos) del usuario en TODOS los negocios.
+// El cruce usuario<->orden espeja CLIENT_MATCH: una orden es del usuario si
+// buyer_email = email (citext) OR buyer_phone = phone OR client_id pertenece a
+// un cliente con su user_id. $1 = email, $2 = phone (nullable), $3 = user.id.
+app.get('/api/me/orders', authRequired, asyncH(async (req, res) => {
+  const { rows } = await db.query(
+    `SELECT o.id, o.created_at, o.total_cents, o.status, o.fulfillment, o.items,
+            b.name AS business_name, b.slug AS business_slug
+       FROM product_orders o
+       JOIN businesses b ON b.id = o.business_id AND b.deleted_at IS NULL
+      WHERE o.buyer_email = $1
+         OR ($2::text IS NOT NULL AND o.buyer_phone = $2::text)
+         OR o.client_id IN (SELECT id FROM clients WHERE user_id = $3)
+      ORDER BY o.created_at DESC
+      LIMIT 200`,
+    [req.user.email, req.user.phone || null, req.user.id]);
+
+  const orders = rows.map(o => ({
+    id: o.id,
+    business_name: o.business_name,
+    business_slug: o.business_slug,
+    created_at: o.created_at,
+    total_cents: o.total_cents,
+    status: o.status,
+    paid: o.status === 'paid' || o.status === 'fulfilled',
+    fulfillment: o.fulfillment,
+    // items es jsonb (array de {product_id,name,qty,price_cents,variant});
+    // normalizamos al shape del contrato {name,qty,price_cents,variant}.
+    items: Array.isArray(o.items) ? o.items.map(it => ({
+      name: it?.name ?? null,
+      qty: it?.qty ?? null,
+      price_cents: it?.price_cents ?? null,
+      variant: it?.variant ?? null,
+    })) : [],
+  }));
+
+  res.json({ orders });
+}));
+
 // El usuario deja una reseña de una de SUS citas (1 por cita, appointment_id UNIQUE).
 app.post('/api/appointments/:code/review', authRequired, asyncH(async (req, res) => {
   const rating = req.body?.rating;
@@ -2357,8 +2422,11 @@ function buildMessage(template, ctx) {
   const { biz, appt } = ctx;
   const when = appt?.starts_at ? fmtPR(appt.starts_at) : '';
   switch (template) {
-    case 'confirm':
-      return `✅ *${biz.name}*\nTu cita quedó ${appt.status === 'pending_deposit' ? 'reservada (pendiente de depósito)' : 'confirmada'}:\n\n💈 ${appt.service_name}\n🗓 ${when}\n🎟 Código: ${appt.confirmation_code}\n\n${appt.status === 'pending_deposit' && biz.ath_phone ? `Para confirmar, envía el depósito de $${(appt.deposit_cents / 100).toFixed(2)} por ATH Móvil a ${biz.ath_phone} y responde con tu referencia.\n\n` : ''}Para cancelar o mover tu cita, responde a este mensaje.`;
+    case 'confirm': {
+      const loc = (biz.address_line ? `📍 ${biz.address_line}\n` : '')
+        + (biz.lat != null && biz.lng != null ? `🗺 Cómo llegar: https://www.google.com/maps/search/?api=1&query=${biz.lat},${biz.lng}\n` : '');
+      return `✅ *${biz.name}*\nTu cita quedó ${appt.status === 'pending_deposit' ? 'reservada (pendiente de depósito)' : 'confirmada'}:\n\n💈 ${appt.service_name}\n🗓 ${when}\n🎟 Código: ${appt.confirmation_code}\n${loc}\n${appt.status === 'pending_deposit' && biz.ath_phone ? `Para confirmar, envía el depósito de $${(appt.deposit_cents / 100).toFixed(2)} por ATH Móvil a ${biz.ath_phone} y responde con tu referencia.\n\n` : ''}Para cancelar o mover tu cita, responde a este mensaje.`;
+    }
     case 'reminder_48h':
       return `📅 *${biz.name}*\nTu cita es en 2 días:\n\n💈 ${appt.service_name}\n🗓 ${when}\n\nSi necesitas mover la fecha, este es buen momento para avisarnos. Responde aquí.`;
     case 'reminder_24h':
@@ -2488,6 +2556,8 @@ function emailAppt(template, ctx) {
   const svc  = appt?.service_name || 'tu servicio';
   const code = appt?.confirmation_code || '';
   const addr = biz?.address_line || '';
+  const mapUrl = (biz?.lat != null && biz?.lng != null)
+    ? `https://www.google.com/maps/search/?api=1&query=${biz.lat},${biz.lng}` : '';
   let title, intro, extra = '';
   switch (template) {
     case 'confirm':
@@ -2510,6 +2580,10 @@ function emailAppt(template, ctx) {
       title = 'Tu cita es en 1 hora';
       intro = 'Te esperamos. ¡Nos vemos pronto!';
       break;
+    case 'reminder_2h':
+      title = 'Tu cita es en 2 horas';
+      intro = 'Te esperamos. ¡Nos vemos pronto!';
+      break;
     case 'manual_assign':
       title = 'Te conseguimos turno';
       intro = 'Si no puedes llegar, avísale al negocio respondiendo aquí.';
@@ -2524,6 +2598,8 @@ function emailAppt(template, ctx) {
     ['Fecha', when],
     code ? ['Código', code] : null,
     addr ? ['Lugar', addr] : null,
+    (template === 'confirm' && mapUrl)
+      ? ['Cómo llegar', `<a href="${mapUrl}" style="color:#0A5B52;text-decoration:none">Ver en el mapa</a>`] : null,
   ].filter(Boolean);
   const rowsHtml = rowsArr.map(([k, v], i) =>
     `<tr><td style="padding:9px 0;font-size:12px;color:#7A7464;width:76px;vertical-align:top;${i ? 'border-top:1px solid #EFEADC' : ''}">${k}</td><td style="padding:9px 0;font-size:14px;font-weight:600;color:#17150F;${i ? 'border-top:1px solid #EFEADC' : ''}">${v}</td></tr>`
@@ -2548,9 +2624,8 @@ function emailAppt(template, ctx) {
 // Encola recordatorios 24h y 2h (idempotente: marca la cita)
 async function queueReminders() {
   for (const [col, tpl, from, to] of [
-    ['reminder_48h_sent_at', 'reminder_48h', 47.5, 48.5],
     ['reminder_24h_sent_at', 'reminder_24h', 23.5, 24.5],
-    ['reminder_1h_sent_at',  'reminder_1h',   0.5,  1.5],
+    ['reminder_2h_sent_at',  'reminder_2h',   1.5,  2.5],
   ]) {
     const { rows } = await db.query(
       `UPDATE appointments a SET ${col} = now()
@@ -2576,7 +2651,7 @@ async function dispatchMessages() {
   const { rows } = await db.query(
     `SELECT m.id, m.channel, m.recipient, m.template, m.appointment_id,
             a.starts_at, a.service_name, a.confirmation_code, a.status, a.deposit_cents,
-            b.name, b.ath_phone, b.address_line
+            b.name, b.ath_phone, b.address_line, b.lat, b.lng
        FROM message_log m
        LEFT JOIN appointments a ON a.id = m.appointment_id
        JOIN businesses b ON b.id = m.business_id
@@ -2584,7 +2659,7 @@ async function dispatchMessages() {
       ORDER BY m.created_at LIMIT 20`);
   for (const m of rows) {
     const ctx = {
-      biz: { name: m.name, ath_phone: m.ath_phone, address_line: m.address_line },
+      biz: { name: m.name, ath_phone: m.ath_phone, address_line: m.address_line, lat: m.lat, lng: m.lng },
       appt: m,
     };
     try {
@@ -2632,6 +2707,7 @@ try {
   require('./module-accounting').mount(app, { db, authRequired, businessScope, h: sharedHelpers });
   require('./module-account').mount(app, { db, authRequired, businessScope, h: sharedHelpers });
   require('./module-payments').mount(app, { db, authRequired, businessScope, h: sharedHelpers });
+  require('./module-platform-billing').mount(app, { db, authRequired, businessScope, h: sharedHelpers });
 } catch (e) {
   console.error('⚠ Error montando módulos v1.1:', e.message);
 }

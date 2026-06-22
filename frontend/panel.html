@@ -187,27 +187,49 @@ main{padding:22px 20px 90px;max-width:760px}
 .tl-col{position:relative;border-right:1px solid var(--border)}
 .tl-col:last-child{border-right:0}
 .tl-col .tl-line{position:absolute;left:0;right:0;height:1px;background:var(--border);opacity:.55}
-.tl-evt{position:absolute;left:5px;right:5px;border-radius:9px;border-left:4px solid var(--green);background:var(--green-soft);padding:5px 8px;overflow:hidden;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.05);transition:transform .08s,box-shadow .12s}
+.tl-evt{position:absolute;left:6px;right:6px;border-radius:11px;border-left:4px solid var(--green);background:var(--green-soft);padding:9px 11px;overflow:hidden;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.05);transition:transform .08s,box-shadow .12s}
 .tl-evt:hover{box-shadow:0 3px 10px rgba(0,0,0,.12);transform:translateY(-1px)}
-.tl-evt b{display:block;font-size:11.5px;font-weight:700;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
-.tl-evt small{display:block;font-size:10px;color:var(--muted);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.tl-evt .tl-ico{font-size:10px;font-weight:800;margin-right:3px}
+.tl-evt b{display:block;font-size:13px;font-weight:700;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);padding-right:26px}
+.tl-evt small{display:block;font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:26px}
+.tl-evt .tl-ico{font-size:11px;font-weight:800;margin-right:4px}
 .tl-evt.is-completed .tl-ico{color:#15803D}
 .tl-evt.is-done-state{opacity:.5}
 .tl-evt.is-done-state .tl-ico{color:#A33A24}
 .tl-evt.is-pending{border-left-style:dashed}
+.tl-evt.is-arrived{box-shadow:0 0 0 2px var(--mango) inset,0 1px 2px rgba(0,0,0,.05)}
+.tl-evt.is-open{box-shadow:0 0 0 2px var(--green) inset,0 6px 18px rgba(0,0,0,.18);transform:translateY(-1px)}
+/* Pin de "Llegó" dentro del bloque */
+.tl-arr-pin{position:absolute;top:6px;right:30px;display:inline-flex;align-items:center;gap:3px;font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--mango);background:var(--card);border:1px solid var(--mango);border-radius:999px;padding:1px 6px;line-height:1.4}
+/* Botón flotante de acciones que vive dentro del bloque */
+.tl-fab{position:absolute;top:5px;right:5px;width:22px;height:22px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--card);border:1px solid var(--border);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.12);cursor:pointer;z-index:2;transition:transform .1s,background .12s,color .12s}
+.tl-fab svg{width:13px;height:13px;display:block}
+.tl-fab:hover,.tl-evt.is-open .tl-fab{background:var(--green);border-color:var(--green);color:var(--green-ink)}
+.tl-evt.is-open .tl-fab{transform:rotate(90deg)}
 .tl-now{position:absolute;left:0;right:0;height:2px;background:var(--mango);z-index:6;pointer-events:none}
 .tl-now-dot{position:absolute;top:-3px;width:8px;height:8px;border-radius:50%;background:var(--mango);transform:translateX(-50%)}
-.tl-pop{position:fixed;z-index:120;background:var(--card);border:1px solid var(--border);border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.22);padding:8px;min-width:200px;max-width:240px}
-.tl-pop h5{font-size:13px;font-weight:700;padding:4px 8px 2px;line-height:1.25}
-.tl-pop p{font-size:11px;color:var(--muted);padding:0 8px 7px;border-bottom:1px solid var(--border);margin-bottom:5px}
-.tl-pop button{display:flex;width:100%;align-items:center;gap:9px;font-size:13px;font-weight:600;text-align:left;padding:9px 10px;border-radius:9px;color:var(--text)}
-.tl-pop button:hover{background:var(--bg2)}
-.tl-pop button.tl-act-done{color:#15803D}
-.tl-pop button.tl-act-wa{color:var(--green)}
+.tl-pop{position:fixed;z-index:120;background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:0 16px 48px rgba(0,0,0,.28);padding:12px;min-width:248px;max-width:280px;transform-origin:top left;animation:tlPopIn .14s ease}
+@keyframes tlPopIn{from{opacity:0;transform:translateY(-6px) scale(.97)}to{opacity:1;transform:none}}
+.tl-pop h5{font-size:14.5px;font-weight:700;padding:2px 4px 2px;line-height:1.25;color:var(--text)}
+.tl-pop p{font-family:var(--mono);font-size:11.5px;color:var(--muted);padding:0 4px 10px;border-bottom:1px solid var(--border);margin-bottom:10px}
+/* 3 acciones principales en rejilla, botones grandes (cómodos en móvil) */
+.tl-pop-main{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-bottom:8px}
+.tl-pop-main button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-height:62px;padding:8px 4px;border-radius:12px;border:1px solid var(--border);background:var(--card-soft);font-size:12px;font-weight:700;color:var(--text);cursor:pointer;transition:transform .08s,border-color .12s,background .12s}
+.tl-pop-main button svg{width:19px;height:19px}
+.tl-pop-main button:hover{transform:translateY(-1px);border-color:var(--green)}
+.tl-pop-main button.tl-m-done{color:var(--green)}
+.tl-pop-main button.tl-m-move{color:var(--mango)}
+/* acciones secundarias */
+.tl-pop-sub{display:flex;gap:7px}
+.tl-pop-sub button{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;font-size:12.5px;font-weight:600;padding:10px 8px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer}
+.tl-pop-sub button svg{width:15px;height:15px}
+.tl-pop-sub button:hover{background:var(--bg2)}
+.tl-pop-sub button.tl-act-wa{color:var(--green);border-color:var(--green)}
+.tl-pop-sub button.tl-act-cancel{color:#C0392B}
 .tl-pop-back{position:fixed;inset:0;z-index:110}
 @media(max-width:640px){
-  .tl-pop{left:12px!important;right:12px!important;max-width:none;width:auto}
+  .tl-pop{left:12px!important;right:12px!important;bottom:12px!important;top:auto!important;max-width:none;width:auto;padding:14px}
+  .tl-pop-main button{min-height:70px;font-size:13px}
+  .tl-pop-sub button{padding:13px 8px;font-size:13.5px}
 }
 /* Mes */
 .mo-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
@@ -385,9 +407,10 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
 
         <div id="loyLocked" style="display:none">
           <div class="card" style="text-align:center;padding:30px 20px">
-            <div style="font-size:32px;margin-bottom:8px">🎁</div>
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:var(--green);margin-bottom:8px" aria-hidden="true"><rect x="3" y="8" width="18" height="13" rx="2"/><path d="M3 12h18"/><path d="M12 8v13"/><path d="M12 8C12 5 9.5 3.5 8 4.5 6.5 5.5 7.5 8 12 8z"/><path d="M12 8c0-3 2.5-4.5 4-3.5 1.5 1 .5 3.5-4 3.5z"/></svg>
             <h3 style="font-family:var(--display);font-weight:800;font-size:18px;margin-bottom:6px">Programa de lealtad</h3>
             <p style="font-size:13.5px;color:var(--muted);line-height:1.6">Disponible en el plan Studio o superior. Mejora tu plan para premiar a tus clientes frecuentes.</p>
+            <button type="button" class="btn btn-teal btn-sm" id="loyViewPlans" style="margin-top:14px">Ver planes</button>
           </div>
         </div>
 
@@ -448,18 +471,11 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
         <!-- Añadir días libres con selección múltiple (Bukéame) -->
         <div class="freecard">
           <div style="font-weight:700;font-size:14.5px;margin-bottom:4px">Añadir días libres</div>
-          <p style="font-size:12.5px;color:var(--ink2);margin-bottom:12px">Toca varios días para marcarlos libres, o usa un rango Desde / Hasta.</p>
+          <p style="font-size:12.5px;color:var(--ink2);margin-bottom:12px">Toca los días que quieras marcar libres en el calendario.</p>
           <div class="alert" id="freeAlert"></div>
 
-          <div class="free-modes">
-            <button type="button" data-free-mode="multi" class="on">Días sueltos</button>
-            <button type="button" data-free-mode="range">Rango</button>
-          </div>
-
-          <div id="freeRangeRow" style="display:none;gap:10px;margin-bottom:14px" class="row2">
-            <div class="field"><label>Desde</label><input id="freeFrom" type="date"></div>
-            <div class="field"><label>Hasta</label><input id="freeTo" type="date"></div>
-          </div>
+          <div class="free-modes"><button type="button" data-free-mode="multi" class="on">Días sueltos</button><button type="button" data-free-mode="range">Rango</button></div>
+          <div id="freeRangeRow" style="display:none;gap:10px;margin-bottom:14px" class="row2"><div class="field"><label>Desde</label><input id="freeFrom" type="date"></div><div class="field"><label>Hasta</label><input id="freeTo" type="date"></div></div>
 
           <div class="cal-head">
             <button type="button" class="cal-nav" id="freePrev" aria-label="Mes anterior">◀</button>
@@ -477,10 +493,21 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
             <input id="freeReason" placeholder="Vacaciones, feriado…" maxlength="120">
           </div>
 
-          <button class="btn btn-teal btn-sm" id="freeSaveBtn" style="width:100%;margin-top:8px" disabled>Marcar libres (0 días)</button>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:4px">
+            <div style="flex:1">
+              <div style="font-weight:700;font-size:13.5px">Día completo libre</div>
+              <p style="font-size:12px;color:var(--ink2);margin-top:2px">Apágalo si ese día trabajas solo unas horas (se bloquea el resto).</p>
+            </div>
+            <label class="switch"><input type="checkbox" id="freeAllDay" checked><span class="slider"></span></label>
+          </div>
+          <div id="freeHours" style="display:none;margin-top:12px" class="row2">
+            <div class="field" style="margin-bottom:0"><label>Trabajo desde</label><input id="freeStart" type="time" value="09:00"></div>
+            <div class="field" style="margin-bottom:0"><label>hasta</label><input id="freeEnd" type="time" value="13:00"></div>
+          </div>
+
+          <button class="btn btn-teal btn-sm" id="freeSaveBtn" style="width:100%;margin-top:14px" disabled>Marcar libres (0 días)</button>
         </div>
 
-        <button class="btn btn-ghost btn-sm" id="addBlockBtn" style="margin-bottom:14px">+ Añadir día libre o bloqueo</button>
         <div id="blocksList"></div>
       </section>
 
@@ -600,6 +627,17 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
           <div class="field"><label>Dirección</label><input id="bizAddr" placeholder="Calle, pueblo"></div>
           <div class="field"><label>ATH Móvil (para depósitos)</label><input id="bizAth" placeholder="787-555-1234"></div>
           <button class="btn btn-teal" id="saveBizBtn">Guardar cambios</button>
+        </div>
+        <div class="card">
+          <div class="seclabel">Políticas del negocio</div>
+          <p style="font-size:12.5px;color:var(--ink2);margin-bottom:12px">Lo que tus clientes verán. Añade o quita lo que quieras.</p>
+          <div class="alert" id="polAlert"></div>
+          <div id="polList" style="margin-bottom:12px"></div>
+          <div class="row2" style="align-items:flex-end;gap:8px">
+            <div class="field" style="margin-bottom:0"><label>Nueva política</label><input id="polInput" maxlength="200" placeholder="Ej: Cancela con 24 horas de anticipación"></div>
+            <button class="btn btn-ghost btn-sm" id="polAddBtn" type="button" style="flex:none">Añadir</button>
+          </div>
+          <button class="btn btn-teal" id="polSaveBtn" type="button" style="margin-top:14px">Guardar políticas</button>
         </div>
         <div class="card">
           <div class="seclabel">Visibilidad</div>
@@ -770,6 +808,21 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
   </div>
 </div>
 
+<!-- Pago con ATH Móvil -->
+<div class="modal" id="athModal" role="dialog" aria-modal="true" aria-labelledby="athTitle">
+  <div class="box">
+    <h3 id="athTitle">Pagar con ATH Móvil</h3>
+    <div class="alert" id="athAlert"></div>
+    <div id="athSummary" style="font-size:13.5px;color:var(--ink);background:var(--paper);border-radius:11px;padding:12px 14px;margin-bottom:14px;line-height:1.6"></div>
+    <p style="font-size:12.5px;color:var(--ink2);margin-bottom:12px">Confirma el pago en la app de ATH Móvil. Al completarse, tu compra se activa automáticamente.</p>
+    <!-- Contenedor donde la librería de ATH Móvil inyecta su botón -->
+    <div id="ATHMovil_Checkout_Button" style="min-height:50px;margin-bottom:12px"></div>
+    <div style="display:flex;gap:10px">
+      <button type="button" class="btn btn-ghost btn-sm" id="athCancel" style="flex:1">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal" id="blockModal">
   <div class="box">
     <h3>Día libre o bloqueo</h3>
@@ -819,6 +872,19 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
     <div style="display:flex;gap:10px">
       <button class="btn btn-ghost btn-sm" id="apCancel" style="flex:1">Cancelar</button>
       <button class="btn btn-teal btn-sm" id="apSave" style="flex:1">Crear cita</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="moveModal">
+  <div class="box">
+    <h3>Mover cita</h3>
+    <div class="alert" id="moveAlert"></div>
+    <p style="font-size:14px;color:var(--ink2);margin-bottom:12px" id="moveWho"></p>
+    <div class="field"><label>Nueva fecha y hora *</label><input id="moveDT" type="datetime-local"></div>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-ghost btn-sm" id="moveCancel" style="flex:1">Cancelar</button>
+      <button class="btn btn-teal btn-sm" id="moveSave" style="flex:1">Mover cita</button>
     </div>
   </div>
 </div>
@@ -927,6 +993,7 @@ document.getElementById('logout2').onclick = doLogout;
 let BIZ = null;
 let PLAN_PRICE_CENTS = 0;
 let PLAN_NAME = 'Tu plan';
+let FEAT_WEEK_CENTS = 0;          // precio por semana de destacado (informativo, lo valida el backend)
 const ADDON_HIDDEN = ['sms','custom_domain'];   // no se usan aún: no mostrar
 const ADDON_STORE = ['store_10','store_25'];    // tiendas: avisar si se activan ambas
 
@@ -959,10 +1026,10 @@ async function loadBlocks(){
     };
   });
 }
-// ── Añadir días libres (selección múltiple + rango) ────────────────────────
-var freeMode = 'multi';           // 'multi' | 'range'
+// ── Añadir días libres (selección múltiple en calendario) ──────────────────
 var freeView = new Date();        // mes mostrado en el calendario
 var freeSel = new Set();          // fechas sueltas seleccionadas (YYYY-MM-DD)
+var freeMode = 'multi';           // 'multi' = días sueltos · 'range' = rango Desde..Hasta
 var freeStaffLoaded = false;
 var FREE_DOW = ['Do','Lu','Ma','Mi','Ju','Vi','Sa'];
 var FREE_MONTHS = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
@@ -970,18 +1037,32 @@ var FREE_MONTHS = ['enero','febrero','marzo','abril','mayo','junio','julio','ago
 function freeToday(){ return new Date().toLocaleDateString('en-CA',{timeZone:'America/Puerto_Rico'}); }
 function freeYmd(y,m,d){ return String(y)+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0'); }
 
-// Devuelve el array de fechas a marcar según el modo actual
+// Calcula todas las fechas YYYY-MM-DD entre 'from' y 'to' inclusive (respeta hoy como mínimo)
+function freeRangeDates(from, to){
+  if(!from || !to) return [];
+  if(to < from){ var tmp = from; from = to; to = tmp; }
+  var today = freeToday();
+  if(from < today) from = today;
+  if(to < today) return [];
+  var out = [];
+  // Parse manual para evitar corrimientos por zona horaria
+  var p = from.split('-'), q = to.split('-');
+  var cur = new Date(Date.UTC(+p[0], +p[1]-1, +p[2]));
+  var end = new Date(Date.UTC(+q[0], +q[1]-1, +q[2]));
+  while(cur <= end){
+    out.push(cur.getUTCFullYear()+'-'+String(cur.getUTCMonth()+1).padStart(2,'0')+'-'+String(cur.getUTCDate()).padStart(2,'0'));
+    cur.setUTCDate(cur.getUTCDate()+1);
+    if(out.length > 400) break; // guarda de seguridad
+  }
+  return out;
+}
+
+// Devuelve el array de fechas seleccionadas según el modo activo
 function freeDates(){
   if(freeMode === 'range'){
-    var a = document.getElementById('freeFrom').value;
-    var b = document.getElementById('freeTo').value;
-    if(!a || !b || b < a) return [];
-    var out = [], cur = new Date(a+'T12:00:00'), end = new Date(b+'T12:00:00');
-    while(cur <= end && out.length < 60){
-      out.push(cur.toLocaleDateString('en-CA'));
-      cur.setDate(cur.getDate()+1);
-    }
-    return out;
+    var from = document.getElementById('freeFrom').value;
+    var to = document.getElementById('freeTo').value;
+    return freeRangeDates(from, to);
   }
   return Array.from(freeSel).sort();
 }
@@ -1000,7 +1081,8 @@ function freeRenderCal(){
   var first = new Date(y,m,1).getDay();
   var days = new Date(y,m+1,0).getDate();
   var today = freeToday();
-  var rangeSet = new Set(freeMode==='range' ? freeDates() : []);
+  // Conjunto de fechas resaltadas según el modo activo
+  var marked = (freeMode === 'range') ? new Set(freeDates()) : freeSel;
   var html = '';
   for(var i=0;i<7;i++){ html += '<div class="cal-dow">'+FREE_DOW[i]+'</div>'; }
   for(var b=0;b<first;b++){ html += '<div class="cal-cell empty"></div>'; }
@@ -1010,8 +1092,7 @@ function freeRenderCal(){
     if(ymd < today){ cls += ' past'; }
     else {
       if(ymd === today) cls += ' today';
-      if(freeMode==='multi' && freeSel.has(ymd)) cls += ' sel';
-      if(freeMode==='range' && rangeSet.has(ymd)) cls += ' inrange';
+      if(marked.has(ymd)) cls += ' sel';
     }
     html += '<div class="'+cls+'" data-ymd="'+ymd+'">'+d+'</div>';
   }
@@ -1019,18 +1100,10 @@ function freeRenderCal(){
   grid.querySelectorAll('.cal-cell[data-ymd]').forEach(function(cell){
     if(cell.classList.contains('past')) return;
     cell.onclick = function(){
+      if(freeMode === 'range') return; // en modo rango se usa Desde/Hasta, no clics sueltos
       var ymd = cell.dataset.ymd;
-      if(freeMode==='multi'){
-        if(freeSel.has(ymd)) freeSel.delete(ymd); else freeSel.add(ymd);
-        freeRenderCal();
-      } else {
-        // en modo rango, tocar un día rellena Desde y luego Hasta
-        var fromEl = document.getElementById('freeFrom'), toEl = document.getElementById('freeTo');
-        if(!fromEl.value || (toEl.value && fromEl.value)){ fromEl.value = ymd; toEl.value = ''; }
-        else if(ymd < fromEl.value){ fromEl.value = ymd; }
-        else { toEl.value = ymd; }
-        freeRenderCal();
-      }
+      if(freeSel.has(ymd)) freeSel.delete(ymd); else freeSel.add(ymd);
+      freeRenderCal();
       freeRefreshBtn();
     };
   });
@@ -1053,43 +1126,66 @@ async function freeLoadStaff(){
   freeStaffLoaded = true;
 }
 
-function freeInit(){
-  freeView = new Date();
-  freeSel.clear();
-  freeMode = 'multi';
-  document.querySelectorAll('[data-free-mode]').forEach(function(b){ b.classList.toggle('on', b.dataset.freeMode==='multi'); });
-  document.getElementById('freeRangeRow').style.display = 'none';
-  var t = freeToday();
-  document.getElementById('freeFrom').value = ''; document.getElementById('freeFrom').min = t;
-  document.getElementById('freeTo').value = ''; document.getElementById('freeTo').min = t;
-  document.getElementById('freeReason').value = '';
-  clearAlert('freeAlert');
-  freeLoadStaff();
+function freeToggleHours(){
+  var allDay = document.getElementById('freeAllDay').checked;
+  document.getElementById('freeHours').style.display = allDay ? 'none' : 'flex';
+}
+
+// Cambia entre 'multi' (días sueltos) y 'range' (rango Desde..Hasta)
+function freeSetMode(mode){
+  freeMode = (mode === 'range') ? 'range' : 'multi';
+  document.querySelectorAll('.free-modes [data-free-mode]').forEach(function(b){
+    b.classList.toggle('on', b.getAttribute('data-free-mode') === freeMode);
+  });
+  document.getElementById('freeRangeRow').style.display = (freeMode === 'range') ? 'flex' : 'none';
   freeRenderCal();
   freeRefreshBtn();
 }
 
-document.querySelectorAll('[data-free-mode]').forEach(function(btn){
-  btn.onclick = function(){
-    freeMode = btn.dataset.freeMode;
-    document.querySelectorAll('[data-free-mode]').forEach(function(b){ b.classList.toggle('on', b===btn); });
-    document.getElementById('freeRangeRow').style.display = (freeMode==='range') ? 'flex' : 'none';
-    clearAlert('freeAlert');
-    freeRenderCal();
-    freeRefreshBtn();
-  };
-});
+function freeInit(){
+  freeView = new Date();
+  freeSel.clear();
+  document.getElementById('freeReason').value = '';
+  document.getElementById('freeAllDay').checked = true;
+  var ff = document.getElementById('freeFrom'); if(ff) ff.value = '';
+  var ft = document.getElementById('freeTo'); if(ft) ft.value = '';
+  freeToggleHours();
+  clearAlert('freeAlert');
+  freeLoadStaff();
+  freeSetMode('multi');
+}
+
 document.getElementById('freePrev').onclick = function(){ freeView.setMonth(freeView.getMonth()-1); freeRenderCal(); };
 document.getElementById('freeNext').onclick = function(){ freeView.setMonth(freeView.getMonth()+1); freeRenderCal(); };
-document.getElementById('freeFrom').onchange = function(){ freeRenderCal(); freeRefreshBtn(); };
-document.getElementById('freeTo').onchange = function(){ freeRenderCal(); freeRefreshBtn(); };
+document.getElementById('freeAllDay').onchange = freeToggleHours;
+
+// Segmento de modo: Días sueltos / Rango
+document.querySelectorAll('.free-modes [data-free-mode]').forEach(function(b){
+  b.onclick = function(){ freeSetMode(b.getAttribute('data-free-mode')); };
+});
+// Re-resaltar el calendario al cambiar las fechas del rango
+(function(){
+  var ff = document.getElementById('freeFrom'), ft = document.getElementById('freeTo');
+  function onRange(){ if(freeMode==='range'){ freeRenderCal(); freeRefreshBtn(); } }
+  if(ff) ff.onchange = onRange;
+  if(ft) ft.onchange = onRange;
+})();
 
 document.getElementById('freeSaveBtn').onclick = async function(){
   clearAlert('freeAlert');
   var dates = freeDates();
   if(dates.length < 1){ showAlert('freeAlert','Selecciona al menos un día.',false); return; }
   if(dates.length > 60){ showAlert('freeAlert','Máximo 60 días por vez.',false); return; }
-  var body = { dates: dates };
+  var allDay = document.getElementById('freeAllDay').checked;
+  var body = { dates: dates, all_day: allDay };
+  if(!allDay){
+    var st = document.getElementById('freeStart').value;
+    var en = document.getElementById('freeEnd').value;
+    if(!st || !en){ showAlert('freeAlert','Indica la hora de inicio y fin.',false); return; }
+    if(en <= st){ showAlert('freeAlert','La hora de fin debe ser después del inicio.',false); return; }
+    body.start_time = st;
+    body.end_time = en;
+  }
   var staffId = document.getElementById('freeStaff').value;
   if(staffId) body.staff_id = staffId;
   var reason = document.getElementById('freeReason').value.trim();
@@ -1098,11 +1194,15 @@ document.getElementById('freeSaveBtn').onclick = async function(){
   var r = await api('POST','/blocks/batch', body);
   if(r.ok){
     var n = (r.data && typeof r.data.created === 'number') ? r.data.created : dates.length;
-    showAlert('freeAlert', n+(n===1?' día marcado libre.':' días marcados libres.'), true);
+    var unidad = n===1 ? ' día' : ' días';
+    var msg = allDay
+      ? (n + unidad + (n===1?' marcado libre.':' marcados libres.'))
+      : (n + unidad + ': trabajas solo de ' + body.start_time + ' a ' + body.end_time + ' (resto bloqueado).');
+    showAlert('freeAlert', msg, true);
     freeSel.clear();
-    document.getElementById('freeFrom').value = '';
-    document.getElementById('freeTo').value = '';
     document.getElementById('freeReason').value = '';
+    var ff = document.getElementById('freeFrom'); if(ff) ff.value = '';
+    var ft = document.getElementById('freeTo'); if(ft) ft.value = '';
     freeRenderCal();
     freeRefreshBtn();
     loadBlocks();
@@ -1112,15 +1212,11 @@ document.getElementById('freeSaveBtn').onclick = async function(){
   }
 };
 
+// El botón "+ Añadir día libre o bloqueo" (#addBlockBtn) se eliminó: los días libres
+// y bloqueos ahora se crean desde el calendario "Añadir días libres" de arriba.
+// Se conserva el modal #blockModal y sus manejadores (dead code inofensivo, sus
+// elementos siguen en el DOM) por si se reutiliza, pero ya no hay forma de abrirlo.
 const blockModal = document.getElementById('blockModal');
-document.getElementById('addBlockBtn').onclick = function(){
-  clearAlert('blockAlert');
-  document.getElementById('blkDate').value = new Date().toLocaleDateString('en-CA',{timeZone:'America/Puerto_Rico'});
-  document.getElementById('blkAllDay').checked = true;
-  document.getElementById('blkHours').style.display = 'none';
-  document.getElementById('blkReason').value = '';
-  blockModal.classList.add('on');
-};
 document.getElementById('blkAllDay').onchange = function(){
   document.getElementById('blkHours').style.display = this.checked ? 'none' : 'block';
 };
@@ -1338,6 +1434,13 @@ async function boot(){
       }, 300);
     }
   } catch(e){ console.error('stripeReturn', e); }
+  // Navegación por hash: enlaces externos como productos.html#cuenta abren la sección.
+  try {
+    var h = (location.hash || '').replace(/^#/, '').trim();
+    if(h && document.getElementById('view-'+h)){
+      switchView(h);
+    }
+  } catch(e){ console.error('hashNav', e); }
 }
 
 // Banner de verificación de email (al verificar se activa el trial del referido)
@@ -1396,6 +1499,7 @@ function fillBusiness(data){
   document.getElementById('bizWa').value = b.whatsapp || '';
   document.getElementById('bizAddr').value = b.address_line || '';
   document.getElementById('bizAth').value = b.ath_phone || '';
+  try { policiesInit(b.policies); } catch(e){ console.error('policiesInit', e); }
   // ── Logo del negocio (premium: Pro+) ──
   (function(){
     var isFree = (b.plan_code || 'free') === 'free';
@@ -1718,6 +1822,9 @@ async function renderAgenda(){
 // Paleta de respaldo para profesionales sin calendar_color asignado.
 const TL_PALETTE = ['#0E8074','#E0762E','#3B6FE0','#9B59B6','#C0392B','#16A085','#D4A017','#2C7BE5','#E0518A','#5D6F66'];
 let TL_STAFF_CACHE = null;   // [{id, display_name, calendar_color, is_active}]
+// Check-in "Llegó": no existe estado en el backend, lo marcamos solo visualmente
+// durante la sesión (persiste mientras no se recargue la página).
+const TL_ARRIVED = new Set();
 
 async function loadTimelineStaff(force){
   if(TL_STAFF_CACHE && !force) return TL_STAFF_CACHE;
@@ -1738,9 +1845,10 @@ function minsOfDay(iso){
   }catch(e){ return 0; }
 }
 
-// Cierra cualquier popover de cita abierto.
+// Cierra cualquier panel de acciones de cita abierto y colapsa el botón flotante.
 function tlClosePopover(){
   document.querySelectorAll('.tl-pop,.tl-pop-back').forEach(function(n){ n.remove(); });
+  document.querySelectorAll('.tl-evt.is-open').forEach(function(n){ n.classList.remove('is-open'); });
 }
 
 function renderDayList(list, items){
@@ -1765,7 +1873,7 @@ function buildDayTimeline(list, items, staff){
   staff.forEach(function(s,i){ colorById[s.id] = staffColor(s,i); });
 
   // Rango de horas: 9–19 ampliado para cubrir primera/última cita.
-  const PXH = 60;            // px por hora
+  const PXH = 84;            // px por hora (más aire para leer cliente + servicio)
   let startMin = 9*60, endMin = 19*60;
   dayItems.forEach(function(a){
     const s = minsOfDay(a.starts_at);
@@ -1778,7 +1886,7 @@ function buildDayTimeline(list, items, staff){
   if(endMin <= startMin) endMin = startMin + 60;
   const totalMin = endMin - startMin;
   const bodyH = (totalMin/60)*PXH;
-  const COLW = 150, GUT = 56, HEADH = 44;
+  const COLW = 168, GUT = 56, HEADH = 44;
 
   // Leyenda.
   let legend = '<div class="tl-legend">'+ staff.map(function(s,i){
@@ -1823,15 +1931,19 @@ function buildDayTimeline(list, items, staff){
       const sMin = minsOfDay(a.starts_at);
       const eMin = a.ends_at ? minsOfDay(a.ends_at) : sMin+30;
       const top = ((sMin-startMin)/60)*PXH;
-      const hgt = Math.max(((Math.max(eMin,sMin+15)-sMin)/60)*PXH - 2, 26);
+      // Altura mínima mayor para que respiren el nombre + servicio + hora.
+      const hgt = Math.max(((Math.max(eMin,sMin+15)-sMin)/60)*PXH - 3, 56);
       const col = colorById[s.id];
       const isCompleted = (st==='completed');
       const isCancelledLike = (st==='no_show' || (st && st.indexOf('cancelled')>=0));
       const isPending = (st==='pending_deposit');
+      const isActive = (st==='confirmed' || st==='pending_deposit');
+      const isArrived = TL_ARRIVED.has(String(a.id));
       let cls = 'tl-evt';
       if(isCompleted) cls += ' is-completed';
       if(isCancelledLike) cls += ' is-done-state';
       if(isPending) cls += ' is-pending';
+      if(isArrived && isActive) cls += ' is-arrived';
       let ico = '';
       if(isCompleted) ico = '<span class="tl-ico">✓</span>';
       else if(isCancelledLike) ico = '<span class="tl-ico">✕</span>';
@@ -1839,11 +1951,14 @@ function buildDayTimeline(list, items, staff){
       const bg = (col)+'22';
       const who = a.client_name || a.service_name || 'Cita';
       const sub = hourLabel(a.starts_at) + (a.service_name? (' · '+a.service_name) : '');
+      // FAB (3 puntos) solo en citas accionables.
+      const fab = isActive ? '<button class="tl-fab" data-fab="1" aria-label="Acciones"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button>' : '';
       h += '<div class="'+cls+'" data-id="'+esc(a.id)+'" data-st="'+esc(st)+'"'+
         ' data-price="'+(a.price_cents||0)+'" data-svc="'+esc(a.service_name||'')+'"'+
         ' data-name="'+esc(who)+'" data-phone="'+esc(a.client_phone||'')+'" data-when="'+esc(hourLabel(a.starts_at))+'"'+
+        ' data-start="'+esc(a.starts_at)+'"'+
         ' style="top:'+top+'px;height:'+hgt+'px;background:'+esc(bg)+';border-left-color:'+esc(col)+'">'+
-        '<b>'+ico+esc(who)+'</b><small>'+esc(sub)+'</small></div>';
+        fab+'<b>'+ico+esc(who)+'</b><small>'+esc(sub)+'</small></div>';
     });
     // punto de la línea AHORA en cada columna
     if(showNow){
@@ -1860,7 +1975,7 @@ function buildDayTimeline(list, items, staff){
   h += '</div></div>';
   list.innerHTML = h;
 
-  // Interacción: clic en cita ACTIVA abre popover de acciones.
+  // Interacción: tocar la cita ACTIVA (o su botón flotante) abre el panel de acciones.
   list.querySelectorAll('.tl-evt').forEach(function(ev){
     ev.onclick = function(e){
       e.stopPropagation();
@@ -1872,45 +1987,82 @@ function buildDayTimeline(list, items, staff){
   });
 }
 
-// Popover compacto de acciones para una cita activa.
+// Iconos SVG inline (sin emojis decorativos).
+const TL_SVG = {
+  pay:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 10h20"/><path d="M6 15h4"/></svg>',
+  arr:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
+  done:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.5V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/></svg>',
+  wa:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7A8.38 8.38 0 0 1 4 11.5 8.5 8.5 0 1 1 21 11.5z"/></svg>',
+  cancel:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg>',
+  move:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="m14 17 3-3-3-3"/></svg>'
+};
+
+// Panel flotante de acciones, anclado a una cita activa. Se cierra al tocar fuera.
 function tlOpenPopover(ev){
+  // Si ya estaba abierta esta misma cita, el toque vuelve a colapsar (toggle).
+  const wasOpen = ev.classList.contains('is-open');
   tlClosePopover();
+  if(wasOpen) return;
+
   const id = ev.dataset.id, svc = ev.dataset.svc, price = parseInt(ev.dataset.price,10)||0;
+  const st = ev.dataset.st;
+  const isPending = (st==='pending_deposit');
   const phone = String(ev.dataset.phone||'').replace(/\D/g,'');
+  const arrived = TL_ARRIVED.has(String(id));
+
+  ev.classList.add('is-open');
+
   const back = document.createElement('div'); back.className='tl-pop-back';
   back.onclick = tlClosePopover;
   const pop = document.createElement('div'); pop.className='tl-pop';
-  let html = '<h5>'+esc(ev.dataset.name||'Cita')+'</h5><p>'+esc(ev.dataset.when||'')+(svc?(' · '+esc(svc)):'')+'</p>'+
-    '<button class="tl-act-done" data-act="completed">✓ Completada</button>'+
-    '<button data-act="no_show">No llegó</button>'+
-    '<button data-act="cancelled_business">Cancelar</button>';
-  if(phone){
-    html += '<button class="tl-act-wa" data-act="wa">WhatsApp</button>';
-  }
+
+  // Acciones del negocio: Completar (cobra→completed), Mover (reagendar), No llegó
+  // (no_show; el cliente pierde el depósito) y Cancelar. El depósito confirma la cita
+  // automáticamente al reservar, por eso no hay botón de confirmar/pagar depósito.
+  let html = '<h5>'+esc(ev.dataset.name||'Cita')+'</h5>'+
+    '<p>'+esc(ev.dataset.when||'')+(svc?(' · '+esc(svc)):'')+'</p>'+
+    '<div class="tl-pop-main">'+
+      '<button class="tl-m-done" data-act="completed">'+TL_SVG.done+'<span>Completar</span></button>'+
+      '<button class="tl-m-move" data-act="move">'+TL_SVG.move+'<span>Mover</span></button>'+
+    '</div>'+
+    '<div class="tl-pop-sub">'+
+      (phone?'<button class="tl-act-wa" data-act="wa">'+TL_SVG.wa+'WhatsApp</button>':'')+
+      '<button data-act="no_show">No llegó</button>'+
+      '<button class="tl-act-cancel" data-act="cancel">'+TL_SVG.cancel+'Cancelar</button>'+
+    '</div>';
   pop.innerHTML = html;
   document.body.appendChild(back);
   document.body.appendChild(pop);
-  // posicionar junto al bloque
+
+  // Posicionar junto al bloque (en móvil el CSS lo ancla abajo).
   const r = ev.getBoundingClientRect();
-  let left = Math.min(r.left, window.innerWidth - 252);
-  let top = Math.min(r.bottom + 6, window.innerHeight - pop.offsetHeight - 12);
+  let left = Math.min(r.right + 8, window.innerWidth - pop.offsetWidth - 12);
+  if(left + pop.offsetWidth > window.innerWidth - 8) left = r.left;
+  let top = Math.min(r.top, window.innerHeight - pop.offsetHeight - 12);
   if(left < 8) left = 8;
   if(top < 8) top = 8;
   pop.style.left = left+'px';
   pop.style.top = top+'px';
 
   pop.querySelectorAll('button').forEach(function(btn){
-    btn.onclick = async function(){
+    btn.onclick = async function(e){
+      e.stopPropagation();
       const act = btn.dataset.act;
       if(act==='wa'){ tlClosePopover(); window.open('https://wa.me/'+phone,'_blank'); return; }
+      // "Completar": cobra y completa la cita (openCobro → status:completed).
       if(act==='completed'){ tlClosePopover(); openCobro(id, svc, price); return; }
-      const labels = {no_show:'marcar que NO LLEGÓ', cancelled_business:'CANCELAR esta cita'};
-      if(!confirm('¿Confirmas '+labels[act]+'?')) return;
-      btn.disabled = true;
-      const resp = await api('PATCH','/appointments/'+id,{ status:act });
-      tlClosePopover();
-      if(resp.ok){ loadDashboard(); }
-      else { alert((resp.data && resp.data.error)||'No se pudo actualizar.'); }
+      // "Mover": reagendar la cita (modal → PATCH start_iso).
+      if(act==='move'){ tlClosePopover(); openReschedule(id, ev.dataset.start, ev.dataset.name); return; }
+      if(act==='no_show' || act==='cancel'){
+        const status = (act==='no_show') ? 'no_show' : 'cancelled_business';
+        const label = (act==='no_show') ? 'marcar que NO LLEGÓ' : 'CANCELAR esta cita';
+        if(!confirm('¿Confirmas '+label+'?')) return;
+        btn.disabled = true;
+        const resp = await api('PATCH','/appointments/'+id,{ status:status });
+        tlClosePopover();
+        if(resp.ok){ loadDashboard(); }
+        else { alert((resp.data && resp.data.error)||'No se pudo actualizar.'); }
+      }
     };
   });
 }
@@ -2091,6 +2243,62 @@ document.getElementById('saveBizBtn').onclick = async function(){
   btn.disabled=false; btn.textContent='Guardar cambios';
   showAlert('bizAlert', r.ok ? '¡Guardado!' : (r.data.error||'No se pudo guardar.'), r.ok);
 };
+
+// ── Políticas del negocio (array de strings) ───────────────────────────────
+var bizPolicies = [];
+function renderPolicies(){
+  var list = document.getElementById('polList');
+  if(!list) return;
+  if(!bizPolicies.length){
+    list.innerHTML = '<div class="empty" style="padding:14px">Aún no has añadido políticas.</div>';
+    return;
+  }
+  list.innerHTML = bizPolicies.map(function(p, i){
+    return '<div class="svc"><div class="grow"><p style="font-size:13.5px;line-height:1.5">'+esc(p)+'</p></div>'+
+      '<button class="del pol-del" type="button" data-i="'+i+'" aria-label="Quitar política">×</button></div>';
+  }).join('');
+  list.querySelectorAll('.pol-del').forEach(function(b){
+    b.onclick = function(){
+      var i = parseInt(b.dataset.i, 10);
+      if(!isNaN(i)){ bizPolicies.splice(i, 1); renderPolicies(); }
+    };
+  });
+}
+function policiesInit(policies){
+  bizPolicies = Array.isArray(policies) ? policies.slice() : [];
+  clearAlert('polAlert');
+  var inp = document.getElementById('polInput'); if(inp) inp.value = '';
+  renderPolicies();
+}
+(function(){
+  var addBtn = document.getElementById('polAddBtn');
+  var inp = document.getElementById('polInput');
+  function addPolicy(){
+    clearAlert('polAlert');
+    var v = (inp.value || '').trim();
+    if(!v){ showAlert('polAlert','Escribe una política.', false); return; }
+    if(v.length > 200){ showAlert('polAlert','Máximo 200 caracteres.', false); return; }
+    bizPolicies.push(v);
+    inp.value = '';
+    renderPolicies();
+  }
+  if(addBtn) addBtn.onclick = addPolicy;
+  if(inp) inp.onkeydown = function(e){ if(e.key === 'Enter'){ e.preventDefault(); addPolicy(); } };
+
+  var saveBtn = document.getElementById('polSaveBtn');
+  if(saveBtn) saveBtn.onclick = async function(){
+    clearAlert('polAlert');
+    saveBtn.disabled = true; saveBtn.textContent = 'Guardando…';
+    var r = await api('PATCH','/businesses/me', { policies: bizPolicies });
+    saveBtn.disabled = false; saveBtn.textContent = 'Guardar políticas';
+    if(r.ok){
+      if(BIZ){ BIZ.policies = bizPolicies.slice(); }
+      showAlert('polAlert','Políticas guardadas.', true);
+    } else {
+      showAlert('polAlert', (r.data && r.data.error) || 'No se pudieron guardar.', false);
+    }
+  };
+})();
 
 // ── Ubicación (mapa Leaflet) ───────────────────────────────────────────────
 let locMap = null, locMarker = null, locLatVal = null, locLngVal = null;
@@ -2342,6 +2550,7 @@ function toggleLoyFields(){
   document.getElementById('loyReward').disabled = !on;
 }
 document.getElementById('loyActive').onchange = toggleLoyFields;
+(function(){ var b = document.getElementById('loyViewPlans'); if(b) b.onclick = function(){ switchView('cuenta'); }; })();
 document.getElementById('loySave').onclick = async function(){
   clearAlert('loyAlert');
   const isActive = document.getElementById('loyActive').checked;
@@ -2564,6 +2773,32 @@ document.getElementById('cobroSave').onclick = async function(){
   else { showAlert('cobroAlert', r.data.error || 'No se pudo completar', false); }
 };
 
+// ── Mover/Reagendar una cita: PATCH start_iso (el backend recalcula ends_at y
+//    detecta choques con otra cita del profesional → 409). Hora local PR (UTC-4).
+let moveId = null;
+function openReschedule(id, startIso, name){
+  moveId = id;
+  clearAlert('moveAlert');
+  document.getElementById('moveWho').textContent = name || '';
+  try {
+    const f = new Intl.DateTimeFormat('sv-SE', { timeZone:'America/Puerto_Rico', year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', hour12:false });
+    document.getElementById('moveDT').value = f.format(new Date(startIso)).replace(' ', 'T');
+  } catch(e){ document.getElementById('moveDT').value = ''; }
+  document.getElementById('moveModal').classList.add('on');
+}
+document.getElementById('moveCancel').onclick = function(){ document.getElementById('moveModal').classList.remove('on'); };
+document.getElementById('moveSave').onclick = async function(){
+  if(!moveId) return;
+  const v = document.getElementById('moveDT').value;  // "YYYY-MM-DDTHH:MM"
+  if(!v){ showAlert('moveAlert','Elige la nueva fecha y hora.', false); return; }
+  const start_iso = (v.length===16 ? v + ':00' : v) + '-04:00';  // hora local de PR
+  const btn = this; btn.disabled = true; btn.textContent = 'Moviendo…';
+  const r = await api('PATCH','/appointments/'+moveId, { start_iso: start_iso });
+  btn.disabled = false; btn.textContent = 'Mover cita';
+  if(r.ok){ document.getElementById('moveModal').classList.remove('on'); loadDashboard(); }
+  else { showAlert('moveAlert', (r.data && r.data.error) || 'No se pudo mover la cita.', false); }
+};
+
 // ════════════════════════ MI CUENTA ════════════════════════
 // Etiquetas legibles de beneficios por plan
 const FEATURE_LABELS = {
@@ -2636,7 +2871,12 @@ async function loadAccount(){
       const rr = await api('POST','/account/plan',{ plan_code:b.dataset.code });
       if(rr.ok){ showAlert('acctMsg','¡Plan actualizado!', true); loadAccount(); return; }
       b.disabled=false; b.textContent='Cambiar a este plan';
-      if(rr.status===402 && rr.data && rr.data.pending){ showAlert('acctMsg','Pago pendiente (se activa con Stripe).', false); }
+      if(rr.status===402){
+        // Pago pendiente: ofrecer ATH Móvil si está disponible.
+        const planRow = (d.plans||[]).find(function(p){ return (p.code||p.plan_code||p.id)===b.dataset.code; }) || {};
+        const planCents = planRow.price_monthly_cents || 0;
+        offerAthPay('acctMsg', { kind:'plan', code:b.dataset.code, amountCents:planCents, title:'Plan '+(planRow.name||b.dataset.code)+' · 1 mes' });
+      }
       else showAlert('acctMsg', (rr.data&&rr.data.error)||'No se pudo cambiar de plan.', false);
     };
   });
@@ -2705,9 +2945,10 @@ async function loadAddons(){
         loadAddons();
         return;
       }
-      if(turningOn && rr.status===402 && rr.data && rr.data.pending){
+      if(turningOn && rr.status===402){
         tg.checked = false;
-        showAlert('addonAlert','Activación pendiente (se activa con Stripe).', false);
+        const a2 = rows.find(function(x){ return x.code === code; }) || {};
+        offerAthPay('addonAlert', { kind:'addon', code:code, amountCents:(a2.price_cents||0), title:'Add-on '+(a2.name||code) });
         return;
       }
       tg.checked = !turningOn;
@@ -2727,6 +2968,8 @@ async function loadFeatured(){
   const st = document.getElementById('featStatus');
   const r = await api('GET','/featured/status');
   if(r.ok && r.data){
+    // Guarda el precio por semana (centavos) si el backend lo expone, para el monto ATH (informativo)
+    FEAT_WEEK_CENTS = r.data.week_price_cents || r.data.price_cents || r.data.weekly_price_cents || FEAT_WEEK_CENTS;
     if(r.data.active && r.data.featured_until){
       const dt = new Date(r.data.featured_until);
       st.innerHTML = 'Estás destacado hasta <b>'+esc(dt.toLocaleDateString('es-PR'))+'</b>.';
@@ -2742,7 +2985,11 @@ document.getElementById('featBuyBtn').onclick = async function(){
   const r = await api('POST','/featured/purchase',{ weeks:weeks });
   btn.disabled=false; btn.textContent='Destacar';
   if(r.ok){ showAlert('featAlert','¡Listo! Tu negocio está destacado.', true); loadFeatured(); return; }
-  if(r.status===402 && r.data && r.data.pending){ showAlert('featAlert','Activación pendiente (se activa con Stripe).', false); return; }
+  if(r.status===402){
+    const amount = (FEAT_WEEK_CENTS||0) * weeks;
+    offerAthPay('featAlert', { kind:'featured', code:'featured', weeks:weeks, amountCents:amount, title:'Destacado · '+weeks+(weeks===1?' semana':' semanas') });
+    return;
+  }
   showAlert('featAlert', (r.data&&r.data.error)||'No se pudo destacar.', false);
 };
 
@@ -2936,6 +3183,155 @@ document.getElementById('exportBtn').onclick = async function(){
 
 function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 
+// ════════════════════════ ATH MÓVIL (pago) ════════════════════════
+// Config pública del backend (SOLO publicToken; nunca el token privado).
+var ATH_CFG = { enabled:false, env:'production', publicToken:'' };
+var ATH_SCRIPT_LOADED = false;
+// Compra en curso para el modal ATH: { kind, code, weeks?, amountCents, title }
+var ATH_PENDING = null;
+
+async function loadAthConfig(){
+  try{
+    var r = await api('GET','/billing/ath/config');
+    if(r.ok && r.data){
+      ATH_CFG.enabled = !!r.data.enabled;
+      ATH_CFG.env = r.data.env || 'production';
+      ATH_CFG.publicToken = r.data.publicToken || '';
+      if(ATH_CFG.enabled && ATH_CFG.publicToken){ loadAthScript(); }
+    }
+  }catch(e){ /* sin ATH: se queda el flujo actual de "pago pendiente" */ }
+}
+
+// Carga el script de ATH Móvil una sola vez (solo si enabled=true).
+function loadAthScript(){
+  if(ATH_SCRIPT_LOADED) return;
+  ATH_SCRIPT_LOADED = true;
+  var s = document.createElement('script');
+  s.src = 'https://payments.athmovil.com/api/modal/js/athmovil_base.js';
+  s.async = true;
+  document.head.appendChild(s);
+}
+
+// ¿Mostrar botón "Pagar con ATH Móvil"? Solo si el backend dijo enabled.
+function athAvailable(){ return ATH_CFG.enabled && !!ATH_CFG.publicToken; }
+
+// Abre el modal de checkout ATH reutilizable.
+// opts: { kind:'plan'|'addon'|'featured', code, weeks?, amountCents, title }
+function openAthCheckout(opts){
+  if(!athAvailable()){ return; }
+  ATH_PENDING = opts;
+  clearAlert('athAlert');
+  var dollars = ((opts.amountCents||0)/100).toFixed(2);
+  var meta2 = opts.kind + ':' + opts.code + (opts.kind==='featured' && opts.weeks ? ':'+opts.weeks : '');
+  document.getElementById('athSummary').innerHTML =
+    '<div style="display:flex;justify-content:space-between;align-items:baseline">'+
+      '<span>'+esc(opts.title||'Compra')+'</span>'+
+      '<b style="font-family:var(--mono,monospace)">$'+dollars+'</b>'+
+    '</div>';
+  // Configuración global que lee la librería de ATH Móvil.
+  window.ATHM_Checkout = {
+    env: ATH_CFG.env,
+    publicToken: ATH_CFG.publicToken,
+    timeout: 600,
+    theme: 'btn',
+    lang: 'es',
+    total: Number(dollars),
+    subtotal: Number(dollars),
+    tax: 0,
+    metadata1: String((BIZ && BIZ.id) || ''),
+    metadata2: meta2,
+    items: [{
+      name: opts.title || 'Compra Bukéame',
+      description: opts.title || 'Compra Bukéame',
+      quantity: '1',
+      price: dollars,
+      tax: '0',
+      metadata: ''
+    }]
+  };
+  document.getElementById('athModal').classList.add('on');
+  // (Re)inicializa el botón de ATH según la librería.
+  try{
+    if(typeof ATHM !== 'undefined' && ATHM && typeof ATHM.setCheckout === 'function'){
+      ATHM.setCheckout(window.ATHM_Checkout);
+    } else if(typeof loadButton === 'function'){
+      loadButton();
+    }
+  }catch(e){ console.error('ATH init', e); }
+}
+
+// Tras un 402: si ATH está disponible muestra el botón "Pagar con ATH Móvil"
+// en el alert dado; si no, deja el mensaje de "pago pendiente" de siempre.
+function offerAthPay(alertId, opts){
+  if(!athAvailable()){
+    showAlert(alertId,'Pago pendiente. Confirma el pago para activar.', false);
+    return;
+  }
+  var el = document.getElementById(alertId);
+  if(!el){ openAthCheckout(opts); return; }
+  el.className = 'alert err';
+  el.innerHTML = '';
+  var span = document.createElement('span');
+  span.textContent = 'Pago pendiente. ';
+  var btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'btn btn-teal btn-sm';
+  btn.style.marginLeft = '8px';
+  btn.textContent = 'Pagar con ATH Móvil';
+  btn.onclick = function(){ openAthCheckout(opts); };
+  el.appendChild(span);
+  el.appendChild(btn);
+}
+
+function closeAthCheckout(){
+  document.getElementById('athModal').classList.remove('on');
+  ATH_PENDING = null;
+}
+document.getElementById('athCancel').onclick = closeAthCheckout;
+
+// ── Callbacks globales que invoca la librería de ATH Móvil ──
+// Pago COMPLETADO: confirma server-side y activa la compra.
+window.authorizationATHM = async function(){
+  try{
+    var r = await authorization();          // expuesta por la librería de ATH
+    var data = (r && r.data) ? r.data : {};
+    if(data.ecommerceStatus !== 'COMPLETED'){
+      showAlert('athAlert','El pago no se completó. Intenta de nuevo.', false);
+      return;
+    }
+    var p = ATH_PENDING || {};
+    var body = {
+      kind: p.kind,
+      code: p.code,
+      ecommerceId: data.ecommerceId,
+      referenceNumber: data.referenceNumber
+    };
+    if(p.kind === 'featured' && p.weeks){ body.weeks = p.weeks; }
+    var cr = await api('POST','/billing/ath/confirm', body);
+    if(cr.ok && cr.data && cr.data.ok){
+      closeAthCheckout();
+      if(p.kind === 'plan'){
+        showAlert('acctMsg','¡Pago recibido! Tu plan está activo.', true);
+        loadAccount();
+      } else if(p.kind === 'addon'){
+        showAlert('addonAlert','¡Pago recibido! Add-on activado.', true);
+        loadAddons();
+      } else if(p.kind === 'featured'){
+        showAlert('featAlert','¡Pago recibido! Tu negocio está destacado.', true);
+        loadFeatured();
+      }
+    } else {
+      showAlert('athAlert', (cr.data && cr.data.error) || 'No se pudo confirmar el pago.', false);
+    }
+  }catch(e){
+    console.error('authorizationATHM', e);
+    showAlert('athAlert','Ocurrió un error al confirmar el pago.', false);
+  }
+};
+window.cancelATHM = function(){ showAlert('athAlert','Pago cancelado.', false); };
+window.expiredATHM = function(){ showAlert('athAlert','El pago expiró. Intenta de nuevo.', false); };
+
+loadAthConfig();
 boot();
 </script>
 </body>

@@ -217,7 +217,7 @@ async function apiPost(path, body){
 // Guarda la sesión y redirige según el ROL elegido.
 //   • Admin de plataforma → siempre admin.html (manda sobre el rol).
 //   • Rol "negocio"       → panel.html (allí crea/gestiona su negocio).
-//   • Rol "cliente"       → cliente.html (sus citas y reseñas).
+//   • Rol "cliente"       → buscar.html (el buscador de negocios).
 function saveSessionAndGo(data){
   localStorage.setItem('bukeame_token', data.access_token);
   localStorage.setItem('bukeame_refresh', data.refresh_token);
@@ -227,7 +227,7 @@ function saveSessionAndGo(data){
   } else if(bukRole === 'negocio'){
     location.href = 'panel.html';
   } else {
-    location.href = 'cliente.html';
+    location.href = 'buscar.html';
   }
 }
 
