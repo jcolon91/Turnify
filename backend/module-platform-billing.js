@@ -89,13 +89,23 @@ function mount(app, ctx) {
   app.post('/api/billing/ath/confirm', authRequired, businessScope, asyncH(async (req, res) => {
     if (!enabled) return bad(res, 'El cobro por ATH Móvil no está disponible', 503);
 
-    const { kind, code, weeks, ecommerceId, referenceNumber } = req.body || {};
+    const { kind, code, codes, weeks, ecommerceId, referenceNumber } = req.body || {};
 
     // ── Validación de entrada ───────────────────────────────────────────────
-    if (!['plan', 'addon', 'featured'].includes(kind)) return bad(res, 'Tipo de cobro inválido');
-    if (!isStr(code, 60)) return bad(res, 'Código inválido');
+    if (!['plan', 'addon', 'addons', 'featured'].includes(kind)) return bad(res, 'Tipo de cobro inválido');
     if (!isStr(ecommerceId, 200)) return bad(res, 'ecommerceId inválido');
     if (!isStr(referenceNumber, 200)) return bad(res, 'referenceNumber inválido');
+
+    // 'addons' (plural) = varios add-ons en un solo pago; los demás usan un solo 'code'.
+    let codesArr = [];
+    if (kind === 'addons') {
+      if (!Array.isArray(codes) || codes.length < 1 || codes.length > 10)
+        return bad(res, 'Selecciona entre 1 y 10 add-ons');
+      codesArr = [...new Set(codes.map(c => String(c == null ? '' : c).trim()).filter(c => c && c.length <= 60))];
+      if (!codesArr.length) return bad(res, 'Códigos de add-ons inválidos');
+    } else if (!isStr(code, 60)) {
+      return bad(res, 'Código inválido');
+    }
 
     let weeksVal = null;
     if (kind === 'featured') {
@@ -103,7 +113,7 @@ function mount(app, ctx) {
       if (weeksVal < 1 || weeksVal > 12) return bad(res, 'Semanas entre 1 y 12');
     }
 
-    const refCode = code.trim();
+    const refCode = kind === 'addons' ? codesArr.join(',') : code.trim();
 
     // ── (a) MONTO ESPERADO calculado EN EL SERVIDOR (regla 1) ────────────────
     let montoEsperadoCents;
@@ -118,6 +128,12 @@ function mount(app, ctx) {
       const a = await db.query(`SELECT name, price_cents FROM addon_catalog WHERE code = $1`, [refCode]);
       if (!a.rows[0]) return bad(res, 'Add-on no existe', 404);
       montoEsperadoCents = a.rows[0].price_cents;
+    } else if (kind === 'addons') {
+      // suma de los precios de cada add-on seleccionado (servidor, nunca el cliente)
+      const a = await db.query(
+        `SELECT code, price_cents FROM addon_catalog WHERE code = ANY($1::text[])`, [codesArr]);
+      if (a.rows.length !== codesArr.length) return bad(res, 'Algún add-on no existe', 404);
+      montoEsperadoCents = a.rows.reduce((s, r) => s + r.price_cents, 0);
     } else { // featured
       if (refCode !== 'featured') return bad(res, 'Código de destacado inválido');
       const f = await db.query(`SELECT price_cents FROM addon_catalog WHERE code = 'featured'`);
@@ -186,6 +202,22 @@ function mount(app, ctx) {
            RETURNING code, status, price_cents`,
           [req.business.id, refCode, montoEsperadoCents]);
         activated = up.rows[0];
+      } else if (kind === 'addons') {
+        // Activa TODOS los add-ons pagados (uno por código), mismo patrón ON CONFLICT.
+        const acts = [];
+        for (const c of codesArr) {
+          const pr = await client.query(`SELECT price_cents FROM addon_catalog WHERE code = $1`, [c]);
+          const cents = pr.rows[0] ? pr.rows[0].price_cents : 0;
+          const up = await client.query(
+            `INSERT INTO addons (business_id, code, price_cents)
+             VALUES ($1,$2,$3)
+             ON CONFLICT (business_id, code)
+             DO UPDATE SET status = 'active', cancelled_at = NULL, price_cents = $3, activated_at = now()
+             RETURNING code, status, price_cents`,
+            [req.business.id, c, cents]);
+          acts.push(up.rows[0]);
+        }
+        activated = acts;
       } else { // featured
         // INSERT featured_listings + marca businesses.is_featured (espeja el admin).
         let catId = null;

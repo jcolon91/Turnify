@@ -35,7 +35,7 @@
 --paper:var(--bg);--ink:var(--text);--ink2:var(--muted);--teal:var(--green);--teal-ink:var(--green);--teal-soft:var(--green-soft);--line:var(--border);
 --mango:#EFA12F;--r:18px;
 --display:"Bricolage Grotesque",sans-serif;--body:"Instrument Sans",sans-serif;--mono:"Spline Sans Mono",monospace}
-html[data-theme="dark"]{
+html[data-theme="dark"]{color-scheme:dark;
 --bg:#0B1A13;--bg2:#0E2218;--card:#12251B;--card-soft:rgba(255,255,255,.05);--border:rgba(255,255,255,.1);
 --text:#ECEAE0;--muted:#8AA197;--muted2:#5d6f66;--green:#36E27B;--green-ink:#08160F;
 --green-soft:rgba(54,226,123,.12);--green-glow:rgba(54,226,123,.3);
@@ -70,7 +70,8 @@ main{padding:22px 20px 90px;max-width:760px}
 .theme-tg{display:inline-flex;gap:2px;background:var(--card-soft);border:1px solid var(--border);border-radius:999px;padding:3px}
 .theme-tg button{font:700 11.5px 'Instrument Sans',sans-serif;padding:6px 12px;border-radius:999px;line-height:1;cursor:pointer;border:0;background:transparent;color:var(--muted)}
 .theme-tg button.on{background:var(--green);color:var(--green-ink)}
-.mobnav{display:none;position:sticky;top:0;z-index:80;background:var(--text);gap:4px;padding:8px;overflow-x:auto}
+.mobnav{display:none;position:sticky;top:0;z-index:80;background:var(--text);padding:10px 12px}
+.mobnav select{width:100%;padding:12px 13px;border-radius:12px;border:1px solid var(--border);background:var(--card);color:var(--text);font-weight:700;font-size:14px}
 @media(max-width:860px){.mobnav{display:flex}}
 .mobnav a{font-size:12px;font-weight:600;color:var(--muted2);padding:8px 13px;border-radius:10px;white-space:nowrap;cursor:pointer}
 .mobnav a.on{background:var(--green-soft);color:var(--plan-accent)}
@@ -604,7 +605,7 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
           <div class="seclabel">Banner del negocio</div>
           <p style="font-size:12.5px;color:var(--ink2);margin-bottom:12px">Así se ve el encabezado de tu página. Medida recomendada para imagen: <b>1600×400</b> (4:1).</p>
           <!-- Preview del banner en vivo -->
-          <div id="bannerPreview" style="width:100%;height:110px;border-radius:14px;overflow:hidden;border:1.5px solid var(--line);margin-bottom:14px"></div>
+          <div id="bannerPreview" style="width:100%;aspect-ratio:16/10;border-radius:14px;overflow:hidden;border:1.5px solid var(--line);margin-bottom:14px"></div>
 
           <!-- Galería de patrones (free + todos) -->
           <div style="font-size:12px;color:var(--ink2);margin-bottom:8px;font-weight:600">Elige un diseño</div>
@@ -612,7 +613,7 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
 
           <!-- Imagen propia (Pro) -->
           <div style="border-top:1.5px solid var(--line);padding-top:14px">
-            <div style="font-size:12px;color:var(--ink2);margin-bottom:8px;font-weight:600">O sube tu propia imagen <span style="color:var(--teal-ink)">· Pro</span></div>
+            <div style="font-size:12px;color:var(--ink2);margin-bottom:8px;font-weight:600">O sube tu propia imagen</div>
             <input type="file" id="coverFile" accept="image/jpeg,image/png,image/webp" style="display:none">
             <button class="btn btn-teal" id="coverUploadBtn" style="padding:10px 16px;font-size:13px">Subir imagen</button>
             <button class="btn btn-ghost" id="coverRemoveBtn" style="padding:10px 16px;font-size:13px;display:none;margin-left:8px">Quitar imagen</button>
@@ -724,6 +725,7 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
           <p style="font-size:13px;color:var(--ink2);margin-bottom:6px">Aparece arriba en el buscador por las semanas que elijas.</p>
           <div class="alert" id="featAlert"></div>
           <div id="featStatus" style="font-size:13px;color:var(--ink2);margin-bottom:12px"></div>
+          <div id="featPrice" style="font-family:var(--mono);font-size:13.5px;color:var(--green);font-weight:700;margin-bottom:12px;display:none"></div>
           <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
             <div class="field" style="margin-bottom:0;max-width:160px">
               <label>Semanas</label>
@@ -731,6 +733,7 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
             </div>
             <button class="btn btn-teal btn-sm" id="featBuyBtn" style="padding:11px 18px">Destacar</button>
           </div>
+          <div id="featTotal" style="font-size:13px;color:var(--ink2);margin-top:12px;display:none"></div>
         </div>
 
         <!-- Zona de peligro -->
@@ -1559,12 +1562,12 @@ function fillBusiness(data){
     var uploadBtn = document.getElementById('logoUploadBtn');
     var removeBtn = document.getElementById('logoRemoveBtn');
 
+    // Plan gratis: solo fondos predeterminados; la imagen propia es del plan Pro en adelante.
     if(isFree){
-      // Plan gratis: bloquear, invitar a upgrade
       if(uploadBtn){
-        uploadBtn.textContent = '🔒 Subir logo (Pro)';
+        uploadBtn.textContent = 'Subir logo (Pro)';
         uploadBtn.onclick = function(){
-          showAlert('bizAlert','El logo personalizado está disponible desde el plan Pro. Sube de plan para personalizar tu página.', false);
+          showAlert('bizAlert','Subir tu propio logo es del plan Pro en adelante. En plan gratis puedes elegir un fondo de los de arriba.', false);
         };
       }
       return;
@@ -1603,12 +1606,12 @@ function fillBusiness(data){
   // ── BANNER / COVER ──
   (function(){
     if(!window.BukeameBanners) return;
-    var isFree = (b.plan_code || 'free') === 'free';
     var preview = document.getElementById('bannerPreview');
     var gallery = document.getElementById('bannerGallery');
     var coverBtn = document.getElementById('coverUploadBtn');
     var coverRemove = document.getElementById('coverRemoveBtn');
     var coverInput = document.getElementById('coverFile');
+    var isFree = (b.plan_code || 'free') === 'free';   // gratis: solo diseños; Pro+: imagen propia
 
     // theme actual del negocio
     var theme = {};
@@ -1655,40 +1658,39 @@ function fillBusiness(data){
       };
     });
 
-    // Subir imagen propia (Pro)
-    if(coverRemove) coverRemove.style.display = currentCover ? 'inline-flex' : 'none';
+    // Subir imagen propia
+    if(coverRemove) coverRemove.style.display = (!isFree && currentCover) ? 'inline-flex' : 'none';
     if(coverBtn){
       if(isFree){
-        coverBtn.textContent = '🔒 Subir imagen (Pro)';
-        coverBtn.onclick = function(){
-          showAlert('bizAlert','El banner con imagen propia está disponible desde el plan Pro. Mientras tanto, elige uno de los diseños de arriba.', false);
-        };
+        coverBtn.textContent = 'Subir imagen (Pro)';
+        coverBtn.onclick = function(){ showAlert('bizAlert','Subir tu propia imagen de banner es del plan Pro en adelante. En plan gratis puedes elegir uno de los diseños de arriba.', false); };
       } else {
+        coverBtn.textContent = 'Subir imagen';
         coverBtn.onclick = function(){ coverInput.click(); };
-        coverInput.onchange = async function(){
-          var file = coverInput.files[0];
-          if(!file) return;
-          if(file.size > 5*1024*1024){ showAlert('bizAlert','La imagen es muy grande (máx 5MB)', false); coverInput.value=''; return; }
-          coverBtn.disabled=true; coverBtn.textContent='Subiendo…';
-          try{
-            var fd = new FormData(); fd.append('cover', file);
-            var res = await fetch(API+'/businesses/me/cover', {
-              method:'POST', headers:{ 'Authorization':'Bearer '+token }, body: fd
-            });
-            var data = await res.json().catch(function(){ return {}; });
-            if(res.ok && data.cover_url){
-              currentCover = data.cover_url + '?t=' + Date.now();
-              renderPreview();
-              coverRemove.style.display='inline-flex';
-              gallery.querySelectorAll('.bnr-swatch').forEach(function(x){ x.style.borderColor='transparent'; });
-              showAlert('bizAlert','Banner actualizado ✓', true);
-            } else {
-              showAlert('bizAlert', data.error||'No se pudo subir el banner', false);
-            }
-          }catch(e){ showAlert('bizAlert','Error al subir. Intenta de nuevo.', false); }
-          coverBtn.disabled=false; coverBtn.textContent='Subir imagen'; coverInput.value='';
-        };
       }
+      coverInput.onchange = async function(){
+        var file = coverInput.files[0];
+        if(!file) return;
+        if(file.size > 5*1024*1024){ showAlert('bizAlert','La imagen es muy grande (máx 5MB)', false); coverInput.value=''; return; }
+        coverBtn.disabled=true; coverBtn.textContent='Subiendo…';
+        try{
+          var fd = new FormData(); fd.append('cover', file);
+          var res = await fetch(API+'/businesses/me/cover', {
+            method:'POST', headers:{ 'Authorization':'Bearer '+token }, body: fd
+          });
+          var data = await res.json().catch(function(){ return {}; });
+          if(res.ok && data.cover_url){
+            currentCover = data.cover_url + '?t=' + Date.now();
+            renderPreview();
+            coverRemove.style.display='inline-flex';
+            gallery.querySelectorAll('.bnr-swatch').forEach(function(x){ x.style.borderColor='transparent'; });
+            showAlert('bizAlert','Banner actualizado ✓', true);
+          } else {
+            showAlert('bizAlert', data.error||'No se pudo subir el banner', false);
+          }
+        }catch(e){ showAlert('bizAlert','Error al subir. Intenta de nuevo.', false); }
+        coverBtn.disabled=false; coverBtn.textContent='Subir imagen'; coverInput.value='';
+      };
     }
     if(coverRemove) coverRemove.onclick = async function(){
       coverRemove.disabled=true;
@@ -2401,6 +2403,7 @@ document.getElementById('pfFile').onchange = async function(){
 function switchView(v){
   document.querySelectorAll('.view').forEach(function(s){ s.classList.toggle('on', s.id==='view-'+v); });
   document.querySelectorAll('.navlink').forEach(function(a){ a.classList.toggle('on', a.dataset.v===v); });
+  var _ms = document.getElementById('mobnavSel'); if(_ms && _ms.value !== v) _ms.value = v;   // sincroniza el dropdown móvil
   document.querySelectorAll('#mobnav a').forEach(function(a){ a.classList.toggle('on', a.dataset.v===v); });
   if(v==='servicios') loadServices();
   if(v==='equipo') loadStaff();
@@ -2417,11 +2420,16 @@ document.querySelectorAll('.navlink').forEach(function(a){ if(!a.dataset.v) retu
 function buildMobnav(){
   const nav = document.getElementById('mobnav');
   const items = [['agenda','Agenda'],['servicios','Servicios'],['equipo','Equipo'],['clientes','Clientes'],['lealtad','Lealtad'],['#productos.html','Tienda'],['#espera.html','Espera'],['horario','Horario'],['contabilidad','$'],['negocio','Negocio'],['pagos','Pagos'],['#referidos.html','Referidos'],['cuenta','Cuenta']];
-  nav.innerHTML = items.map(function(it,i){
-    if(it[0].charAt(0)==='#'){ return '<a href="'+it[0].slice(1)+'">'+it[1]+'</a>'; }
-    return '<a data-v="'+it[0]+'" class="'+(i===0?'on':'')+'">'+it[1]+'</a>';
-  }).join('');
-  nav.querySelectorAll('a[data-v]').forEach(function(a){ a.onclick=function(){ switchView(a.dataset.v); }; });
+  // Móvil: un solo dropdown para elegir la sección (en vez de una barra de pestañas).
+  nav.innerHTML = '<select id="mobnavSel" aria-label="Secciones del panel">' + items.map(function(it){
+    return '<option value="'+it[0]+'">'+it[1]+'</option>';
+  }).join('') + '</select>';
+  var sel = document.getElementById('mobnavSel');
+  sel.onchange = function(){
+    var v = sel.value;
+    if(v.charAt(0)==='#'){ location.href = v.slice(1); return; }   // enlaces externos (Tienda, Espera, Referidos)
+    switchView(v);
+  };
 }
 
 // ════════════════════════ CLIENTES (perfil + historial) ════════════════════════
@@ -2909,67 +2917,131 @@ async function loadAddons(){
   const rows = addons.filter(function(a){ return a.code !== 'featured' && ADDON_HIDDEN.indexOf(a.code) === -1; });
   renderAddonTotal(rows);
   if(rows.length === 0){ wrap.innerHTML = '<p style="font-size:13px;color:var(--ink2)">No hay add-ons disponibles.</p>'; return; }
-  wrap.innerHTML = rows.map(function(a){
-    const price = a.price_cents ? (money(a.price_cents)+(a.billing==='monthly'?'/mes':'')) : 'Gratis';
-    return '<div class="addon-row"><div class="grow"><h4>'+esc(a.name||a.code)+'</h4>'+
-      (a.description?'<p>'+esc(a.description)+'</p>':'')+
-      '<span class="addon-price">'+price+'</span></div>'+
-      '<label class="switch"><input type="checkbox" class="addon-tg" data-code="'+esc(a.code)+'" '+(a.is_active?'checked':'')+'><span class="slider"></span></label></div>';
-  }).join('');
-  wrap.querySelectorAll('.addon-tg').forEach(function(tg){
-    tg.onchange = async function(){
+
+  const activeRows = rows.filter(function(a){ return a.is_active; });
+  const availRows  = rows.filter(function(a){ return !a.is_active; });
+
+  function priceLabel(a){
+    return a.price_cents ? (money(a.price_cents)+(a.billing==='monthly'?'/mes':'')) : 'Gratis';
+  }
+
+  let html = '';
+
+  // ── Disponibles: checkbox + precio, pago único ──
+  if(availRows.length){
+    html += '<div style="font-size:12px;color:var(--ink2);margin-bottom:8px;font-weight:600">Disponibles</div>';
+    html += availRows.map(function(a){
+      return '<label class="addon-row" style="cursor:pointer">'+
+        '<input type="checkbox" class="addon-sel" data-code="'+esc(a.code)+'" data-cents="'+(a.price_cents||0)+'" style="width:18px;height:18px;flex:none;accent-color:var(--teal)">'+
+        '<div class="grow"><h4>'+esc(a.name||a.code)+'</h4>'+
+        (a.description?'<p>'+esc(a.description)+'</p>':'')+
+        '<span class="addon-price">'+priceLabel(a)+'</span></div></label>';
+    }).join('');
+    html += '<div id="addonSelTotal" style="margin-top:14px;display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px">'+
+        '<span style="font-size:13px;color:var(--ink2)">Total seleccionado</span>'+
+        '<b id="addonSelTotalVal" style="font-family:var(--mono);font-size:15px;color:var(--green)">'+money(0)+'</b></div>';
+    html += '<button class="btn btn-teal btn-sm" id="addonPayBtn" type="button" style="margin-top:12px;padding:11px 18px" disabled>Pagar con ATH Móvil ('+money(0)+')</button>';
+  }
+
+  // ── Activos: sin checkbox, con opción de cancelar ──
+  if(activeRows.length){
+    html += '<div style="font-size:12px;color:var(--ink2);margin:'+(availRows.length?'20px':'0')+' 0 8px;font-weight:600;border-top:'+(availRows.length?'1px solid var(--border)':'0')+';padding-top:'+(availRows.length?'16px':'0')+'">Activos</div>';
+    html += activeRows.map(function(a){
+      return '<div class="addon-row"><div class="grow"><h4>'+esc(a.name||a.code)+'</h4>'+
+        (a.description?'<p>'+esc(a.description)+'</p>':'')+
+        '<span class="addon-price">'+priceLabel(a)+'</span></div>'+
+        '<button class="btn btn-ghost btn-sm addon-cancel" type="button" data-code="'+esc(a.code)+'" style="flex:none">Cancelar</button></div>';
+    }).join('');
+  }
+
+  wrap.innerHTML = html;
+
+  // ── Selección múltiple: total en vivo + botón de pago único ──
+  const selBoxes = wrap.querySelectorAll('.addon-sel');
+  const payBtn = document.getElementById('addonPayBtn');
+  const totalVal = document.getElementById('addonSelTotalVal');
+  function selectedCodes(){
+    return Array.prototype.filter.call(selBoxes, function(c){ return c.checked; })
+      .map(function(c){ return c.dataset.code; });
+  }
+  function selectedCents(){
+    return Array.prototype.reduce.call(selBoxes, function(s,c){
+      return s + (c.checked ? (parseInt(c.dataset.cents,10)||0) : 0);
+    }, 0);
+  }
+  function refreshSel(){
+    const cents = selectedCents();
+    const n = selectedCodes().length;
+    if(totalVal) totalVal.textContent = money(cents);
+    if(payBtn){
+      payBtn.textContent = 'Pagar con ATH Móvil ('+money(cents)+')';
+      payBtn.disabled = (n === 0);
+    }
+  }
+  selBoxes.forEach(function(c){ c.onchange = function(){ clearAlert('addonAlert'); refreshSel(); }; });
+  refreshSel();
+
+  if(payBtn){
+    payBtn.onclick = function(){
       clearAlert('addonAlert');
-      const code = tg.dataset.code;
-      const turningOn = tg.checked;
-      // Tienda 10 + Tienda 25 a la vez: permitido pero avisado
-      if(turningOn && ADDON_STORE.indexOf(code) !== -1){
-        const otherStore = ADDON_STORE.find(function(c){ return c !== code; });
-        const otherActive = rows.some(function(a){ return a.code === otherStore && a.is_active; });
-        if(otherActive && !confirm('Tener Tienda 10 y Tienda 25 a la vez = 35 productos y se cobran AMBOS. ¿Activar de todas formas?')){
-          tg.checked = false;
-          return;
-        }
-      }
-      tg.disabled = true;
-      const rr = await api('POST','/addons/'+code+'/'+(turningOn?'activate':'cancel'));
-      tg.disabled = false;
+      const codes = selectedCodes();
+      const cents = selectedCents();
+      if(codes.length === 0){ showAlert('addonAlert','Elige al menos un add-on.', false); return; }
+      if(codes.length === 1 && !confirm('¿Es todo lo que necesitas? Puedes añadir más add-ons y pagarlos juntos.')) return;
+      offerAthPay('addonAlert', { kind:'addons', codes:codes, amountCents:cents, title:'Add-ons ('+codes.length+')' });
+    };
+  }
+
+  // ── Cancelar un add-on activo ──
+  wrap.querySelectorAll('.addon-cancel').forEach(function(btn){
+    btn.onclick = async function(){
+      clearAlert('addonAlert');
+      const code = btn.dataset.code;
+      if(!confirm('¿Cancelar este add-on?')) return;
+      btn.disabled = true;
+      const rr = await api('POST','/addons/'+code+'/cancel');
+      btn.disabled = false;
       if(rr.ok){
-        // aviso del impacto en la factura
         const a = rows.find(function(x){ return x.code === code; }) || {};
         const cents = addonMonthlyCents(a);
-        if(turningOn){
-          showAlert('addonAlert','Add-on activado.'+(cents?' Se suma '+money(cents)+'/mes a tu factura.':''), true);
-        } else {
-          showAlert('addonAlert','Add-on desactivado.'+(cents?' Se resta '+money(cents)+'/mes de tu factura.':''), true);
-        }
+        showAlert('addonAlert','Add-on desactivado.'+(cents?' Se resta '+money(cents)+'/mes de tu factura.':''), true);
         loadAddons();
         return;
       }
-      if(turningOn && rr.status===402){
-        tg.checked = false;
-        const a2 = rows.find(function(x){ return x.code === code; }) || {};
-        offerAthPay('addonAlert', { kind:'addon', code:code, amountCents:(a2.price_cents||0), title:'Add-on '+(a2.name||code) });
-        return;
-      }
-      tg.checked = !turningOn;
-      showAlert('addonAlert', (rr.data&&rr.data.error)||'No se pudo actualizar el add-on.', false);
+      showAlert('addonAlert', (rr.data&&rr.data.error)||'No se pudo cancelar el add-on.', false);
     };
   });
 }
 
 // ── Destacar (featured) ────────────────────────────────────────────────────
+function renderFeatTotal(){
+  const totalEl = document.getElementById('featTotal');
+  if(!totalEl) return;
+  if(!FEAT_WEEK_CENTS){ totalEl.style.display='none'; return; }
+  const sel = document.getElementById('featWeeks');
+  const weeks = sel ? (parseInt(sel.value,10) || 1) : 1;
+  totalEl.style.display = 'block';
+  totalEl.innerHTML = 'Total por '+weeks+(weeks===1?' semana':' semanas')+': '+
+    '<b style="font-family:var(--mono);color:var(--green)">'+money(FEAT_WEEK_CENTS*weeks)+'</b>';
+}
 async function loadFeatured(){
   const sel = document.getElementById('featWeeks');
   if(sel && !sel.options.length){
     let opts = '';
     for(let i=1;i<=12;i++){ opts += '<option value="'+i+'">'+i+' '+(i===1?'semana':'semanas')+'</option>'; }
     sel.innerHTML = opts;
+    sel.onchange = renderFeatTotal;
   }
   const st = document.getElementById('featStatus');
+  const priceEl = document.getElementById('featPrice');
   const r = await api('GET','/featured/status');
   if(r.ok && r.data){
-    // Guarda el precio por semana (centavos) si el backend lo expone, para el monto ATH (informativo)
+    // Guarda el precio por semana (centavos) si el backend lo expone, para el monto ATH
     FEAT_WEEK_CENTS = r.data.week_price_cents || r.data.price_cents || r.data.weekly_price_cents || FEAT_WEEK_CENTS;
+    if(priceEl){
+      if(FEAT_WEEK_CENTS){ priceEl.style.display='block'; priceEl.textContent = money(FEAT_WEEK_CENTS)+' / semana'; }
+      else { priceEl.style.display='none'; }
+    }
     if(r.data.active && r.data.featured_until){
       const dt = new Date(r.data.featured_until);
       st.innerHTML = 'Estás destacado hasta <b>'+esc(dt.toLocaleDateString('es-PR'))+'</b>.';
@@ -2977,6 +3049,7 @@ async function loadFeatured(){
       st.textContent = 'Tu negocio no está destacado ahora mismo.';
     }
   } else { st.textContent = ''; }
+  renderFeatTotal();
 }
 document.getElementById('featBuyBtn').onclick = async function(){
   clearAlert('featAlert');
@@ -3216,13 +3289,18 @@ function loadAthScript(){
 function athAvailable(){ return ATH_CFG.enabled && !!ATH_CFG.publicToken; }
 
 // Abre el modal de checkout ATH reutilizable.
-// opts: { kind:'plan'|'addon'|'featured', code, weeks?, amountCents, title }
+// opts: { kind:'plan'|'addon'|'addons'|'featured', code?, codes?, weeks?, amountCents, title }
 function openAthCheckout(opts){
   if(!athAvailable()){ return; }
   ATH_PENDING = opts;
   clearAlert('athAlert');
   var dollars = ((opts.amountCents||0)/100).toFixed(2);
-  var meta2 = opts.kind + ':' + opts.code + (opts.kind==='featured' && opts.weeks ? ':'+opts.weeks : '');
+  var meta2;
+  if(opts.kind==='addons'){
+    meta2 = 'addons:' + (opts.codes||[]).join(',');
+  } else {
+    meta2 = opts.kind + ':' + opts.code + (opts.kind==='featured' && opts.weeks ? ':'+opts.weeks : '');
+  }
   document.getElementById('athSummary').innerHTML =
     '<div style="display:flex;justify-content:space-between;align-items:baseline">'+
       '<span>'+esc(opts.title||'Compra')+'</span>'+
@@ -3302,10 +3380,11 @@ window.authorizationATHM = async function(){
     var p = ATH_PENDING || {};
     var body = {
       kind: p.kind,
-      code: p.code,
       ecommerceId: data.ecommerceId,
       referenceNumber: data.referenceNumber
     };
+    if(p.kind === 'addons'){ body.codes = p.codes || []; }
+    else { body.code = p.code; }
     if(p.kind === 'featured' && p.weeks){ body.weeks = p.weeks; }
     var cr = await api('POST','/billing/ath/confirm', body);
     if(cr.ok && cr.data && cr.data.ok){
@@ -3313,8 +3392,8 @@ window.authorizationATHM = async function(){
       if(p.kind === 'plan'){
         showAlert('acctMsg','¡Pago recibido! Tu plan está activo.', true);
         loadAccount();
-      } else if(p.kind === 'addon'){
-        showAlert('addonAlert','¡Pago recibido! Add-on activado.', true);
+      } else if(p.kind === 'addon' || p.kind === 'addons'){
+        showAlert('addonAlert','¡Pago recibido! Add-ons activados.', true);
         loadAddons();
       } else if(p.kind === 'featured'){
         showAlert('featAlert','¡Pago recibido! Tu negocio está destacado.', true);
