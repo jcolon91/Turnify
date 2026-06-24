@@ -38,23 +38,15 @@ o para una app nativa que consume el mismo backend `/api`.
 ## 1. Política de privacidad (URL pública)
 
 - [ ] La política existe en una **URL pública, estable y accesible sin login**:
-      `https://bukeame.com/privacidad.html` (ya existe, v1.0 jun-2026).
+      `https://bukeame.com/privacidad.html` (ya existe, v2.0 borrador jun-2026).
 - [ ] La misma URL se pega en **App Store Connect** (campo *Privacy Policy URL*) y en
       **Google Play Console** (*Store listing → Privacy Policy*).
 - [ ] La política debe estar **enlazada también dentro de la app** (no solo en la ficha
       de la tienda): un enlace visible en ajustes / menú de cuenta.
 - [ ] El **contenido debe coincidir** con lo que realmente recopila la app y con lo
       declarado en Data Safety / Nutrition Labels (inconsistencia = causa de rechazo).
-- [ ] **VALIDAR:** la política actual (`privacidad.html` v1.0) **no menciona por nombre**
-      Stripe, PayPal, gift cards, lista de espera, reseñas, geolocalización/Leaflet,
-      `localStorage`, ni Resend/Evolution en detalle. Antes de someter, **ampliar la
-      política** para nombrar explícitamente:
-  - Procesadores de pago: **Stripe, PayPal, ATH Móvil** (y que el dinero va directo al negocio).
-  - Mensajería: **WhatsApp/Evolution** (recordatorios y avisos).
-  - Email: **Resend** (verificación, avisos, gift cards).
-  - **Geolocalización** opcional del navegador/dispositivo y mapas **Leaflet/OpenStreetMap**.
-  - Uso de **`localStorage`** para sesión (`bukeame_token`, `bukeame_role`) y tema (`bukeame_theme`).
-  - **Reseñas, gift cards, lista de espera** como datos que se recopilan.
+- [ ] **VERIFICAR:** `privacidad.html` ya está en **v2.0 (borrador)** y **YA nombra explícitamente** los procesadores y datos: **Stripe, PayPal, ATH Móvil** (dinero directo al negocio), **WhatsApp/Evolution**, **Resend**, **geolocalización + Leaflet/OpenStreetMap**, **gift cards, lista de espera, reseñas**, y una sección de **almacenamiento local**. Solo confirmar que sigue cubriéndolos y que coincide con lo declarado en Data Safety / Nutrition Labels (inconsistencia = causa de rechazo).
+  - Pendiente menor: confirmar que la sección de almacenamiento local nombre el **token de sesión JWT** (`bukeame_token` / `bukeame_role`), además del tema (`bukeame_theme`).
 - [ ] Identificar al responsable: **Wifnix LLC, Puerto Rico**, con método de contacto.
 - [ ] **VALIDAR LEGAL:** como Bukéame procesa datos de **clientes finales** en nombre del
       negocio (modelo encargado/responsable), confirmar el lenguaje de rol de datos.

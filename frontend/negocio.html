@@ -1052,14 +1052,13 @@ function renderProfile(){
   }
 }
 
-// ── Galería hero estilo Booksy: cover + fotos del portafolio en scroll horizontal ──
+// ── Hero: SOLO el banner/cover del negocio (el portafolio va aparte en #sec-gallery) ──
 function renderHeroGallery(){
   var host = document.getElementById('bkGallery');
   if(!host) return;
   var b = state.biz || {};
   var urls = [];
-  if(b.cover_url) urls.push(b.cover_url);
-  (state.gallery||[]).forEach(function(g){ if(g && g.url && urls.indexOf(g.url)<0) urls.push(g.url); });
+  if(b.cover_url) urls.push(b.cover_url);   // solo el banner/cover; el portafolio va en su propia sección (#sec-gallery)
   urls = urls.slice(0,8);
   if(urls.length===0){
     // Sin fotos: degradado de marca con inicial del negocio
