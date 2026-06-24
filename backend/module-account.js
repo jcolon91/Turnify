@@ -198,13 +198,8 @@ module.exports.mount = function (app, ctx) {
                 user_id   = NULL
           WHERE business_id = $1`, [bizId]);
 
-      // ── 3. Anonimizar nombres de cliente "congelados" en citas ──
-      await client.query(
-        `UPDATE appointments
-            SET client_name = 'Cliente eliminado',
-                client_phone = NULL,
-                notes = NULL
-          WHERE business_id = $1`, [bizId]);
+      // ── 3. (Las citas NO guardan datos personales "congelados": sólo
+      //       referencian al cliente por client_id, ya anonimizado arriba.) ──
 
       // ── 4. BORRAR contenido no-financiero del negocio ──
       // Estas tablas son operativas/personales, no fiscales → se eliminan.

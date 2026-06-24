@@ -278,7 +278,9 @@ const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 function confirmCode(prefix, starts) {
   let suf = '';
   for (let i = 0; i < 5; i++) suf += CODE_ALPHABET[crypto.randomInt(CODE_ALPHABET.length)];
-  const mmdd = String(starts.getMonth() + 1).padStart(2, '0') + String(starts.getDate()).padStart(2, '0');
+  // MMDD en zona America/Puerto_Rico (no la del servidor) → 'en-CA' da YYYY-MM-DD.
+  const prDate = new Date(starts).toLocaleDateString('en-CA', { timeZone: 'America/Puerto_Rico' });
+  const mmdd = prDate.slice(5, 7) + prDate.slice(8, 10);
   return `${prefix || 'BK'}-${mmdd}-${suf}`;
 }
 
@@ -527,11 +529,19 @@ async function socialLoginUpsert(req, res, { provider, sub, email, name }) {
   const emailLc = email.toLowerCase();
   // Busca por *_sub o por email (para enlazar una cuenta existente al proveedor social).
   const found = await db.query(
-    `SELECT id, full_name, email, is_platform_admin FROM users
+    `SELECT id, full_name, email, is_platform_admin,
+            (${subCol} = $1) AS sub_match,
+            email_verified_at IS NOT NULL AS is_verified,
+            password_hash IS NOT NULL AS has_password
+       FROM users
       WHERE (${subCol} = $1 OR email = $2) AND deleted_at IS NULL
       ORDER BY (${subCol} = $1) DESC LIMIT 1`, [sub, emailLc]);
   let user;
   if (found.rows[0]) {
+    // Anti account-takeover: fusión SOLO por email exige cuenta local verificada o sin contraseña.
+    // Si la cuenta tiene password y NO está verificada, no enlazamos automáticamente.
+    if (!found.rows[0].sub_match && found.rows[0].has_password && !found.rows[0].is_verified)
+      return bad(res, 'Ya existe una cuenta con ese correo. Inicia sesión con tu correo y contraseña.', 409);
     // Enlaza el sub + provider y marca el email como verificado (el proveedor ya lo hizo).
     const upd = await db.query(
       `UPDATE users
@@ -734,6 +744,15 @@ const BIZ_EDITABLE = ['name','bio','phone','whatsapp','email','address_line','mu
   'cancellation_hours','no_show_policy','booking_lead_min','booking_horizon_days',
   'slot_granularity_min','is_published'];
 
+// Rangos válidos para los campos numéricos editables → se rechaza fuera de rango.
+const BIZ_NUM_RANGES = {
+  slot_granularity_min: [5, 120],
+  booking_lead_min:     [0, 10080],
+  booking_horizon_days: [1, 365],
+  deposit_default_cents:[0, 100000000],
+  cancellation_hours:   [0, 168],
+};
+
 app.patch('/api/businesses/me', authRequired, businessScope, asyncH(async (req, res) => {
   const sets = [], vals = [];
   for (const k of BIZ_EDITABLE) if (k in (req.body || {})) {
@@ -756,6 +775,13 @@ app.patch('/api/businesses/me', authRequired, businessScope, asyncH(async (req, 
     if ((k === 'logo_url' || k === 'cover_url') && v != null &&
         (typeof v !== 'string' || !/^\/uploads\/(logos|covers)\/[A-Za-z0-9._-]+$/.test(v)))
       return bad(res, `${k} inválido`);
+    // numéricos: rechaza fuera de rango (no number, no entero o fuera de límites)
+    if (k in BIZ_NUM_RANGES) {
+      const n = Number(v), [lo, hi] = BIZ_NUM_RANGES[k];
+      if (!Number.isInteger(n) || n < lo || n > hi)
+        return bad(res, `${k} fuera de rango (${lo}..${hi})`);
+      v = n;
+    }
     vals.push(v); sets.push(`${k} = $${vals.length}`);
   }
   // policies: arreglo de strings que el negocio edita (cada uno <=200 chars, máx 20, saneados)
@@ -1401,9 +1427,9 @@ async function eligibleStaff(bizId, serviceId, dateStr) {
        JOIN staff st ON st.id = ss.staff_id
        LEFT JOIN appointments a ON a.staff_id = st.id AND a.status = ANY($4)
             AND a.starts_at < $3 AND a.ends_at > $2
-      WHERE ss.service_id = $1 AND st.is_active AND st.deleted_at IS NULL
+      WHERE ss.service_id = $1 AND st.business_id = $5 AND st.is_active AND st.deleted_at IS NULL
       GROUP BY st.id ORDER BY count(a.id) ASC`,
-    [serviceId, start, end, ALIVE]);
+    [serviceId, start, end, ALIVE, bizId]);
   return rows.map(r => r.id);
 }
 
@@ -1952,7 +1978,8 @@ app.post('/api/public/appointments/:code/ath-reference', codeLimiter, asyncH(asy
   const { rows } = await db.query(
     `UPDATE payments p SET external_ref = $1
        FROM appointments a
-      WHERE p.appointment_id = a.id AND a.confirmation_code = $2
+      WHERE p.appointment_id = a.id AND p.business_id = a.business_id
+        AND a.confirmation_code = $2
         AND p.kind = 'deposit' AND p.method = 'ath_movil' AND p.status = 'pending'
       RETURNING a.business_id, a.id, a.service_name`, [reference.trim(), req.params.code.toUpperCase()]);
   if (!rows[0]) return bad(res, 'Cita o depósito no encontrado', 404);
@@ -2398,11 +2425,14 @@ app.patch('/api/notifications/:id/read', authRequired, businessScope, asyncH(asy
 
 // Mi suscripción + referidos
 app.get('/api/subscription', authRequired, businessScope, asyncH(async (req, res) => {
-  const [sub, ref] = await Promise.all([
+  const [sub, ref, refs] = await Promise.all([
     db.query(`SELECT s.plan_code, s.cycle, s.status, s.current_period_end, p.price_monthly_cents
        FROM subscriptions s JOIN plans p ON p.code = s.plan_code WHERE s.business_id = $1`, [req.business.id]),
     db.query(`SELECT COALESCE(active_referrals,0) AS active_referrals, COALESCE(discount_cents,0) AS discount_cents
        FROM (SELECT 1) x LEFT JOIN v_referral_discounts v ON v.business_id = $1`, [req.business.id]),
+    db.query(`SELECT r.status, r.created_at, r.activated_at, b.name AS business_name
+       FROM referrals r JOIN businesses b ON b.id = r.referred_business_id
+      WHERE r.referrer_business_id = $1 ORDER BY r.created_at DESC`, [req.business.id]),
   ]);
   const s = sub.rows[0], r = ref.rows[0];
   const price = s.price_monthly_cents;
@@ -2412,6 +2442,7 @@ app.get('/api/subscription', authRequired, businessScope, asyncH(async (req, res
     active_referrals: r.active_referrals,
     discount_cents: Math.min(r.discount_cents, price),
     effective_monthly_cents: Math.max(price - r.discount_cents, 0),
+    referrals: refs.rows,
   });
 }));
 

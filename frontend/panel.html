@@ -70,11 +70,18 @@ main{padding:22px 20px 90px;max-width:760px}
 .theme-tg{display:inline-flex;gap:2px;background:var(--card-soft);border:1px solid var(--border);border-radius:999px;padding:3px}
 .theme-tg button{font:700 11.5px 'Instrument Sans',sans-serif;padding:6px 12px;border-radius:999px;line-height:1;cursor:pointer;border:0;background:transparent;color:var(--muted)}
 .theme-tg button.on{background:var(--green);color:var(--green-ink)}
-.mobnav{display:none;position:sticky;top:0;z-index:80;background:var(--text);padding:10px 12px}
-.mobnav select{width:100%;padding:12px 13px;border-radius:12px;border:1px solid var(--border);background:var(--card);color:var(--text);font-weight:700;font-size:14px}
+.mobnav{display:none;position:sticky;top:0;z-index:80;background:var(--text);padding:10px 14px;align-items:center;justify-content:space-between}
+.mobnav .logo{font-family:var(--display);font-weight:800;font-size:19px;color:var(--nav-ink)}.mobnav .logo i{font-style:normal;color:var(--green)}
+.hamb{display:flex;flex-direction:column;justify-content:center;gap:5px;width:42px;height:38px;padding:9px 8px;background:transparent;border:0;cursor:pointer}
+.hamb span{display:block;height:2px;border-radius:2px;background:var(--nav-ink)}
 @media(max-width:860px){.mobnav{display:flex}}
-.mobnav a{font-size:12px;font-weight:600;color:var(--muted2);padding:8px 13px;border-radius:10px;white-space:nowrap;cursor:pointer}
-.mobnav a.on{background:var(--green-soft);color:var(--plan-accent)}
+.mob-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:90}
+.mob-backdrop.open{display:block}
+.mob-drawer{position:fixed;top:0;left:0;bottom:0;width:78%;max-width:300px;background:var(--side-bg);z-index:100;padding:18px 14px;display:flex;flex-direction:column;gap:2px;overflow-y:auto;transform:translateX(-100%);transition:transform .25s}
+.mob-drawer.open{transform:translateX(0)}
+.mob-drawer a{font-size:14px;font-weight:600;color:var(--text);padding:11px 13px;border-radius:10px;white-space:nowrap;cursor:pointer}
+.mob-drawer a.on{background:var(--green-soft);color:var(--plan-accent)}
+@media(min-width:861px){.hamb,.mob-drawer,.mob-backdrop{display:none}}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:22px}
 .kpi{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px}
 .kpi small{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
@@ -105,6 +112,7 @@ main{padding:22px 20px 90px;max-width:760px}
 .btn-sm{font-size:13px;padding:9px 14px;border-radius:10px}
 .alert{display:none;font-size:13px;font-weight:600;padding:11px 13px;border-radius:12px;margin-bottom:14px;line-height:1.45}
 .alert.err{display:block;background:#FCE8E6;color:#A1281C;border:1px solid #F3C0BA}
+html[data-theme="dark"] .alert.err{background:rgba(225,75,60,.14);color:#FF9A8E;border-color:rgba(225,75,60,.35)}
 .alert.ok{display:block;background:var(--green-soft);color:var(--green);border:1px solid var(--green)}
 .apt{background:var(--card);border:1px solid var(--border);border-left:4px solid var(--green);border-radius:14px;padding:12px 13px;display:flex;gap:12px;align-items:center;margin-bottom:8px}
 .apt time{font-family:var(--mono);font-weight:700;font-size:13px;width:54px;flex:none}
@@ -267,6 +275,7 @@ main{padding:22px 20px 90px;max-width:760px}
 .dayrow:last-child{border-bottom:0}
 .dayrow .dname{width:90px;font-weight:600;font-size:13.5px}
 .dayrow input[type=time]{padding:8px 10px;border:1.5px solid var(--border);border-radius:10px;background:var(--input-bg);color:var(--text)}
+@media(max-width:520px){.dayrow{flex-wrap:wrap}.dayrow .dname{width:100%}.dayrow input[type=time]{flex:1;min-width:0}}
 .switch{position:relative;width:42px;height:24px;flex:none;margin-left:auto}
 .switch input{opacity:0;width:0;height:0}
 .slider{position:absolute;inset:0;background:var(--muted2);border-radius:99px;transition:.2s;cursor:pointer}
@@ -327,7 +336,12 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
   <span>Verifica tu email para activar tu prueba Pro y todas las funciones.</span>
   <button id="verifyResend" class="btn btn-teal btn-sm" type="button">Reenviar correo</button>
 </div>
-  <div class="mobnav" id="mobnav"></div>
+  <div class="mobnav" id="mobnav">
+    <div class="logo">Buk<i>é</i>ame</div>
+    <button id="hambBtn" class="hamb" type="button" aria-label="Abrir menú" aria-expanded="false"><span></span><span></span><span></span></button>
+  </div>
+  <div id="mobBackdrop" class="mob-backdrop"></div>
+  <nav id="mobDrawer" class="mob-drawer"></nav>
   <div class="shell">
     <aside class="side">
       <div class="logo">Buk<i>é</i>ame</div>
@@ -2403,8 +2417,7 @@ document.getElementById('pfFile').onchange = async function(){
 function switchView(v){
   document.querySelectorAll('.view').forEach(function(s){ s.classList.toggle('on', s.id==='view-'+v); });
   document.querySelectorAll('.navlink').forEach(function(a){ a.classList.toggle('on', a.dataset.v===v); });
-  var _ms = document.getElementById('mobnavSel'); if(_ms && _ms.value !== v) _ms.value = v;   // sincroniza el dropdown móvil
-  document.querySelectorAll('#mobnav a').forEach(function(a){ a.classList.toggle('on', a.dataset.v===v); });
+  document.querySelectorAll('#mobDrawer a').forEach(function(a){ a.classList.toggle('on', a.dataset.v===v); });
   if(v==='servicios') loadServices();
   if(v==='equipo') loadStaff();
   if(v==='clientes') loadClients();
@@ -2417,19 +2430,25 @@ function switchView(v){
 }
 document.querySelectorAll('.navlink').forEach(function(a){ if(!a.dataset.v) return; a.onclick=function(){ switchView(a.dataset.v); }; });
 
+function openMenu(){ var d=document.getElementById('mobDrawer'),b=document.getElementById('mobBackdrop'),h=document.getElementById('hambBtn'); d.classList.add('open'); b.classList.add('open'); if(h) h.setAttribute('aria-expanded','true'); }
+function closeMenu(){ var d=document.getElementById('mobDrawer'),b=document.getElementById('mobBackdrop'),h=document.getElementById('hambBtn'); d.classList.remove('open'); b.classList.remove('open'); if(h) h.setAttribute('aria-expanded','false'); }
 function buildMobnav(){
-  const nav = document.getElementById('mobnav');
+  const nav = document.getElementById('mobDrawer');
   const items = [['agenda','Agenda'],['servicios','Servicios'],['equipo','Equipo'],['clientes','Clientes'],['lealtad','Lealtad'],['#productos.html','Tienda'],['#espera.html','Espera'],['horario','Horario'],['contabilidad','$'],['negocio','Negocio'],['pagos','Pagos'],['#referidos.html','Referidos'],['cuenta','Cuenta']];
-  // Móvil: un solo dropdown para elegir la sección (en vez de una barra de pestañas).
-  nav.innerHTML = '<select id="mobnavSel" aria-label="Secciones del panel">' + items.map(function(it){
-    return '<option value="'+it[0]+'">'+it[1]+'</option>';
-  }).join('') + '</select>';
-  var sel = document.getElementById('mobnavSel');
-  sel.onchange = function(){
-    var v = sel.value;
-    if(v.charAt(0)==='#'){ location.href = v.slice(1); return; }   // enlaces externos (Tienda, Espera, Referidos)
-    switchView(v);
-  };
+  // Móvil: drawer off-canvas (hamburguesa) en vez de una barra de pestañas.
+  nav.innerHTML = items.map(function(it){
+    return '<a data-v="'+it[0]+'">'+it[1]+'</a>';
+  }).join('');
+  nav.querySelectorAll('a').forEach(function(a){
+    a.onclick = function(){
+      var v = a.dataset.v;
+      closeMenu();
+      if(v.charAt(0)==='#'){ location.href = v.slice(1); return; }   // enlaces externos (Tienda, Espera, Referidos)
+      switchView(v);
+    };
+  });
+  var h = document.getElementById('hambBtn'); if(h) h.onclick = openMenu;
+  var b = document.getElementById('mobBackdrop'); if(b) b.onclick = closeMenu;
 }
 
 // ════════════════════════ CLIENTES (perfil + historial) ════════════════════════

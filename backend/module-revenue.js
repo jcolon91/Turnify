@@ -14,7 +14,7 @@ const crypto = require('crypto');
 
 module.exports.mount = function (app, ctx) {
   const { db, authRequired, businessScope, h } = ctx;
-  const { asyncH, bad, isStr, isUuid, isEmail, isPhone, normPhone, audit, notify, bookingLimiter, publicLimiter } = h;
+  const { asyncH, bad, isStr, isUuid, isEmail, isPhone, normPhone, audit, notify, bookingLimiter, publicLimiter, codeLimiter } = h;
 
   // ---- helpers locales ----
   const cents = v => Number.isInteger(v) && v >= 0 && v <= 100000000; // ≤ $1M
@@ -443,7 +443,7 @@ module.exports.mount = function (app, ctx) {
   }));
 
   // pública: consultar saldo de una gift card
-  app.get('/api/public/:slug/gift-cards/:code', asyncH(async (req, res) => {
+  app.get('/api/public/:slug/gift-cards/:code', codeLimiter, asyncH(async (req, res) => {
     const { rows } = await db.query(
       `SELECT g.code, g.balance_cents, g.initial_cents, g.status, g.expires_at
          FROM gift_cards g JOIN businesses b ON b.id = g.business_id
