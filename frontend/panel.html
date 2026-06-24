@@ -634,7 +634,8 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
 
           <!-- Imagen propia (Pro) -->
           <div style="border-top:1.5px solid var(--line);padding-top:14px">
-            <div style="font-size:12px;color:var(--ink2);margin-bottom:8px;font-weight:600">O sube tu propia imagen</div>
+            <div style="font-size:12px;color:var(--ink2);margin-bottom:4px;font-weight:600">O sube tu propia imagen</div>
+            <div style="font-size:11.5px;color:var(--ink2);margin-bottom:8px">Recomendado: 1600×600 px, horizontal, máx 2MB</div>
             <input type="file" id="coverFile" accept="image/jpeg,image/png,image/webp" style="display:none">
             <button class="btn btn-teal" id="coverUploadBtn" style="padding:10px 16px;font-size:13px">Subir imagen</button>
             <button class="btn btn-ghost" id="coverRemoveBtn" style="padding:10px 16px;font-size:13px;display:none;margin-left:8px">Quitar imagen</button>
@@ -1277,10 +1278,27 @@ async function loadStaff(){
     var av = s.avatar_url
       ? '<img src="'+esc(s.avatar_url)+'" alt="" style="width:46px;height:46px;border-radius:50%;object-fit:cover;flex:none">'
       : '<div style="width:46px;height:46px;border-radius:50%;background:var(--green-soft);color:var(--green);display:grid;place-items:center;font-family:var(--display);font-weight:800;flex:none">'+esc((s.display_name||'?').charAt(0).toUpperCase())+'</div>';
-    return '<div class="svc">'+av+'<div class="grow"><h4>'+esc(s.display_name)+'</h4><p>'+(s.bio?esc(s.bio):'Profesional')+'</p></div>'+
+    return '<div class="svc">'+av+'<div class="grow"><h4>'+esc(s.display_name)+'</h4><p>'+(s.bio?esc(s.bio):'Profesional')+'</p>'+
+      '<div class="st-invite-code" data-id="'+esc(s.id)+'" style="display:none;margin-top:6px;font-family:var(--mono);font-size:13px;color:var(--teal-ink);background:var(--paper);border-radius:8px;padding:6px 10px;word-break:break-all"></div></div>'+
+      '<button class="btn btn-ghost btn-sm st-invite" data-id="'+esc(s.id)+'">Generar código de invitación</button>'+
       '<button class="btn btn-ghost btn-sm st-photo" data-id="'+esc(s.id)+'">Foto</button>'+
       '<button class="del" data-id="'+esc(s.id)+'">Quitar</button></div>';
   }).join('');
+  // Generar código de invitación para que el empleado se una
+  list.querySelectorAll('.st-invite').forEach(function(b){
+    b.onclick = async function(){
+      b.disabled = true; b.textContent = '…';
+      const rr = await api('POST','/staff/'+b.dataset.id+'/invite');
+      b.disabled = false; b.textContent = 'Generar código de invitación';
+      if(rr.ok && rr.data && (rr.data.code || rr.data.invite_code)){
+        const code = rr.data.code || rr.data.invite_code;
+        const box = list.querySelector('.st-invite-code[data-id="'+b.dataset.id+'"]');
+        if(box){ box.textContent = 'Código: '+code+' — dáselo al empleado para que se una.'; box.style.display = 'block'; }
+      } else {
+        alert((rr.data && rr.data.error) || 'No se pudo generar el código.');
+      }
+    };
+  });
   // Subir/cambiar foto del profesional (FormData, sin forzar Content-Type JSON)
   list.querySelectorAll('.st-photo').forEach(function(b){
     b.onclick = function(){
@@ -2942,8 +2960,17 @@ async function loadAddons(){
   const addons = (r.ok && Array.isArray(r.data)) ? r.data : (r.ok && r.data.addons ? r.data.addons : []);
   // 'featured' tiene su propia tarjeta; 'sms' y 'custom_domain' no se usan aún → ocultos
   const rows = addons.filter(function(a){ return a.code !== 'featured' && ADDON_HIDDEN.indexOf(a.code) === -1; });
+
+  // Add-on Payroll (nómina de varios empleados). Si el backend aún no lo lista, lo añadimos como activable.
+  if(!rows.some(function(a){ return a.code === 'payroll'; })){
+    rows.push({ code:'payroll', name:'Payroll', description:'Gestiona la nómina de varios empleados.', price_cents:999, billing:'monthly', is_active:false });
+  }
+
   renderAddonTotal(rows);
   if(rows.length === 0){ wrap.innerHTML = '<p style="font-size:13px;color:var(--ink2)">No hay add-ons disponibles.</p>'; return; }
+
+  // Contabilidad completa: feature de plan (Pro+), no add-on de negocio. En plan gratis no se muestra.
+  const planIsPro = (BIZ && BIZ.plan_code && BIZ.plan_code !== 'free');
 
   const activeRows = rows.filter(function(a){ return a.is_active; });
   const availRows  = rows.filter(function(a){ return !a.is_active; });
@@ -2954,8 +2981,17 @@ async function loadAddons(){
 
   let html = '';
 
+  // Contabilidad completa: en Pro+ se muestra deshabilitada (ya incluida en el plan).
+  const accountingRowHtml = planIsPro
+    ? '<div class="addon-row" style="opacity:.6">'+
+        '<input type="checkbox" disabled style="width:18px;height:18px;flex:none">'+
+        '<div class="grow"><h4>Contabilidad completa</h4>'+
+        '<p>Reportes por mes y año, desglose por servicio, registro de gastos y exportación.</p>'+
+        '<span class="addon-pending">Ya incluido en tu plan</span></div></div>'
+    : '';
+
   // ── Disponibles: checkbox + precio, pago único ──
-  if(availRows.length){
+  if(availRows.length || accountingRowHtml){
     html += '<div style="font-size:12px;color:var(--ink2);margin-bottom:8px;font-weight:600">Disponibles</div>';
     html += availRows.map(function(a){
       return '<label class="addon-row" style="cursor:pointer">'+
@@ -2964,6 +3000,7 @@ async function loadAddons(){
         (a.description?'<p>'+esc(a.description)+'</p>':'')+
         '<span class="addon-price">'+priceLabel(a)+'</span></div></label>';
     }).join('');
+    html += accountingRowHtml;
     html += '<div id="addonSelTotal" style="margin-top:14px;display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px">'+
         '<span style="font-size:13px;color:var(--ink2)">Total seleccionado</span>'+
         '<b id="addonSelTotalVal" style="font-family:var(--mono);font-size:15px;color:var(--green)">'+money(0)+'</b></div>';

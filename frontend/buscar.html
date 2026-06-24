@@ -384,6 +384,7 @@ function renderPortada(d){
   const featured = d.featured || [];
   const nearby = d.nearby || [];
   const top = d.top_rated || [];
+  const recent = d.recent || [];
   const P = document.getElementById('portada');
   let html = '';
 
@@ -399,6 +400,10 @@ function renderPortada(d){
   if(top.length){
     html += '<div class="section"><div class="head"><h2>Mejor calificados</h2><span class="sub">★</span></div>'+
       '<div class="grid">'+top.map(b=>mcard(b)).join('')+'</div></div>';
+  }
+  if(recent.length){
+    html += '<div class="section"><div class="head"><h2>Recién llegados</h2></div>'+
+      '<div class="grid">'+recent.map(b=>mcard(b)).join('')+'</div></div>';
   }
   if(featured.length){
     html += '<div class="section"><div class="head"><h2>Promocionados</h2></div>'+

@@ -5,6 +5,10 @@
 //    GET /api/admin/overview     → métricas + listas para el tablero completo
 //    GET /api/admin/businesses   → lista detallada de negocios (con dueño y plan)
 //    GET /api/admin/billing      → quién está por vencer trial / por cobrar
+//    GET /api/admin/businesses/:id/analytics → ganancias del negocio (admin)
+//    GET /api/admin/category-requests        → solicitudes de profesión/categoría
+//    POST .../category-requests/:id/approve  → aprueba + crea categoría
+//    POST .../category-requests/:id/reject   → rechaza la solicitud
 //  Todas las rutas exigen un usuario con is_platform_admin = true.
 // ============================================================================
 
@@ -334,6 +338,30 @@ function mount(app, { db, authRequired, h }) {
     res.json({ ok: true, action, addon: rows[0] || { code, status: 'cancelled' } });
   }));
 
+  // ── GET /api/admin/addon-catalog ──────────────────────────────────────────
+  // Catálogo de add-ons para el modal "Gestionar". Devuelve TODAS las filas del
+  // catálogo y, si se pasa ?business_id=, los códigos de add-ons ACTIVOS de ese
+  // negocio (para que el modal marque cuáles ya están activados y muestre
+  // "Revocar" en lugar de "Activar"). El POST .../addons sigue activando/revocando.
+  //   → { addons: [{ code, name, price_cents, description }], activos: [code, …] }
+  app.get('/api/admin/addon-catalog', authRequired, adminRequired, asyncH(async (req, res) => {
+    const cat = await db.query(
+      `SELECT code, name, price_cents, description
+         FROM addon_catalog
+        ORDER BY price_cents ASC, name ASC`);
+
+    let activos = [];
+    const businessId = req.query.business_id;
+    if (businessId) {
+      if (!isUuid(businessId)) return bad(res, 'business_id inválido');
+      const act = await db.query(
+        `SELECT code FROM addons WHERE business_id = $1 AND status = 'active'`,
+        [businessId]);
+      activos = act.rows.map(r => r.code);
+    }
+    res.json({ addons: cat.rows, activos });
+  }));
+
   // ── POST /api/admin/businesses/:id/featured ───────────────────────────────
   // Conceder destacado por N semanas TRAS confirmar el pago.
   // Body: { weeks, municipality_id?, category_id? }
@@ -362,6 +390,220 @@ function mount(app, { db, authRequired, h }) {
       `Tu negocio aparece primero por ${weeks} semana(s). ¡Gracias!`, { weeks });
     await audit(req, 'admin.featured.grant', 'featured', rows[0].id, { weeks });
     res.json({ ok: true, featured: rows[0] });
+  }));
+
+  // ── GET /api/admin/businesses/:id/analytics ───────────────────────────────
+  // Ganancias de UN negocio (lo que el dueño ve en su contabilidad), pero desde
+  // el panel de plataforma. Como admin NO tiene businessScope, cargamos el
+  // negocio por el :id del path. Reusa la lógica de module-accounting.js.
+  //   ?period=day|week|month|year  ó  ?from=YYYY-MM-DD&to=YYYY-MM-DD
+  // El admin SIEMPRE ve el detalle completo (no aplica el gate de plan free).
+  const PAID_PLANS = new Set(['pro', 'studio', 'team', 'grande', 'ilimitado']);
+  const isDate = v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
+  // Mismo cálculo de rango que module-accounting.js:26-40 (to es exclusivo).
+  function resolveRange(period, from, to) {
+    if (isDate(from) && isDate(to)) return { from, to };
+    const now = new Date();
+    const y = now.getUTCFullYear(), m = now.getUTCMonth(), d = now.getUTCDate();
+    const iso = (dt) => dt.toISOString().slice(0, 10);
+    let start, end = new Date(Date.UTC(y, m, d + 1));
+    switch (period) {
+      case 'day':   start = new Date(Date.UTC(y, m, d)); break;
+      case 'week':  start = new Date(Date.UTC(y, m, d - 6)); break;
+      case 'month': start = new Date(Date.UTC(y, m, 1)); break;
+      case 'year':  start = new Date(Date.UTC(y, 0, 1)); break;
+      default:      start = new Date(Date.UTC(y, m, d - 6)); break;
+    }
+    return { from: iso(start), to: iso(end) };
+  }
+
+  app.get('/api/admin/businesses/:id/analytics', authRequired, adminRequired, asyncH(async (req, res) => {
+    if (!isUuid(req.params.id)) return bad(res, 'ID inválido');
+    const biz = await db.query(
+      `SELECT b.id, b.name, s.plan_code
+         FROM businesses b
+         LEFT JOIN subscriptions s ON s.business_id = b.id
+        WHERE b.id = $1 AND b.deleted_at IS NULL`, [req.params.id]);
+    if (!biz.rows[0]) return bad(res, 'Negocio no encontrado', 404);
+    const bid = biz.rows[0].id;
+    const paid = PAID_PLANS.has(biz.rows[0].plan_code);
+    const period = String(req.query.period || 'month');
+    const { from, to } = resolveRange(period, req.query.from, req.query.to);
+
+    // ── INGRESOS REALIZADOS: citas completadas (por starts_at) ──
+    const facturado = await db.query(
+      `SELECT COALESCE(SUM(price_cents),0)::bigint AS total, COUNT(*)::int AS n
+         FROM appointments
+        WHERE business_id = $1 AND status = 'completed'
+          AND starts_at >= $2::date AND starts_at < $3::date`,
+      [bid, from, to]);
+
+    // ── INGRESOS COBRADOS: pagos recibidos + propinas (por paid_at) ──
+    const cobrado = await db.query(
+      `SELECT COALESCE(SUM(amount_cents + COALESCE(tip_cents,0)),0)::bigint AS total,
+              COALESCE(SUM(COALESCE(tip_cents,0)),0)::bigint AS propinas,
+              COUNT(*)::int AS n
+         FROM payments
+        WHERE business_id = $1 AND status = 'paid'
+          AND paid_at >= $2::date AND paid_at < $3::date`,
+      [bid, from, to]);
+
+    // ── GASTOS anotados ──
+    const gastos = await db.query(
+      `SELECT COALESCE(SUM(amount_cents),0)::bigint AS total, COUNT(*)::int AS n
+         FROM expenses
+        WHERE business_id = $1 AND spent_on >= $2::date AND spent_on < $3::date`,
+      [bid, from, to]);
+
+    // ── GASTO DE LA APP (mensualidad a Bukeame) ──
+    const appCost = await db.query(
+      `SELECT COALESCE(SUM(amount_cents - discount_cents),0)::bigint AS total
+         FROM platform_payments
+        WHERE business_id = $1 AND status = 'paid'
+          AND paid_at >= $2::date AND paid_at < $3::date`,
+      [bid, from, to]);
+
+    // ── DEPÓSITOS RETENIDOS: canceladas + no-show con depósito no reembolsado ──
+    const canceladas = await db.query(
+      `SELECT COALESCE(SUM(p.amount_cents),0)::bigint AS total, COUNT(DISTINCT a.id)::int AS n
+         FROM appointments a
+         JOIN payments p ON p.appointment_id = a.id
+        WHERE a.business_id = $1
+          AND a.status IN ('cancelled_client','cancelled_business')
+          AND p.kind = 'deposit' AND p.status = 'paid' AND p.refunded_at IS NULL
+          AND a.starts_at >= $2::date AND a.starts_at < $3::date`,
+      [bid, from, to]);
+    const noShow = await db.query(
+      `SELECT COALESCE(SUM(p.amount_cents),0)::bigint AS total, COUNT(DISTINCT a.id)::int AS n
+         FROM appointments a
+         JOIN payments p ON p.appointment_id = a.id
+        WHERE a.business_id = $1 AND a.status = 'no_show'
+          AND p.kind = 'deposit' AND p.status = 'paid' AND p.refunded_at IS NULL
+          AND a.starts_at >= $2::date AND a.starts_at < $3::date`,
+      [bid, from, to]);
+
+    // ── DESGLOSE POR SERVICIO (citas completadas) ──
+    const porServicio = await db.query(
+      `SELECT service_name,
+              COUNT(*)::int AS citas,
+              COALESCE(SUM(price_cents),0)::bigint AS total_cents
+         FROM appointments
+        WHERE business_id = $1 AND status = 'completed'
+          AND starts_at >= $2::date AND starts_at < $3::date
+        GROUP BY service_name
+        ORDER BY total_cents DESC`,
+      [bid, from, to]);
+
+    const facturadoTotal = Number(facturado.rows[0].total);
+    const cobradoTotal   = Number(cobrado.rows[0].total);
+    const gastosManual   = Number(gastos.rows[0].total);
+    const gastoApp       = Number(appCost.rows[0].total);
+    const gastosTotal    = gastosManual + gastoApp;
+    const depositosRetenidos = Number(canceladas.rows[0].total) + Number(noShow.rows[0].total);
+    // Neto: igual que el dueño Pro = realizado + depósitos retenidos − gastos.
+    const neto = facturadoTotal + depositosRetenidos - gastosTotal;
+
+    res.json({
+      negocio: biz.rows[0].name,
+      plan_code: biz.rows[0].plan_code || null,
+      plan_pagado: paid,
+      period, from, to,
+      ingresos: {
+        facturado_cents:   facturadoTotal,
+        cobrado_cents:     cobradoTotal,
+        propinas_cents:    Number(cobrado.rows[0].propinas),
+        citas_completadas: facturado.rows[0].n,
+        pagos_registrados: cobrado.rows[0].n,
+      },
+      depositos_retenidos: {
+        total_cents:      depositosRetenidos,
+        canceladas_cents: Number(canceladas.rows[0].total),
+        canceladas_n:     canceladas.rows[0].n,
+        no_show_cents:    Number(noShow.rows[0].total),
+        no_show_n:        noShow.rows[0].n,
+      },
+      gastos: {
+        total_cents:  gastosTotal,
+        manual_cents: gastosManual,
+        app_cents:    gastoApp,
+        cantidad:     gastos.rows[0].n,
+      },
+      neto_cents: neto,
+      por_servicio: porServicio.rows.map(r => ({
+        servicio: r.service_name, citas: r.citas, total_cents: Number(r.total_cents),
+      })),
+    });
+  }));
+
+  // ── GET /api/admin/category-requests ──────────────────────────────────────
+  // Lista de solicitudes de profesión/categoría (join con businesses y users
+  // para mostrar quién la pidió). Pendientes primero, luego por fecha desc.
+  app.get('/api/admin/category-requests', authRequired, adminRequired, asyncH(async (_req, res) => {
+    const { rows } = await db.query(`
+      SELECT cr.id, cr.business_id, cr.requested_by, cr.name_es, cr.name_en,
+             cr.note, cr.status, cr.created_at, cr.reviewed_at, cr.reviewed_by,
+             cr.created_category_id,
+             b.name  AS negocio,
+             u.email AS solicitante_email
+        FROM category_requests cr
+        LEFT JOIN businesses b ON b.id = cr.business_id
+        LEFT JOIN users u ON u.id = cr.requested_by
+       ORDER BY CASE cr.status WHEN 'pending' THEN 0 ELSE 1 END, cr.created_at DESC`);
+    res.json({ requests: rows });
+  }));
+
+  // ── POST /api/admin/category-requests/:id/approve ─────────────────────────
+  // Marca la solicitud como aprobada e inserta la categoría en `categories`
+  // si aún no existe (idempotente por slug). Body opcional para editar antes
+  // de aprobar: { name_es, name_en, slug, icon }
+  app.post('/api/admin/category-requests/:id/approve', authRequired, adminRequired, asyncH(async (req, res) => {
+    if (!isUuid(req.params.id)) return bad(res, 'ID inválido');
+    const cr = await db.query(
+      `SELECT * FROM category_requests WHERE id = $1 AND status = 'pending'`, [req.params.id]);
+    if (!cr.rows[0]) return bad(res, 'Solicitud no encontrada o ya resuelta', 404);
+
+    const nameEs = String(req.body?.name_es || cr.rows[0].name_es || '').trim();
+    if (!nameEs || nameEs.length > 60) return bad(res, 'Nombre de la categoría inválido (máx 60 caracteres)');
+    // name_en es NOT NULL en categories → si no viene, usa el nombre en español.
+    const nameEn = String(req.body?.name_en || cr.rows[0].name_en || nameEs).trim();
+    // slug: del body o derivado de name_es (sin acentos, minúsculas, guiones).
+    const slug = String(req.body?.slug || nameEs).toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    if (!slug) return bad(res, 'No se pudo generar un slug válido para la categoría');
+    const icon = req.body?.icon ? String(req.body.icon).trim().slice(0, 60) : null;
+
+    // Inserta sin duplicar (slug es UNIQUE). Si ya existe, recuperamos su id.
+    const ins = await db.query(
+      `INSERT INTO categories (name_es, name_en, slug, icon, sort_order)
+       VALUES ($1, $2, $3, $4, (SELECT COALESCE(MAX(sort_order),0)+1 FROM categories))
+       ON CONFLICT (slug) DO NOTHING
+       RETURNING id`, [nameEs, nameEn, slug, icon]);
+    const catId = ins.rows[0]?.id
+      || (await db.query(`SELECT id FROM categories WHERE slug = $1`, [slug])).rows[0]?.id || null;
+
+    await db.query(
+      `UPDATE category_requests
+          SET status = 'approved', reviewed_at = now(), reviewed_by = $2, created_category_id = $3
+        WHERE id = $1`,
+      [req.params.id, req.user.id, catId]);
+    await audit(req, 'admin.category_request.approve', 'category', String(catId), { slug });
+    res.json({ ok: true, category_id: catId, slug });
+  }));
+
+  // ── POST /api/admin/category-requests/:id/reject ──────────────────────────
+  // Marca la solicitud como rechazada (sin crear categoría).
+  app.post('/api/admin/category-requests/:id/reject', authRequired, adminRequired, asyncH(async (req, res) => {
+    if (!isUuid(req.params.id)) return bad(res, 'ID inválido');
+    const { rows } = await db.query(
+      `UPDATE category_requests
+          SET status = 'rejected', reviewed_at = now(), reviewed_by = $2
+        WHERE id = $1 AND status = 'pending'
+        RETURNING id`,
+      [req.params.id, req.user.id]);
+    if (!rows[0]) return bad(res, 'Solicitud no encontrada o ya resuelta', 404);
+    await audit(req, 'admin.category_request.reject', 'category_request', req.params.id, {});
+    res.json({ ok: true });
   }));
 }
 

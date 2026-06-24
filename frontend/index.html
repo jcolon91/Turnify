@@ -435,7 +435,7 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
     if(!box) return;
     fetch('/api/public/discover').then(function(r){ return r.json(); }).then(function(d){
       d = d || {};
-      var list = (d.featured||[]).concat(d.top_rated||[], d.nearby||[]);
+      var list = (d.featured||[]).concat(d.top_rated||[], d.recent||[], d.nearby||[]);
       // de-duplicar por slug, máximo 8
       var seen = {}, out = [];
       list.forEach(function(b){ if(b && b.slug && !seen[b.slug]){ seen[b.slug]=1; out.push(b); } });

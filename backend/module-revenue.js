@@ -56,7 +56,14 @@ module.exports.mount = function (app, ctx) {
   // ==========================================================================
   //  ADD-ONS
   // ==========================================================================
+  // "Contabilidad completa" (employee_accounting) va INCLUIDA en planes Pro o
+  // superior: cualquier plan distinto de 'free'. El front deshabilita ese add-on
+  // cuando accounting_included = true (ya lo tiene por el plan; no se cobra aparte).
+  const accountingIncluded = planCode => planCode !== 'free';
+
   app.get('/api/addons/catalog', asyncH(async (_req, res) => {
+    // Catálogo completo: incluye automáticamente 'payroll' y 'employee_accounting'
+    // (migración 17). Mismas columnas que las demás filas de addon_catalog.
     const { rows } = await db.query(
       `SELECT code, name, price_cents, billing, description FROM addon_catalog ORDER BY price_cents`);
     res.json({ catalog: rows });
@@ -67,7 +74,15 @@ module.exports.mount = function (app, ctx) {
       `SELECT a.code, a.status, a.price_cents, a.activated_at, c.name, c.billing, c.description
          FROM addons a JOIN addon_catalog c ON c.code = a.code
         WHERE a.business_id = $1 ORDER BY a.activated_at DESC`, [req.business.id]);
-    res.json({ addons: rows });
+    // Catálogo completo (incluye 'payroll' y 'employee_accounting' de la migración 17)
+    // + indicador de que la contabilidad completa ya viene con el plan Pro o superior.
+    const cat = await db.query(
+      `SELECT code, name, price_cents, billing, description FROM addon_catalog ORDER BY price_cents`);
+    res.json({
+      addons: rows,
+      catalog: cat.rows,
+      accounting_included: accountingIncluded(req.business.plan_code),
+    });
   }));
 
   app.post('/api/addons/:code/activate', authRequired, businessScope, asyncH(async (req, res) => {
@@ -78,6 +93,11 @@ module.exports.mount = function (app, ctx) {
     // plan free no puede activar add-ons que dependan de integraciones externas
     if (code === 'custom_domain' && !(req.business.features?.external_integrations))
       return bad(res, 'El dominio propio requiere un plan pago', 403);
+
+    // La contabilidad completa ya viene incluida en planes Pro o superior:
+    // no se cobra como add-on a esos planes (el front también lo deshabilita).
+    if (code === 'employee_accounting' && accountingIncluded(req.business.plan_code))
+      return bad(res, 'La contabilidad completa ya está incluida en tu plan', 409);
 
     const price = cat.rows[0].price_cents;
 

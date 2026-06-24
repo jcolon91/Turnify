@@ -70,10 +70,14 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer;border:0
 .chip{font-size:11.5px;font-weight:600;padding:5px 11px;border-radius:99px;background:var(--card-soft);color:var(--muted)}
 .planbtn{font-size:12px;font-weight:700;padding:6px 12px;border-radius:9px;background:var(--ink-bar);color:var(--ink-bar-text);white-space:nowrap}
 .planbtn:hover{opacity:.88}
-.delbtn{font-size:12px;font-weight:700;padding:6px 12px;border-radius:9px;background:transparent;color:#c8392b;border:1px solid rgba(200,57,43,.4);white-space:nowrap;margin-left:6px}
+.delbtn{font-size:12px;font-weight:700;padding:6px 12px;border-radius:9px;background:transparent;color:#c8392b;border:1px solid rgba(200,57,43,.4);white-space:nowrap}
 .delbtn:hover{background:rgba(200,57,43,.1)}
 .delbtn:disabled{opacity:.5}
-.acts{display:flex;align-items:center;flex-wrap:wrap;gap:0}
+.mngbtn{font-size:12px;font-weight:700;padding:6px 12px;border-radius:9px;background:var(--green-soft);color:var(--green);white-space:nowrap}
+.mngbtn:hover{opacity:.85}
+.anbtn{font-size:12px;font-weight:700;padding:6px 12px;border-radius:9px;background:var(--card-soft);color:var(--text);white-space:nowrap}
+.anbtn:hover{opacity:.85}
+.acts{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
 .chip b{font-family:var(--mono)}
 .chip.green{background:var(--green-soft);color:var(--green)}
 .chip.amber{background:var(--amber-soft);color:var(--amber-ink)}
@@ -100,6 +104,33 @@ tr:last-child td{border-bottom:0}
 .actbtn{font-size:12px;font-weight:700;padding:7px 12px;border-radius:9px;background:var(--green);color:var(--green-ink);white-space:nowrap}
 .actbtn.off{background:var(--card-soft);color:var(--muted)}
 .actbtn:disabled{opacity:.6}
+.catbtn{font-size:12px;font-weight:700;padding:7px 12px;border-radius:9px;background:var(--green);color:var(--green-ink);white-space:nowrap}
+.catbtn.off{background:var(--card-soft);color:var(--muted)}
+.catbtn:disabled{opacity:.6}
+
+/* Modales grandes (gestionar / ganancias) */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;align-items:center;justify-content:center;padding:20px}
+.modal-box{background:var(--card);color:var(--text);border-radius:18px;max-width:440px;width:100%;padding:22px;border:1px solid var(--border);max-height:90vh;overflow-y:auto}
+.modal-box h3{font-family:var(--display,sans-serif);font-size:19px;margin-bottom:4px}
+.modal-sub{font-size:13px;color:var(--muted);margin-bottom:16px}
+.msec{border-top:1px solid var(--border);padding-top:14px;margin-top:14px}
+.msec:first-of-type{border-top:0;padding-top:0;margin-top:0}
+.msec-t{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+.addrow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}
+.addrow:last-child{border-bottom:0}
+.addrow .ai .an{font-weight:700;font-size:13.5px}
+.addrow .ai .ad{font-size:11.5px;color:var(--muted)}
+.addrow .ap{font-family:var(--mono);font-size:12px;color:var(--green);font-weight:700}
+.mfield{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
+.mfield label{font-size:12px;font-weight:700;display:block;margin-bottom:6px}
+.mfield input,.mfield select{padding:10px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;background:var(--bg2);color:var(--text)}
+.seg{display:inline-flex;background:var(--card-soft);border-radius:11px;padding:3px;gap:2px;margin-bottom:14px}
+.seg button{font:700 12.5px var(--body);padding:7px 14px;border-radius:8px;background:transparent;color:var(--muted)}
+.seg button.on{background:var(--green);color:var(--green-ink)}
+.anmetrics{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.anmetrics .metric{padding:13px 14px}
+.anmetrics .metric .n{font-size:22px}
+@media(max-width:560px){.anmetrics{grid-template-columns:1fr}}
 
 /* responsive: scroll horizontal en tablas en móvil */
 .scrollx{overflow-x:auto;-webkit-overflow-scrolling:touch}
@@ -195,6 +226,19 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
       </div>
     </div>
 
+    <!-- SOLICITUDES DE PROFESIÓN -->
+    <div class="section">
+      <div class="seclabel">Solicitudes de profesión</div>
+      <div class="tablecard">
+        <div class="scrollx">
+          <table id="catreqTable"><thead><tr>
+            <th>Profesión solicitada</th><th>Negocio</th><th>Solicitante</th><th>Estado</th><th>Acción</th>
+          </tr></thead><tbody></tbody></table>
+        </div>
+        <div class="empty" id="catreqEmpty" style="display:none">No hay solicitudes de profesión.</div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -239,6 +283,78 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
   </div>
 </div>
 
+<!-- MODAL: Gestionar negocio (add-ons + destacado + plan) -->
+<div id="manageModal" class="modal-bg">
+  <div class="modal-box">
+    <h3>Gestionar negocio</h3>
+    <p id="mgBiz" class="modal-sub"></p>
+    <div id="mgAlert" style="display:none;font-size:13px;padding:9px;border-radius:8px;margin-bottom:12px"></div>
+
+    <!-- Plan -->
+    <div class="msec">
+      <div class="msec-t">Plan</div>
+      <div class="mfield">
+        <div style="flex:1;min-width:150px">
+          <label>Plan</label>
+          <select id="mgPlan" style="width:100%">
+            <option value="free">Free (gratis)</option>
+            <option value="pro">Pro — $14.99</option>
+            <option value="studio">Studio — $19.99</option>
+            <option value="team">Team — $29.99</option>
+            <option value="grande">Grande — $44.99</option>
+            <option value="ilimitado">Ilimitado — $59.99</option>
+          </select>
+        </div>
+        <div style="width:90px">
+          <label>Meses</label>
+          <input id="mgMonths" type="number" value="1" min="1" max="24" style="width:100%">
+        </div>
+        <button id="mgPlanSave" class="actbtn">Aplicar</button>
+      </div>
+    </div>
+
+    <!-- Add-ons -->
+    <div class="msec">
+      <div class="msec-t">Add-ons</div>
+      <div id="mgAddons"><div class="muted" style="font-size:12.5px">Cargando add-ons…</div></div>
+    </div>
+
+    <!-- Destacado -->
+    <div class="msec">
+      <div class="msec-t">Destacado</div>
+      <div class="mfield">
+        <div style="width:120px">
+          <label>Semanas</label>
+          <input id="mgWeeks" type="number" value="4" min="1" max="52" style="width:100%">
+        </div>
+        <button id="mgFeatSave" class="actbtn">Destacar</button>
+      </div>
+      <p class="muted" style="font-size:11.5px;margin-top:8px">Aparece primero en su municipio y categoría por el número de semanas indicado.</p>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:18px">
+      <button id="mgClose" style="flex:1;padding:11px;border-radius:10px;background:var(--card-soft);color:var(--text);font-weight:700">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Ganancias (analytics por negocio) -->
+<div id="analyticsModal" class="modal-bg">
+  <div class="modal-box">
+    <h3>Ganancias</h3>
+    <p id="anBiz" class="modal-sub"></p>
+    <div class="seg" id="anSeg">
+      <button type="button" data-period="week">Semana</button>
+      <button type="button" data-period="month" class="on">Mes</button>
+      <button type="button" data-period="year">Año</button>
+    </div>
+    <div id="anBody"><div class="muted" style="font-size:12.5px">Cargando ganancias…</div></div>
+    <div style="display:flex;gap:8px;margin-top:18px">
+      <button id="anClose" style="flex:1;padding:11px;border-radius:10px;background:var(--card-soft);color:var(--text);font-weight:700">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const API = '/api';
 const token = localStorage.getItem('bukeame_token');
@@ -267,6 +383,11 @@ function fdatetime(iso){
          d.toLocaleTimeString('es-PR',{hour:'numeric',minute:'2-digit'});
 }
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+// Formato de dinero (recibe centavos) en USD
+function money(cents){
+  var n = Number(cents||0) / 100;
+  return n.toLocaleString('es-PR',{style:'currency',currency:'USD'});
+}
 
 // ── Referidos ──────────────────────────────────────────────────────────────
 async function loadReferrals(){
@@ -307,8 +428,9 @@ function renderReferrals(refs){
     </tr>`;
   }).join('');
 
-  // Conectar botones de acción
-  document.querySelectorAll('.actbtn').forEach(btn=>{
+  // Conectar botones de acción (scopeados a la tabla de referidos para no pisar
+  // los .actbtn del modal "Gestionar": #mgPlanSave, #mgFeatSave, add-ons).
+  document.querySelectorAll('#refTable .actbtn').forEach(btn=>{
     btn.onclick = async ()=>{
       const id = btn.dataset.id, act = btn.dataset.act;
       const msg = act==='activate'
@@ -327,6 +449,67 @@ function renderReferrals(refs){
   });
 }
 
+// ── Solicitudes de profesión ────────────────────────────────────────────────
+async function loadCategoryRequests(){
+  try{
+    const r = await fetch(API + '/admin/category-requests', { headers:{ 'Authorization':'Bearer '+token } });
+    if(!r.ok) return;
+    const data = await r.json();
+    renderCategoryRequests(data.requests || []);
+  }catch(e){}
+}
+
+function renderCategoryRequests(reqs){
+  const tb = document.querySelector('#catreqTable tbody');
+  if(reqs.length === 0){
+    document.getElementById('catreqTable').style.display = 'none';
+    document.getElementById('catreqEmpty').style.display = 'block';
+    return;
+  }
+  document.getElementById('catreqTable').style.display = '';
+  document.getElementById('catreqEmpty').style.display = 'none';
+  tb.innerHTML = reqs.map(cr=>{
+    const estado = cr.status==='pending'  ? '<span class="pill trialing">pendiente</span>'
+                 : cr.status==='approved' ? '<span class="pill active">aprobada</span>'
+                 : '<span class="pill cancelled">rechazada</span>';
+    let accion;
+    if(cr.status === 'pending'){
+      accion = `<button class="catbtn" data-id="${esc(cr.id)}" data-act="approve">Aprobar</button>`
+             + ` <button class="catbtn off" data-id="${esc(cr.id)}" data-act="reject">Rechazar</button>`;
+    } else {
+      accion = '<span class="muted">Resuelta</span>';
+    }
+    const nombre = esc(cr.name_es) + (cr.name_en ? `<div class="muted">${esc(cr.name_en)}</div>` : '');
+    const negocio = cr.negocio ? esc(cr.negocio) : '<span class="muted">—</span>';
+    const solicitante = cr.solicitante_email ? esc(cr.solicitante_email) : '<span class="muted">—</span>';
+    return `<tr>
+      <td class="biz">${nombre}${cr.note ? `<div class="muted">${esc(cr.note)}</div>` : ''}</td>
+      <td>${negocio}</td>
+      <td class="muted">${solicitante}</td>
+      <td>${estado}</td>
+      <td>${accion}</td>
+    </tr>`;
+  }).join('');
+
+  document.querySelectorAll('.catbtn').forEach(btn=>{
+    btn.onclick = async ()=>{
+      const id = btn.dataset.id, act = btn.dataset.act;
+      const msg = act==='approve'
+        ? '¿Aprobar esta profesión? Se añadirá a las categorías disponibles del marketplace.'
+        : '¿Rechazar esta solicitud de profesión?';
+      if(!confirm(msg)) return;
+      btn.disabled = true; btn.textContent = '…';
+      try{
+        const r = await fetch(API + '/admin/category-requests/'+id+'/'+act, {
+          method:'POST', headers:{ 'Authorization':'Bearer '+token }
+        });
+        if(r.ok){ loadCategoryRequests(); }
+        else { alert('No se pudo completar. Intenta de nuevo.'); btn.disabled=false; btn.textContent = act==='approve'?'Aprobar':'Rechazar'; }
+      }catch(e){ alert('Error de conexión.'); btn.disabled=false; btn.textContent = act==='approve'?'Aprobar':'Rechazar'; }
+    };
+  });
+}
+
 async function load(){
   try{
     const r = await fetch(API + '/admin/overview', {
@@ -341,6 +524,7 @@ async function load(){
     const data = await r.json();
     render(data);
     loadReferrals();
+    loadCategoryRequests();
   }catch(err){
     showError('Error de conexión. Verifica tu internet e intenta de nuevo.');
   }
@@ -428,6 +612,8 @@ function render(data){
         <td class="muted">${fdate(b.created_at)}</td>
         <td><div class="acts">
           <button class="planbtn" data-id="${esc(b.id)}" data-name="${esc(b.name)}" data-plan="${esc(b.plan_code||'free')}">Cambiar plan</button>
+          <button class="mngbtn" data-id="${esc(b.id)}" data-name="${esc(b.name)}" data-plan="${esc(b.plan_code||'free')}">Gestionar</button>
+          <button class="anbtn" data-id="${esc(b.id)}" data-name="${esc(b.name)}">Ganancias</button>
           <button class="delbtn" data-id="${esc(b.id)}" data-name="${esc(b.name)}">Borrar</button>
         </div></td>
       </tr>`;
@@ -439,6 +625,14 @@ function render(data){
     // Enganchar botones de borrar cuenta
     document.querySelectorAll('.delbtn').forEach(function(btn){
       btn.onclick = function(){ openDeleteBiz(btn.dataset.id, btn.dataset.name); };
+    });
+    // Enganchar botones de gestionar (add-ons + destacado + plan)
+    document.querySelectorAll('.mngbtn').forEach(function(btn){
+      btn.onclick = function(){ openManage(btn.dataset.id, btn.dataset.name, btn.dataset.plan); };
+    });
+    // Enganchar botones de ganancias (analytics por negocio)
+    document.querySelectorAll('.anbtn').forEach(function(btn){
+      btn.onclick = function(){ openAnalytics(btn.dataset.id, btn.dataset.name); };
     });
   }
 
@@ -544,6 +738,178 @@ document.getElementById('dmDelete').onclick = async function(){
   }
   del.disabled = false; del.textContent = 'Borrar cuenta';
 };
+
+// ── Gestionar negocio: add-ons + destacado + plan ──
+let mgCurrentId = null;
+function mgFlash(ok, text){
+  var al = document.getElementById('mgAlert');
+  al.style.display = 'block';
+  al.style.background = ok ? 'var(--green-soft)' : 'var(--red-soft)';
+  al.style.color = ok ? 'var(--green)' : 'var(--red-ink)';
+  al.textContent = text;
+}
+function openManage(id, name, currentPlan){
+  mgCurrentId = id;
+  document.getElementById('mgBiz').textContent = name + ' · plan actual: ' + (currentPlan||'free').toUpperCase();
+  document.getElementById('mgPlan').value = currentPlan || 'free';
+  document.getElementById('mgMonths').value = 1;
+  document.getElementById('mgWeeks').value = 4;
+  document.getElementById('mgAlert').style.display = 'none';
+  document.getElementById('mgAddons').innerHTML = '<div class="muted" style="font-size:12.5px">Cargando add-ons…</div>';
+  document.getElementById('manageModal').style.display = 'flex';
+  loadAddonCatalog();
+}
+document.getElementById('mgClose').onclick = function(){
+  document.getElementById('manageModal').style.display = 'none';
+  load();
+};
+
+async function loadAddonCatalog(){
+  try{
+    // Pasamos el business_id del negocio gestionado para que el backend marque
+    // cuáles add-ons ya están activos en ESE negocio (Revocar vs Activar).
+    const qs = mgCurrentId ? ('?business_id=' + encodeURIComponent(mgCurrentId)) : '';
+    const r = await fetch(API + '/admin/addon-catalog' + qs, { headers:{ 'Authorization':'Bearer '+token } });
+    if(!r.ok){ document.getElementById('mgAddons').innerHTML = '<div class="muted" style="font-size:12.5px">No se pudo cargar el catálogo.</div>'; return; }
+    const data = await r.json();
+    renderAddonCatalog(data.addons || [], data.activos || []);
+  }catch(e){
+    document.getElementById('mgAddons').innerHTML = '<div class="muted" style="font-size:12.5px">Error de conexión.</div>';
+  }
+}
+function renderAddonCatalog(addons, activos){
+  const box = document.getElementById('mgAddons');
+  if(addons.length === 0){ box.innerHTML = '<div class="muted" style="font-size:12.5px">No hay add-ons en el catálogo.</div>'; return; }
+  const activeSet = {};
+  (activos||[]).forEach(function(c){ activeSet[c] = true; });
+  box.innerHTML = addons.map(function(a){
+    const on = !!activeSet[a.code];
+    const btn = on
+      ? `<button class="actbtn off" data-code="${esc(a.code)}" data-act="revoke">Revocar</button>`
+      : `<button class="actbtn" data-code="${esc(a.code)}" data-act="grant">Activar</button>`;
+    return `<div class="addrow">
+      <div class="ai"><div class="an">${esc(a.name)}</div><div class="ad">${esc(a.description||'')}</div></div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="ap">${money(a.price_cents)}</span>${btn}
+      </div>
+    </div>`;
+  }).join('');
+  box.querySelectorAll('.actbtn').forEach(function(btn){
+    btn.onclick = async function(){
+      if(!mgCurrentId) return;
+      const code = btn.dataset.code, act = btn.dataset.act;
+      btn.disabled = true; btn.textContent = '…';
+      try{
+        const r = await fetch(API + '/admin/businesses/' + mgCurrentId + '/addons', {
+          method:'POST',
+          headers:{ 'Authorization':'Bearer '+token, 'Content-Type':'application/json' },
+          body: JSON.stringify({ code: code, action: act })
+        });
+        const data = await r.json().catch(function(){ return {}; });
+        if(r.ok){ mgFlash(true, act==='grant' ? 'Add-on activado' : 'Add-on revocado'); loadAddonCatalog(); }
+        else { mgFlash(false, data.error || 'No se pudo actualizar el add-on'); btn.disabled=false; btn.textContent = act==='grant'?'Activar':'Revocar'; }
+      }catch(e){ mgFlash(false, 'Error de conexión'); btn.disabled=false; btn.textContent = act==='grant'?'Activar':'Revocar'; }
+    };
+  });
+}
+
+document.getElementById('mgPlanSave').onclick = async function(){
+  if(!mgCurrentId) return;
+  var plan = document.getElementById('mgPlan').value;
+  var months = parseInt(document.getElementById('mgMonths').value,10) || 1;
+  var btn = this; btn.disabled = true; btn.textContent = '…';
+  try{
+    var r = await fetch(API + '/admin/businesses/' + mgCurrentId + '/plan', {
+      method:'POST',
+      headers:{ 'Authorization':'Bearer '+token, 'Content-Type':'application/json' },
+      body: JSON.stringify({ plan_code: plan, months: months })
+    });
+    var data = await r.json().catch(function(){ return {}; });
+    if(r.ok){ mgFlash(true, 'Plan actualizado'); }
+    else { mgFlash(false, data.error || 'No se pudo cambiar el plan'); }
+  }catch(e){ mgFlash(false, 'Error de conexión'); }
+  btn.disabled = false; btn.textContent = 'Aplicar';
+};
+
+document.getElementById('mgFeatSave').onclick = async function(){
+  if(!mgCurrentId) return;
+  var weeks = parseInt(document.getElementById('mgWeeks').value,10) || 0;
+  if(weeks < 1 || weeks > 52){ mgFlash(false, 'Semanas entre 1 y 52'); return; }
+  var btn = this; btn.disabled = true; btn.textContent = '…';
+  try{
+    var r = await fetch(API + '/admin/businesses/' + mgCurrentId + '/featured', {
+      method:'POST',
+      headers:{ 'Authorization':'Bearer '+token, 'Content-Type':'application/json' },
+      body: JSON.stringify({ weeks: weeks })
+    });
+    var data = await r.json().catch(function(){ return {}; });
+    if(r.ok){ mgFlash(true, 'Destacado activado por ' + weeks + ' semana' + (weeks===1?'':'s')); }
+    else { mgFlash(false, data.error || 'No se pudo activar el destacado'); }
+  }catch(e){ mgFlash(false, 'Error de conexión'); }
+  btn.disabled = false; btn.textContent = 'Destacar';
+};
+
+// ── Ganancias: analytics por negocio ──
+let anCurrentId = null;
+let anPeriod = 'month';
+function openAnalytics(id, name){
+  anCurrentId = id;
+  anPeriod = 'month';
+  document.getElementById('anBiz').textContent = name;
+  document.querySelectorAll('#anSeg button').forEach(function(b){
+    b.classList.toggle('on', b.dataset.period === 'month');
+  });
+  document.getElementById('anBody').innerHTML = '<div class="muted" style="font-size:12.5px">Cargando ganancias…</div>';
+  document.getElementById('analyticsModal').style.display = 'flex';
+  loadAnalytics();
+}
+document.getElementById('anClose').onclick = function(){
+  document.getElementById('analyticsModal').style.display = 'none';
+};
+document.querySelectorAll('#anSeg button').forEach(function(b){
+  b.onclick = function(){
+    anPeriod = b.dataset.period;
+    document.querySelectorAll('#anSeg button').forEach(function(x){ x.classList.toggle('on', x===b); });
+    loadAnalytics();
+  };
+});
+async function loadAnalytics(){
+  if(!anCurrentId) return;
+  try{
+    const r = await fetch(API + '/admin/businesses/' + anCurrentId + '/analytics?period=' + encodeURIComponent(anPeriod), {
+      headers:{ 'Authorization':'Bearer '+token }
+    });
+    const data = await r.json().catch(function(){ return {}; });
+    if(!r.ok){ document.getElementById('anBody').innerHTML = '<div class="muted" style="font-size:12.5px">' + esc(data.error || 'No se pudieron cargar las ganancias.') + '</div>'; return; }
+    renderAnalytics(data);
+  }catch(e){
+    document.getElementById('anBody').innerHTML = '<div class="muted" style="font-size:12.5px">Error de conexión.</div>';
+  }
+}
+function renderAnalytics(d){
+  const ing = d.ingresos || {};
+  const gas = d.gastos || {};
+  const det = d.detalle || {};
+  const depositos = (det.depositos_cents || 0);
+  let html = '<div class="anmetrics">';
+  html += `<div class="metric"><div class="n">${money(ing.facturado_cents)}</div><div class="l">Realizado</div></div>`;
+  html += `<div class="metric"><div class="n">${money(ing.cobrado_cents)}</div><div class="l">Cobrado</div></div>`;
+  html += `<div class="metric"><div class="n">${money(depositos)}</div><div class="l">Depósitos</div></div>`;
+  html += `<div class="metric"><div class="n">${money(gas.total_cents)}</div><div class="l">Gastos</div></div>`;
+  html += `<div class="metric hi"><div class="n">${money(d.neto_cents)}</div><div class="l">Neto</div></div>`;
+  html += '</div>';
+
+  const serv = d.por_servicio || [];
+  if(serv.length){
+    html += '<div class="msec"><div class="msec-t">Por servicio</div><div class="scrollx"><table>';
+    html += '<thead><tr><th>Servicio</th><th>Citas</th><th>Total</th></tr></thead><tbody>';
+    html += serv.map(function(s){
+      return `<tr><td class="biz">${esc(s.servicio||'—')}</td><td>${s.citas||0}</td><td>${money(s.total_cents)}</td></tr>`;
+    }).join('');
+    html += '</tbody></table></div></div>';
+  }
+  document.getElementById('anBody').innerHTML = html;
+}
 
 load();
 </script>

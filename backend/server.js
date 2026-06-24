@@ -1306,6 +1306,85 @@ app.put('/api/staff/:id/hours', authRequired, businessScope, asyncH(async (req, 
   res.json({ ok: true });
 }));
 
+// ----------------------------------------------------------------------------
+// INVITACIONES DE EQUIPO (staff_invites — migración 17, en paralelo)
+// El dueño genera un código corto para un profesional; el invitado lo canjea
+// con su cuenta para quedar ligado (staff.user_id) a ese profesional.
+// ----------------------------------------------------------------------------
+
+// Genera un código corto de 8 chars del alfabeto sin O/0/I/1/L (no enumerable).
+function inviteCode() {
+  let c = '';
+  for (let i = 0; i < 8; i++) c += CODE_ALPHABET[crypto.randomInt(CODE_ALPHABET.length)];
+  return c;
+}
+
+// El dueño invita a un profesional de SU negocio. Devuelve { code }.
+app.post('/api/staff/:id/invite', authRequired, businessScope, asyncH(async (req, res) => {
+  if (!isUuid(req.params.id)) return bad(res, 'ID inválido');
+  // El profesional debe pertenecer al negocio del dueño.
+  const st = await db.query(
+    `SELECT id FROM staff WHERE id = $1 AND business_id = $2 AND deleted_at IS NULL`,
+    [req.params.id, req.business.id]);
+  if (!st.rows[0]) return bad(res, 'Profesional no encontrado', 404);
+
+  // Inserta con reintento: si el code choca (UNIQUE), genera otro.
+  let code = null;
+  for (let i = 0; i < 5; i++) {
+    const candidate = inviteCode();
+    try {
+      const { rows } = await db.query(
+        `INSERT INTO staff_invites (business_id, staff_id, code, expires_at)
+         VALUES ($1, $2, $3, now() + interval '7 days') RETURNING code`,
+        [req.business.id, req.params.id, candidate]);
+      code = rows[0].code;
+      break;
+    } catch (e) {
+      if (e.code === '23505') continue;   // colisión de code: reintenta
+      throw e;
+    }
+  }
+  if (!code) return bad(res, 'No se pudo generar el código. Intenta de nuevo.', 500);
+  await audit(req, 'staff.invite', 'staff', req.params.id);
+  res.status(201).json({ code });
+}));
+
+// Cualquier usuario autenticado canjea un código para unirse a un equipo.
+app.post('/api/team/join', authRequired, asyncH(async (req, res) => {
+  const raw = (req.body || {}).code;
+  if (!isStr(raw, 40)) return bad(res, 'Código requerido');
+  const code = raw.trim().toUpperCase();
+
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    // Bloquea el invite válido (no usado y no expirado) para evitar doble canje.
+    const inv = await client.query(
+      `SELECT id, business_id, staff_id FROM staff_invites
+        WHERE code = $1 AND used_at IS NULL
+          AND (expires_at IS NULL OR expires_at > now())
+        FOR UPDATE`, [code]);
+    if (!inv.rows[0]) {
+      await client.query('ROLLBACK');
+      return bad(res, 'Código inválido o expirado');
+    }
+    const { id, business_id, staff_id } = inv.rows[0];
+    await client.query(
+      `UPDATE staff SET user_id = $1 WHERE id = $2 AND business_id = $3`,
+      [req.user.id, staff_id, business_id]);
+    await client.query(
+      `UPDATE staff_invites SET used_at = now(), used_by_user_id = $1 WHERE id = $2`,
+      [req.user.id, id]);
+    await client.query('COMMIT');
+    res.json({ ok: true, business_id });
+  } catch (e) {
+    await client.query('ROLLBACK');
+    throw e;
+  } finally {
+    client.release();
+  }
+}));
+
 // Servicios
 app.get('/api/services', authRequired, businessScope, asyncH(async (req, res) => {
   const { rows } = await db.query(
@@ -1560,20 +1639,31 @@ app.get('/api/public/discover', publicLimiter, publicCache, asyncH(async (req, r
     8,
   ).catch(() => []);
 
-  // nearby: sólo si hay geo válida; los más cercanos por distancia.
+  // nearby ("cerca de ti"): SÓLO si hay geo válida; requiere lat/lng del negocio.
   const nearbyP = hasGeo
     ? buildList(`b.lat IS NOT NULL AND b.lng IS NOT NULL`, `distance_km ASC NULLS LAST`, 12).catch(() => [])
     : Promise.resolve([]);
 
-  // top_rated: con al menos 1 reseña, mejor promedio primero.
+  // top_rated ("mejor calificados"): NO depende de ubicación. No exige reseñas
+  // para no esconder negocios publicados nuevos; los mejor calificados van
+  // primero y, a igualdad, los más recientes. Así un publicado SIN lat/lng,
+  // SIN categoría y SIN reseñas igual aparece en la portada.
   const topRatedP = buildList(
-    `b.rating_count >= 1`,
-    `b.rating_avg DESC NULLS LAST, b.rating_count DESC`,
+    null,
+    `b.rating_avg DESC NULLS LAST, b.rating_count DESC, b.created_at DESC`,
     12,
   ).catch(() => []);
 
-  const [featured, nearby, top_rated] = await Promise.all([featuredP, nearbyP, topRatedP]);
-  res.json({ featured, nearby, top_rated });
+  // recent ("recientes"): publicados más nuevos primero. Tampoco depende de
+  // ubicación, categoría ni reseñas: garantiza que TODO publicado sea visible.
+  const recentP = buildList(
+    null,
+    `b.created_at DESC`,
+    12,
+  ).catch(() => []);
+
+  const [featured, nearby, top_rated, recent] = await Promise.all([featuredP, nearbyP, topRatedP, recentP]);
+  res.json({ featured, nearby, top_rated, recent });
 }));
 
 // Perfil público (la página SEO bukeame.com/<slug>)

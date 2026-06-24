@@ -144,6 +144,15 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
     <span style="flex:1"><b style="font-family:var(--display);font-size:15px;color:var(--text);display:block;margin-bottom:2px">¿Tienes un negocio?</b><span style="font-size:12.5px;color:var(--muted);line-height:1.5">Conviértete en profesional y administra tu agenda, equipo y pagos. Puedes hacerlo cuando quieras.</span></span>
     <span style="font-weight:800;color:var(--green);font-size:18px;flex:none">→</span>
   </a>
+  <div style="margin-top:14px;background:var(--card-soft);border:1px solid var(--border);border-radius:16px;padding:16px 18px">
+    <b style="font-family:var(--display);font-size:15px;color:var(--text);display:block;margin-bottom:2px">¿Eres empleado de un negocio?</b>
+    <span style="font-size:12.5px;color:var(--muted);line-height:1.5;display:block;margin-bottom:10px">Si tu jefe te dio un código de invitación, úsalo aquí para unirte a su negocio (no necesitas plan).</span>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <input id="joinCode" type="text" placeholder="Código (ej. ABCD2345)" style="flex:1;min-width:140px;padding:11px 13px;border:1.5px solid var(--border);border-radius:12px;background:var(--card);color:var(--text);font-family:var(--mono);text-transform:uppercase">
+      <button type="button" id="joinBtn" style="background:var(--green);color:var(--green-ink);font-weight:700;border:0;border-radius:12px;padding:11px 20px;cursor:pointer">Unirme</button>
+    </div>
+    <div id="joinMsg" style="font-size:12.5px;margin-top:8px"></div>
+  </div>
 </div>
 </div>
 <div class="foot">Hecho con Bukéame · bukeame.com</div>
@@ -174,6 +183,23 @@ async function api(method,path,body){
   let data={};try{data=await r.json();}catch(e){}
   return {status:r.status,ok:r.ok,data};
 }
+
+// Unirse a un negocio con código de invitación (empleado)
+(function(){
+  var jb=document.getElementById('joinBtn'); if(!jb) return;
+  jb.onclick=async function(){
+    var inp=document.getElementById('joinCode'), msg=document.getElementById('joinMsg');
+    var code=(inp.value||'').trim().toUpperCase();
+    if(!code){ msg.style.color='var(--muted)'; msg.textContent='Escribe el código.'; return; }
+    jb.disabled=true; msg.style.color='var(--muted)'; msg.textContent='Uniéndote…';
+    try{
+      var r=await api('POST','/team/join',{code:code});
+      if(r.ok){ msg.style.color='var(--green)'; msg.textContent='¡Listo! Te uniste al negocio. Entra al panel para ver tu agenda.'; inp.value=''; }
+      else { msg.style.color='#c0392b'; msg.textContent=(r.data&&r.data.error)||'Código inválido o expirado.'; }
+    }catch(e){}
+    jb.disabled=false;
+  };
+})();
 
 let DATA={upcoming:[],past:[],orders:[]};
 let TAB='up';
