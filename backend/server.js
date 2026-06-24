@@ -2454,7 +2454,7 @@ async function sendWhatsApp(phone, text) {
   const r = await fetch(`${EVOLUTION_API_URL}/message/sendText/${EVOLUTION_INSTANCE}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', apikey: EVOLUTION_API_KEY },
-    body: JSON.stringify({ number: phone.replace('+', ''), textMessage: { text } }),
+    body: JSON.stringify({ number: phone.replace('+', ''), text }),
   });
   if (!r.ok) throw new Error(`Evolution ${r.status}`);
   const j = await r.json().catch(() => ({}));
