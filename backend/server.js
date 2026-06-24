@@ -234,7 +234,7 @@ const privateCors = cors({ origin: corsOrigin, credentials: false });
 app.use((req, res, next) =>
   req.path.startsWith('/api/public') ? publicCors(req, res, next) : privateCors(req, res, next));
 
-app.use(rateLimit({ windowMs: 60_000, max: 300, standardHeaders: true, legacyHeaders: false }));
+app.use(rateLimit({ windowMs: 60_000, max: 1000, standardHeaders: true, legacyHeaders: false }));
 const authLimiter   = rateLimit({ windowMs: 15 * 60_000, max: 20,  message: { error: 'Demasiados intentos. Espera 15 minutos.' } });
 // Lockout por cuenta: keyed por email (o IP si no hay email) para frenar fuerza bruta dirigida.
 const loginLimiter  = rateLimit({ windowMs: 15 * 60_000, max: 8, keyGenerator: (req) => (req.body && req.body.email) ? ('em:' + String(req.body.email).toLowerCase().trim()) : req.ip, message: { error: 'Demasiados intentos para esta cuenta. Espera 15 minutos.' } });

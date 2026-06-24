@@ -52,7 +52,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer;border:0
 input,select,textarea{font:inherit}
 .bootload{min-height:100vh;display:grid;place-items:center;color:var(--ink2);font-size:14px}
 .shell{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:230px 1fr;min-height:100vh}
-@media(max-width:860px){.shell{grid-template-columns:1fr}.side{display:none}}
+@media(max-width:860px){.shell{grid-template-columns:1fr}.shell .side{display:none}}
 .side{border-right:1px solid var(--border);padding:20px 16px;display:flex;flex-direction:column;gap:4px;background:var(--side-bg)}
 .side .logo{font-family:var(--display);font-weight:800;font-size:21px;padding:4px 10px 18px}.side .logo i{font-style:normal;color:var(--green)}
 .side a{display:flex;align-items:center;gap:11px;font-size:14px;font-weight:600;color:var(--muted);padding:11px 12px;border-radius:12px;cursor:pointer}
@@ -352,6 +352,7 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
       <a data-v="lealtad" class="navlink">Lealtad</a>
       <a href="productos.html" class="navlink">Tienda</a>
       <a href="espera.html" class="navlink">Lista de espera</a>
+      <a data-v="ordenes" class="navlink">Órdenes</a>
       <a data-v="horario" class="navlink">Horario</a>
       <a data-v="contabilidad" class="navlink">Contabilidad</a>
       <a data-v="negocio" class="navlink">Mi negocio</a>
@@ -591,6 +592,12 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
             <button class="btn btn-teal btn-sm" id="exportBtn" style="padding:10px 18px">Descargar CSV</button>
           </div>
         </div>
+      </section>
+
+      <section class="view" id="view-ordenes">
+        <div class="tophead"><div><h1>Órdenes</h1><p>Lo que compran tus clientes y su preparación.</p></div></div>
+        <div id="ordersAlert" class="alert"></div>
+        <div id="ordersList"></div>
       </section>
 
       <section class="view" id="view-negocio">
@@ -2424,6 +2431,7 @@ function switchView(v){
   if(v==='lealtad') loadLoyalty();
   if(v==='horario'){ loadBlocks(); freeInit(); }
   if(v==='contabilidad') loadAccounting();
+  if(v==='ordenes') loadOrders();
   if(v==='pagos') loadPayments();
   if(v==='negocio'){ initLocMap(); loadPortfolio(); }
   if(v==='cuenta') loadAccount();
@@ -2434,7 +2442,7 @@ function openMenu(){ var d=document.getElementById('mobDrawer'),b=document.getEl
 function closeMenu(){ var d=document.getElementById('mobDrawer'),b=document.getElementById('mobBackdrop'),h=document.getElementById('hambBtn'); d.classList.remove('open'); b.classList.remove('open'); if(h) h.setAttribute('aria-expanded','false'); }
 function buildMobnav(){
   const nav = document.getElementById('mobDrawer');
-  const items = [['agenda','Agenda'],['servicios','Servicios'],['equipo','Equipo'],['clientes','Clientes'],['lealtad','Lealtad'],['#productos.html','Tienda'],['#espera.html','Lista de espera'],['horario','Horario'],['contabilidad','Contabilidad'],['negocio','Mi negocio'],['pagos','Pagos'],['#referidos.html','Referidos'],['cuenta','Mi cuenta']];
+  const items = [['agenda','Agenda'],['servicios','Servicios'],['equipo','Equipo'],['clientes','Clientes'],['lealtad','Lealtad'],['#productos.html','Tienda'],['#espera.html','Lista de espera'],['ordenes','Órdenes'],['horario','Horario'],['contabilidad','Contabilidad'],['negocio','Mi negocio'],['pagos','Pagos'],['#referidos.html','Referidos'],['cuenta','Mi cuenta']];
   // Móvil: drawer off-canvas (hamburguesa) en vez de una barra de pestañas.
   nav.innerHTML = items.map(function(it){
     return '<a data-v="'+it[0]+'">'+it[1]+'</a>';
@@ -3219,6 +3227,56 @@ async function loadExpenses(){
       if(!confirm('¿Borrar este gasto?')) return;
       const rr = await api('DELETE','/accounting/expenses/'+b.dataset.id);
       if(rr.ok){ loadAccounting(); }
+    };
+  });
+}
+
+// ════════════════════════ ÓRDENES (tienda) ════════════════════════
+const ORDER_ST_LABELS = { pending:'Recibida', paid:'Recibida', preparing:'Preparando', ready:'Lista', fulfilled_pickup:'Recogida', fulfilled_shipping:'Entregada', cancelled:'Cancelada' };
+async function loadOrders(){
+  clearAlert('ordersAlert');
+  const list = document.getElementById('ordersList');
+  list.innerHTML = '<div class="empty">Cargando…</div>';
+  const r = await api('GET','/orders');
+  if(!r.ok){ list.innerHTML = ''; showAlert('ordersAlert', (r.data && r.data.error) || 'No se pudieron cargar las órdenes', false); return; }
+  const orders = (r.data && r.data.orders) ? r.data.orders : [];
+  if(!orders.length){ list.innerHTML = '<div class="empty">Aún no tienes órdenes. Aparecen cuando un cliente compra en tu tienda.</div>'; return; }
+  list.innerHTML = orders.map(function(o){
+    const st = o.status || 'pending';
+    const isPickup = o.fulfillment === 'pickup';
+    const stKey = (st==='fulfilled') ? ('fulfilled_'+(isPickup?'pickup':'shipping')) : st;
+    const stLabel = ORDER_ST_LABELS[stKey] || esc(st);
+    const items = Array.isArray(o.items) ? o.items : [];
+    const phone = (o.buyer_phone||'').replace(/[^0-9]/g,'');
+    const buyer = '<b>'+esc(o.buyer_name||'Cliente')+'</b>' + (phone ? (' · <a href="https://wa.me/'+phone+'" target="_blank" rel="noopener" style="color:var(--ink2)">'+esc(o.buyer_phone)+'</a>') : '');
+    const itemsHtml = items.length ? items.map(function(it){
+      return '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--ink2)"><span>'+esc(it.name||'Producto')+' x'+esc(it.qty||1)+'</span><span>'+money((it.price_cents||0)*(it.qty||1))+'</span></div>';
+    }).join('') : '<div style="font-size:13px;color:var(--ink2)">Sin detalle de productos.</div>';
+    const metodo = isPickup ? 'Recogida' : 'Entregada';
+    var btns = '';
+    if(st==='pending' || st==='paid') btns += '<button class="btn btn-sm" data-ord="'+esc(o.id)+'" data-next="preparing">Marcar preparando</button>';
+    if(st==='preparing') btns += '<button class="btn btn-sm" data-ord="'+esc(o.id)+'" data-next="ready">Marcar lista</button>';
+    if(st==='ready') btns += '<button class="btn btn-sm" data-ord="'+esc(o.id)+'" data-next="fulfilled">Marcar '+(isPickup?'recogida':'entregada')+'</button>';
+    if(st!=='fulfilled' && st!=='cancelled') btns += '<button class="btn btn-sm btn-ghost" data-ord="'+esc(o.id)+'" data-next="cancelled">Cancelar</button>';
+    return '<div class="card" style="display:block">'+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">'+
+        '<div style="min-width:0">'+buyer+'</div>'+
+        '<span class="pill">'+stLabel+'</span>'+
+      '</div>'+
+      '<div style="margin:10px 0">'+itemsHtml+'</div>'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding-top:8px">'+
+        '<small style="color:var(--ink2)">'+metodo+'</small><b>'+money(o.total_cents)+'</b>'+
+      '</div>'+
+      (btns ? '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">'+btns+'</div>' : '')+
+    '</div>';
+  }).join('');
+  list.querySelectorAll('[data-ord]').forEach(function(b){
+    b.onclick = async function(){
+      if(b.dataset.next==='cancelled' && !confirm('¿Cancelar esta orden?')) return;
+      b.disabled = true;
+      const rr = await api('PATCH','/orders/'+b.dataset.ord, { status: b.dataset.next });
+      if(rr.ok){ loadOrders(); }
+      else { b.disabled = false; showAlert('ordersAlert', (rr.data && rr.data.error) || 'No se pudo actualizar la orden', false); }
     };
   });
 }

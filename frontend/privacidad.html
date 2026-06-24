@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Política de Privacidad — Bukéame</title>
-<meta name="description" content="Política de privacidad de Bukéame: qué datos recopilamos, cómo los usamos, cómo protegemos tu información y qué derechos tienes sobre ella.">
+<meta name="description" content="Política de privacidad de Bukéame: qué datos recopilamos, cómo los usamos, con quién los compartimos, cuánto los conservamos y qué derechos tienes, incluido el derecho a eliminar tu cuenta y tus datos.">
 <link rel="canonical" href="https://bukeame.com/privacidad.html">
 <meta name="theme-color" content="#0E8074">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%230E8074'/%3E%3Ctext x='16' y='22' font-family='Arial,sans-serif' font-size='18' font-weight='bold' text-anchor='middle' fill='%23fff'%3EB%3C/text%3E%3C/svg%3E">
 <meta property="og:title" content="Política de Privacidad — Bukéame">
-<meta property="og:description" content="Política de privacidad de Bukéame: qué datos recopilamos, cómo los usamos, cómo protegemos tu información y qué derechos tienes sobre ella.">
+<meta property="og:description" content="Política de privacidad de Bukéame: qué datos recopilamos, cómo los usamos, con quién los compartimos y qué derechos tienes sobre tu información.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://bukeame.com/privacidad.html">
 <meta property="og:site_name" content="Bukéame">
@@ -48,11 +48,18 @@ h1{font-family:var(--display);font-weight:800;font-size:30px;letter-spacing:-.02
 .card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:26px 28px;margin-bottom:40px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
 h2{font-family:var(--display);font-weight:700;font-size:18px;margin:26px 0 8px;letter-spacing:-.01em}
 h2:first-child{margin-top:0}
+h3{font-family:var(--display);font-weight:700;font-size:15px;margin:16px 0 4px;letter-spacing:-.01em}
 p{margin:8px 0;color:var(--text)}
 ul{margin:8px 0 8px 20px}li{margin:5px 0}
 .note{background:var(--green-soft);border-radius:12px;padding:14px 16px;font-size:14px;color:var(--muted);margin:16px 0}
+.draft{background:#FBE9D6;border:1px solid #E0A66A;border-radius:12px;padding:14px 16px;font-size:13.5px;color:#7A4A12;margin:0 0 4px;font-weight:600}
+html[data-theme="dark"] .draft{background:rgba(224,166,106,.12);border-color:rgba(224,166,106,.45);color:#E0A66A}
+.draft b{font-weight:800}
 .back{display:inline-block;margin:0 0 26px;font-family:var(--mono);font-size:12px}
 .foot{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:24px 0 40px}
+table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13.5px}
+th,td{border:1px solid var(--border);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--card-soft);font-family:var(--display);font-weight:700;font-size:13px}
 </style>
 <script>
 (function(){var t=localStorage.getItem('bukeame_theme')||'dark';document.documentElement.setAttribute('data-theme',t);
@@ -68,51 +75,151 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
   <a class="back" href="acceso.html">← Volver</a>
 
   <h1>Política de Privacidad</h1>
-  <div class="meta">Versión 1.0 · Última actualización: junio 2026</div>
+  <div class="meta">Versión 2.0 (borrador) · Última actualización: junio 2026</div>
 
   <div class="card">
-    <div class="note">
-      En Bukéame (operado por Wifnix LLC, Puerto Rico) respetamos tu privacidad. Aquí te explicamos qué información recopilamos, cómo la usamos y qué control tienes sobre ella.
+    <div class="draft">
+      <b>BORRADOR — debe ser revisado por un abogado licenciado en Puerto Rico / EE.&nbsp;UU. antes de publicarse.</b> Este documento es un borrador profesional preparado para guiar la versión final, pero no constituye asesoría legal y no garantizamos su cumplimiento con ninguna ley, reglamento ni con los requisitos de Apple App Store o Google Play. Antes de publicarlo o someter la app a las tiendas, debe ser revisado y aprobado por un abogado licenciado. Es posible que las tiendas requieran también una versión en inglés de esta política.
     </div>
 
-    <h2>1. Información que recopilamos</h2>
+    <div class="note">
+      En Bukéame (operado por Wifnix LLC, Puerto Rico) respetamos tu privacidad. Aquí te explicamos, de forma clara, qué información recopilamos, para qué la usamos, con quién la compartimos, cuánto tiempo la conservamos y qué control tienes sobre ella, incluido tu derecho a eliminar tu cuenta y tus datos directamente desde la app.
+    </div>
+
+    <h2>1. Quiénes somos</h2>
+    <p>Bukéame es una plataforma de gestión de citas, reservas y tienda en línea para negocios de servicios (barberías, salones, spas, estéticas y similares) y sus clientes, disponible como sitio web y como aplicación móvil. Bukéame es operado por <b>Wifnix LLC</b>, una entidad organizada en Puerto Rico. Cuando esta política dice "Bukéame", "nosotros" o "nuestro", se refiere a Wifnix LLC.</p>
+    <p>Esta política aplica a dos tipos de usuarios: los <b>negocios</b> que usan Bukéame para administrar su operación, y los <b>clientes</b> que reservan citas, compran productos o gift cards a través de la plataforma. Donde un punto aplica solo a uno de los dos, lo indicamos.</p>
+
+    <h2>2. Información que recopilamos</h2>
+    <p>Recopilamos los siguientes tipos de información, según cómo uses Bukéame:</p>
+
+    <h3>a) Datos de cuenta y autenticación</h3>
     <ul>
-      <li><b>De tu cuenta:</b> nombre, email, teléfono y contraseña (guardada de forma cifrada).</li>
-      <li><b>De tu negocio:</b> nombre del negocio, dirección, horarios, servicios y productos que publiques.</li>
-      <li><b>De tus clientes:</b> los datos que tus clientes proporcionan al reservar (nombre, contacto), que tú gestionas como negocio.</li>
-      <li><b>De uso:</b> información técnica básica para mantener el servicio funcionando y seguro.</li>
+      <li>Nombre completo, dirección de correo electrónico y número de teléfono.</li>
+      <li>Contraseña, que se guarda siempre cifrada (con un algoritmo de hashing) y nunca en texto plano.</li>
+      <li>Estado de verificación de tu correo electrónico.</li>
+      <li>Un identificador de sesión (token) y tu rol (negocio o cliente), que se guardan en el almacenamiento local de tu dispositivo o navegador.</li>
     </ul>
 
-    <h2>2. Cómo usamos tu información</h2>
+    <h3>b) Datos del negocio (si tienes una cuenta de negocio)</h3>
     <ul>
-      <li>Para operar la plataforma: agendar citas, enviar recordatorios y notificaciones.</li>
-      <li>Para comunicarte avisos importantes sobre tu cuenta o el servicio.</li>
-      <li>Para mejorar Bukéame y dar soporte.</li>
+      <li>Nombre del negocio, categoría, descripción, dirección física, teléfono y WhatsApp.</li>
+      <li>Pueblo o municipio (de Puerto Rico), horarios, días libres y bloqueos.</li>
+      <li>Servicios, precios, depósitos, productos, variantes, inventario y políticas del negocio.</li>
+      <li>Equipo o personal (nombre, especialidad, avatar).</li>
+      <li>Imágenes: logo, banner, portafolio y fotos de productos.</li>
+      <li>Ubicación en mapa (coordenadas de latitud y longitud) que tú fijas voluntariamente.</li>
+      <li>Información para conectar tus métodos de cobro (por ejemplo, número de ATH Móvil, usuario de PayPal). No almacenamos credenciales privadas de pago (ver sección 5).</li>
     </ul>
 
-    <h2>3. Contraseñas y seguridad</h2>
-    <p>Tu contraseña se guarda cifrada con un algoritmo de hashing seguro; nunca la almacenamos en texto plano y nadie en Bukéame puede verla. Usamos cifrado TLS para proteger los datos en tránsito.</p>
+    <h3>c) Datos de los clientes del negocio</h3>
+    <p>Cuando un cliente reserva una cita, compra un producto o una gift card, o se une a una lista de espera, recopilamos lo que esa persona proporciona: nombre, WhatsApp o teléfono, correo electrónico (opcional) y notas. El negocio también puede añadir notas internas y marcar a un cliente como bloqueado. Estos datos pertenecen al negocio que los recopila; Bukéame los procesa en su nombre (ver sección 7).</p>
 
-    <h2>4. Comunicaciones por WhatsApp y email</h2>
-    <p>Bukéame envía recordatorios y notificaciones de citas por WhatsApp y/o email según la configuración del negocio. Estos mensajes son parte del funcionamiento del servicio. Puedes ajustar tus preferencias de notificación.</p>
+    <h3>d) Datos de citas, reservas y compras</h3>
+    <ul>
+      <li>Servicios seleccionados, profesional, fecha y hora, código de confirmación y estado de la cita.</li>
+      <li>Método de pago utilizado, propina y depósitos.</li>
+      <li>Reseñas y calificaciones (de 1 a 5 estrellas) y comentarios, junto con las respuestas del negocio.</li>
+      <li>Órdenes de la tienda: artículos, totales, tipo de entrega (recogida o envío) e historial.</li>
+      <li>Gift cards: monto, nombre del comprador y del destinatario, mensaje y código.</li>
+    </ul>
 
-    <h2>5. Con quién compartimos información</h2>
-    <p>No vendemos tu información. La compartimos únicamente con proveedores que nos ayudan a operar (por ejemplo, servicios de mensajería o alojamiento), y solo lo necesario para que el servicio funcione. También podemos divulgar información si la ley lo requiere.</p>
+    <h3>e) Datos de ubicación</h3>
+    <ul>
+      <li><b>Negocio:</b> las coordenadas que fija al ubicar su pin en el mapa.</li>
+      <li><b>Cliente:</b> si lo autorizas, tu navegador o dispositivo comparte tu ubicación aproximada (latitud y longitud) para mostrarte negocios cercanos y la distancia en kilómetros. Esto es <b>opcional</b>; si no lo autorizas, puedes seguir usando la búsqueda sin geolocalización.</li>
+    </ul>
 
-    <h2>6. Datos de los clientes del negocio</h2>
-    <p>Los datos de los clientes que reservan pertenecen al negocio que los recopila. Bukéame los procesa en nombre del negocio para facilitar las reservas. Cada negocio es responsable del uso adecuado de los datos de sus propios clientes.</p>
+    <h3>f) Datos de pago</h3>
+    <p>Bukéame <b>no custodia el dinero</b> entre el negocio y sus clientes, ni almacena números completos de tarjeta. Los pagos los procesan terceros (ATH Móvil, Stripe, PayPal). Solo guardamos datos de configuración (como el número de ATH Móvil del negocio o su usuario de PayPal) y referencias o estados de transacción necesarios para mostrar el resultado (ver sección 5).</p>
 
-    <h2>7. Tus derechos</h2>
-    <p>Puedes acceder, corregir o solicitar la eliminación de tu información de cuenta. Si eliminas tu cuenta, removemos tus datos asociados según nuestras prácticas de retención y lo que exija la ley.</p>
+    <h3>g) Datos de comunicaciones</h3>
+    <p>Para enviar recordatorios, confirmaciones, avisos de lista de espera y notificaciones, procesamos el WhatsApp y/o el correo de la persona destinataria, así como el contenido de esos mensajes de servicio.</p>
 
-    <h2>8. Retención</h2>
-    <p>Conservamos tu información mientras tu cuenta esté activa y por el tiempo necesario para cumplir obligaciones legales o resolver disputas.</p>
+    <h3>h) Datos técnicos y de uso</h3>
+    <p>Información técnica básica necesaria para operar y proteger el servicio (por ejemplo, registros de actividad, tipo de dispositivo o navegador y datos de la sesión). No usamos cookies de rastreo publicitario (ver sección 9).</p>
 
-    <h2>9. Cambios a esta política</h2>
-    <p>Podemos actualizar esta política. Si hay cambios importantes, te lo notificaremos a través de la plataforma.</p>
+    <h2>3. Cómo usamos tu información</h2>
+    <ul>
+      <li>Para operar la plataforma: crear y administrar cuentas, agendar y gestionar citas, procesar reservas, órdenes, gift cards y listas de espera.</li>
+      <li>Para enviar recordatorios, confirmaciones y notificaciones por WhatsApp y/o correo electrónico.</li>
+      <li>Para mostrar negocios en el buscador, calcular distancias (si compartes tu ubicación) y mostrar reseñas y calificaciones.</li>
+      <li>Para facilitar cobros y depósitos a través de los procesadores de pago que cada negocio conecta.</li>
+      <li>Para comunicarte avisos importantes sobre tu cuenta, tu plan o el servicio, y para verificar tu correo.</li>
+      <li>Para dar soporte, prevenir fraude y abuso, y mantener la seguridad de la plataforma.</li>
+      <li>Para cumplir obligaciones legales, fiscales y contables aplicables en Puerto Rico y EE.&nbsp;UU.</li>
+      <li>Para mejorar y desarrollar nuevas funciones de Bukéame.</li>
+    </ul>
 
-    <h2>10. Contacto</h2>
-    <p>Si tienes preguntas sobre tu privacidad o quieres ejercer tus derechos, contáctanos por los canales oficiales de Bukéame.</p>
+    <h2>4. Comunicaciones por WhatsApp y correo electrónico</h2>
+    <p>Bukéame envía mensajes de servicio (recordatorios y confirmaciones de citas, avisos de lista de espera, notificaciones de cuenta y de gift cards) por WhatsApp y/o correo electrónico, según la configuración del negocio. Para ello usamos proveedores externos de mensajería y correo (ver sección 5). Estos mensajes forman parte del funcionamiento del servicio. Puedes ajustar las preferencias de notificación disponibles en la plataforma; algunos avisos esenciales de cuenta o de seguridad pueden no ser opcionales.</p>
+
+    <h2>5. Con quién compartimos tu información</h2>
+    <p><b>No vendemos tu información personal</b> ni la cedemos a terceros para su mercadeo. Compartimos datos únicamente con proveedores que nos ayudan a operar el servicio ("encargados del tratamiento"), y solo lo necesario para la función que prestan. Estos incluyen:</p>
+    <table>
+      <tr><th>Proveedor</th><th>Para qué</th><th>Qué recibe (lo mínimo necesario)</th></tr>
+      <tr><td>ATH Móvil (Evertec)</td><td>Cobros y depósitos vía ATH Móvil</td><td>Datos de la transacción y configuración del negocio (teléfono, token público)</td></tr>
+      <tr><td>Stripe</td><td>Procesamiento de pagos con tarjeta</td><td>Datos de la transacción y de cuenta conectada del negocio</td></tr>
+      <tr><td>PayPal</td><td>Pagos vía PayPal.me / email</td><td>Monto y handle/email del negocio (redirección a paypal.com)</td></tr>
+      <tr><td>Resend</td><td>Envío de correos (avisos, verificación, gift cards)</td><td>Correo y contenido del mensaje</td></tr>
+      <tr><td>Evolution / WhatsApp</td><td>Recordatorios y notificaciones por WhatsApp</td><td>Número de WhatsApp y contenido del mensaje de servicio</td></tr>
+      <tr><td>Proveedor de alojamiento</td><td>Infraestructura del servicio</td><td>Datos almacenados de forma segura</td></tr>
+      <tr><td>OpenStreetMap / Leaflet</td><td>Mapas</td><td>Coordenadas para mostrar el mapa</td></tr>
+      <tr><td>Google Fonts</td><td>Tipografías de la interfaz</td><td>Solicitud técnica del navegador</td></tr>
+    </table>
+    <p>El uso de ATH Móvil, Stripe, PayPal, Resend, Evolution/WhatsApp, OpenStreetMap y Google Fonts está sujeto además a las políticas de privacidad de cada uno de esos proveedores. Cuando un negocio conecta su cuenta de pago, los pagos y depósitos van directo a la cuenta del negocio; la suscripción del negocio a Bukéame se cobra por separado.</p>
+    <p>También podemos divulgar información si la ley lo exige (por ejemplo, ante una orden judicial o requerimiento de una autoridad competente) o cuando sea necesario para proteger los derechos, la seguridad o la propiedad de Bukéame, de nuestros usuarios o del público. Si Wifnix LLC participa en una fusión, adquisición o venta de activos, tu información podría transferirse como parte de esa operación, sujeta a esta política.</p>
+
+    <h2>6. Pagos: aclaración importante</h2>
+    <p>Bukéame <b>no es un procesador de pagos ni custodia fondos</b> entre un negocio y sus clientes. Cada negocio conecta su propia cuenta (ATH Móvil, Stripe, PayPal o efectivo) y los depósitos y cobros van directamente a esa cuenta. No almacenamos el número completo ni los datos sensibles de tu tarjeta; esos datos los maneja el procesador de pagos correspondiente. Para ATH Móvil en modo automático solo usamos el "Public Token" (que no es secreto); nunca debes ingresar el "Private Token" en Bukéame. Los reembolsos y disputas entre un negocio y su cliente se gestionan a través del procesador y del propio negocio.</p>
+
+    <h2>7. Datos de los clientes del negocio</h2>
+    <p>Los datos que un cliente proporciona al reservar, comprar o unirse a una lista de espera pertenecen al <b>negocio</b> que los recopila. Bukéame actúa como encargado que procesa esos datos en nombre del negocio para hacer posible la reserva, la compra y la comunicación. Cada negocio es responsable de usar los datos de sus propios clientes de forma adecuada y conforme a la ley. Si eres cliente y quieres ejercer derechos sobre datos que un negocio guarda de ti, puedes contactar directamente al negocio o escribirnos para ayudarte a canalizar la solicitud.</p>
+
+    <h2>8. Seguridad</h2>
+    <p>Tomamos medidas razonables para proteger tu información. Tu contraseña se guarda cifrada con un algoritmo de hashing seguro; nunca la almacenamos en texto plano y nadie en Bukéame puede verla. Usamos cifrado TLS para proteger los datos en tránsito y aplicamos controles de acceso a nuestros sistemas. Sin embargo, ningún método de transmisión o almacenamiento es 100% seguro, por lo que no podemos garantizar seguridad absoluta. Si ocurriera una brecha que afecte tu información, actuaremos conforme a la ley aplicable.</p>
+
+    <h2>9. Cookies y almacenamiento local</h2>
+    <p>Bukéame no utiliza cookies de rastreo publicitario ni de terceros con fines de mercadeo. Usamos el <b>almacenamiento local</b> de tu navegador o dispositivo para guardar tu token de sesión, tu rol (negocio o cliente) y tu preferencia de tema (claro u oscuro). Esto es necesario para que puedas mantener tu sesión y para que la app funcione. Algunos recursos de terceros (Google Fonts, mapas de Leaflet/OpenStreetMap, el widget de ATH Móvil y las redirecciones a PayPal o Stripe) se cargan desde sus propios servidores y pueden recibir solicitudes técnicas de tu navegador.</p>
+
+    <h2>10. Retención de datos</h2>
+    <p>Conservamos tu información mientras tu cuenta esté activa y por el tiempo que sea necesario para prestar el servicio, cumplir obligaciones legales, fiscales y contables, resolver disputas y hacer cumplir nuestros acuerdos. Cuando eliminas tu cuenta, borramos o anonimizamos tus datos según se describe en la sección 11. <b>Los registros de transacciones se conservan de forma anonimizada por requisitos fiscales de Puerto Rico y de EE.&nbsp;UU.</b>, incluso después de borrar la cuenta.</p>
+
+    <h2>11. Derecho a eliminar tu cuenta y tus datos</h2>
+    <p>Puedes eliminar tu cuenta y los datos personales asociados <b>directamente desde la app</b>, sin necesidad de contactarnos:</p>
+    <ul>
+      <li>Si eres negocio: entra a <b>Mi cuenta → Zona de peligro → Borrar cuenta</b>, confirma escribiendo "BORRAR MI CUENTA" y completa el proceso. Antes de borrar, te ofrecemos descargar tu contabilidad.</li>
+      <li>Si eres cliente: puedes solicitar la eliminación de tu cuenta desde la sección de tu cuenta o escribiéndonos por los canales oficiales.</li>
+    </ul>
+    <p>Al borrar tu cuenta eliminamos tus datos personales y, en el caso de los negocios, los datos de sus clientes que custodiamos en su nombre. <b>Los registros de transacciones se conservan anonimizados</b> (sin identificarte) por requisito fiscal de Puerto Rico y EE.&nbsp;UU. La eliminación es permanente y no se puede deshacer. Si prefieres no usar la opción in-app, también puedes solicitar la eliminación escribiéndonos a los canales oficiales de Bukéame.</p>
+
+    <h2>12. Tus derechos</h2>
+    <p>Según la ley aplicable, puedes tener derecho a:</p>
+    <ul>
+      <li>Acceder a la información personal que tenemos sobre ti.</li>
+      <li>Corregir datos inexactos o incompletos.</li>
+      <li>Solicitar la eliminación de tu información (ver sección 11).</li>
+      <li>Obtener una copia de tus datos en un formato portátil cuando aplique.</li>
+      <li>Oponerte o limitar ciertos usos, o retirar un consentimiento que hayas dado (por ejemplo, la geolocalización).</li>
+    </ul>
+
+    <h3>Residentes de California (CCPA / CPRA)</h3>
+    <p>Si resides en California, las leyes CCPA y CPRA te otorgan derechos adicionales, entre ellos: saber qué categorías de información personal recopilamos y con qué fines, solicitar acceso o eliminación, corregir información inexacta y limitar el uso de cierta información sensible. <b>Bukéame no vende ni comparte tu información personal</b> en el sentido de esas leyes para publicidad de comportamiento. No te discriminaremos por ejercer tus derechos. Para ejercerlos, escríbenos por los canales oficiales; podremos pedirte que verifiques tu identidad antes de responder.</p>
+
+    <h2>13. Transferencias de información</h2>
+    <p>Bukéame opera desde Puerto Rico (EE.&nbsp;UU.). Algunos de nuestros proveedores pueden procesar o almacenar información en servidores ubicados en EE.&nbsp;UU. u otras jurisdicciones. Al usar Bukéame, entiendes que tu información puede ser tratada en esos lugares conforme a esta política y a la ley aplicable.</p>
+
+    <h2>14. Privacidad de menores</h2>
+    <p>Bukéame no está dirigido a menores de edad. Las cuentas de negocio requieren tener al menos 18 años. No recopilamos a sabiendas información personal de menores de 13 años. Si crees que un menor nos ha proporcionado información sin la autorización correspondiente, contáctanos y la eliminaremos conforme a la ley aplicable.</p>
+
+    <h2>15. Cambios a esta política</h2>
+    <p>Podemos actualizar esta política para reflejar cambios en el servicio o en la ley. Si hay cambios importantes, te lo notificaremos a través de la plataforma y actualizaremos la fecha de "última actualización" en la parte superior. El uso continuado de Bukéame después de un cambio significa que aceptas la política actualizada.</p>
+
+    <h2>16. Relevo de responsabilidad</h2>
+    <p>Esta política se ofrece "tal cual", con fines informativos, y no constituye asesoría legal. Bukéame y Wifnix LLC no garantizan que el servicio o esta política cumplan con todas las leyes o reglamentos que puedan aplicarte. En la medida permitida por la ley, Wifnix LLC no será responsable por daños indirectos, incidentales o consecuentes derivados del uso de la plataforma o del tratamiento de datos por terceros (procesadores de pago, mensajería, mapas u otros proveedores), cuyas prácticas se rigen por sus propias políticas. Esta política se interpreta conforme a las leyes de Puerto Rico y las leyes federales aplicables de EE.&nbsp;UU.</p>
+
+    <h2>17. Contacto</h2>
+    <p>Si tienes preguntas sobre tu privacidad o quieres ejercer tus derechos, contáctanos por los canales oficiales de Bukéame. Operado por Wifnix LLC, Puerto Rico.</p>
   </div>
 </div>
 <div class="foot">Bukéame · Wifnix LLC · Puerto Rico</div>

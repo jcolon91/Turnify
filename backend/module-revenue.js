@@ -378,7 +378,7 @@ module.exports.mount = function (app, ctx) {
   app.patch('/api/orders/:id', authRequired, businessScope, asyncH(async (req, res) => {
     if (!isUuid(req.params.id)) return bad(res, 'ID inválido');
     const { status } = req.body || {};
-    if (!['paid', 'fulfilled', 'cancelled'].includes(status)) return bad(res, 'Estado inválido');
+    if (!['paid', 'preparing', 'ready', 'fulfilled', 'cancelled'].includes(status)) return bad(res, 'Estado inválido');
     await db.query(`UPDATE product_orders SET status = $1 WHERE id = $2 AND business_id = $3`,
       [status, req.params.id, req.business.id]);
     res.json({ ok: true });
