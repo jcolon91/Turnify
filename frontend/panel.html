@@ -73,7 +73,7 @@ main{padding:22px 20px 90px;max-width:760px}
 .mobnav{display:none;position:sticky;top:0;z-index:80;background:var(--text);padding:10px 14px;align-items:center;justify-content:space-between}
 .mobnav .logo{font-family:var(--display);font-weight:800;font-size:19px;color:var(--nav-ink)}.mobnav .logo i{font-style:normal;color:var(--green)}
 .hamb{display:flex;flex-direction:column;justify-content:center;gap:5px;width:42px;height:38px;padding:9px 8px;background:transparent;border:0;cursor:pointer}
-.hamb span{display:block;height:2px;border-radius:2px;background:var(--nav-ink)}
+.hamb span{display:block;width:24px;height:3px;border-radius:2px;background:var(--nav-ink)}
 @media(max-width:860px){.mobnav{display:flex}}
 .mob-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:90}
 .mob-backdrop.open{display:block}
@@ -2434,7 +2434,7 @@ function openMenu(){ var d=document.getElementById('mobDrawer'),b=document.getEl
 function closeMenu(){ var d=document.getElementById('mobDrawer'),b=document.getElementById('mobBackdrop'),h=document.getElementById('hambBtn'); d.classList.remove('open'); b.classList.remove('open'); if(h) h.setAttribute('aria-expanded','false'); }
 function buildMobnav(){
   const nav = document.getElementById('mobDrawer');
-  const items = [['agenda','Agenda'],['servicios','Servicios'],['equipo','Equipo'],['clientes','Clientes'],['lealtad','Lealtad'],['#productos.html','Tienda'],['#espera.html','Espera'],['horario','Horario'],['contabilidad','$'],['negocio','Negocio'],['pagos','Pagos'],['#referidos.html','Referidos'],['cuenta','Cuenta']];
+  const items = [['agenda','Agenda'],['servicios','Servicios'],['equipo','Equipo'],['clientes','Clientes'],['lealtad','Lealtad'],['#productos.html','Tienda'],['#espera.html','Lista de espera'],['horario','Horario'],['contabilidad','Contabilidad'],['negocio','Mi negocio'],['pagos','Pagos'],['#referidos.html','Referidos'],['cuenta','Mi cuenta']];
   // Móvil: drawer off-canvas (hamburguesa) en vez de una barra de pestañas.
   nav.innerHTML = items.map(function(it){
     return '<a data-v="'+it[0]+'">'+it[1]+'</a>';

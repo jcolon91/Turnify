@@ -17,6 +17,7 @@ const express   = require('express');
 const helmet    = require('helmet');
 const cors      = require('cors');
 const rateLimit = require('express-rate-limit');
+const compression = require('compression');
 const bcrypt    = require('bcryptjs');
 const jwt       = require('jsonwebtoken');
 const crypto    = require('crypto');
@@ -58,7 +59,14 @@ const ACCESS_TTL  = '15m';
 const REFRESH_DAYS = 30;
 const ALIVE = ['pending_deposit','confirmed'];   // citas que ocupan turno
 
-const db = new Pool({ connectionString: DATABASE_URL, max: 10 });
+const db = new Pool({
+  connectionString: DATABASE_URL,
+  max: 10,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 5000,
+  statement_timeout: 15000,
+});
+db.on('error', (err) => { console.error('[pg pool error]', err && err.message); });
 
 // ----------------------------------------------------------------------------
 // APP BASE + SEGURIDAD
@@ -67,6 +75,7 @@ const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', 1);             // detrás de Nginx
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+app.use(compression());
 
 // ----------------------------------------------------------------------------
 // STRIPE CONNECT — WEBHOOK (cargo DIRECTO en la cuenta del negocio)
@@ -242,6 +251,20 @@ const bookingLimiter = rateLimit({ windowMs: 60_000,     max: 12,  message: { er
 // HELPERS
 // ----------------------------------------------------------------------------
 const asyncH = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+
+// Caché en memoria (TTL 30s) SOLO para lecturas públicas pesadas (discover/search).
+// Por req.originalUrl; nunca cachea endpoints autenticados/personalizados.
+const _cache = new Map();
+function cacheGet(key){ const e=_cache.get(key); if(e && e.exp>Date.now()) return e.val; if(e) _cache.delete(key); return null; }
+function cacheSet(key,val){ if(_cache.size>500) _cache.clear(); _cache.set(key,{val,exp:Date.now()+30000}); }
+const publicCache = (req, res, next) => {
+  const key = req.originalUrl;
+  const hit = cacheGet(key);
+  if (hit !== null) return res.json(hit);
+  const _json = res.json.bind(res);
+  res.json = (body) => { if (res.statusCode === 200) cacheSet(key, body); return _json(body); };
+  next();
+};
 const bad    = (res, msg, code = 400) => res.status(code).json({ error: msg });
 const sha256 = s => crypto.createHash('sha256').update(s).digest('hex');
 
@@ -1447,7 +1470,7 @@ app.get('/api/public/municipalities', asyncH(async (_req, res) => {
 }));
 
 // Buscador del marketplace (typo-tolerante + cerca de mí + featured primero)
-app.get('/api/public/search', publicLimiter, asyncH(async (req, res) => {
+app.get('/api/public/search', publicLimiter, publicCache, asyncH(async (req, res) => {
   const { q, category, municipality, lat, lng } = req.query;
   const vals = [], where = [`b.is_published`, `b.deleted_at IS NULL`];
   let rank = `b.rating_avg`;
@@ -1490,7 +1513,7 @@ app.get('/api/public/search', publicLimiter, asyncH(async (req, res) => {
 // vía earth_distance/ll_to_earth cuando hay lat/lng, category = name_es de la
 // categoría principal del negocio (subquery a business_categories+categories).
 // Resiliente: si alguna lista falla, devuelve [] en vez de tumbar la portada.
-app.get('/api/public/discover', publicLimiter, asyncH(async (req, res) => {
+app.get('/api/public/discover', publicLimiter, publicCache, asyncH(async (req, res) => {
   const { lat, lng, municipality } = req.query;
   const la = parseFloat(lat), lo = parseFloat(lng);
   const hasGeo = Number.isFinite(la) && Number.isFinite(lo);
@@ -2765,5 +2788,7 @@ app.use((err, _req, res, _next) => {
   bad(res, 'Error interno. Intenta de nuevo.', 500);
 });
 
-app.listen(PORT, '127.0.0.1', () =>
+const server = app.listen(PORT, '127.0.0.1', () =>
   console.log(`🟢 bukeame-api en http://127.0.0.1:${PORT} (${NODE_ENV})`));
+server.requestTimeout = 30000;
+server.headersTimeout = 35000;
