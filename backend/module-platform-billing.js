@@ -38,19 +38,20 @@ function mount(app, ctx) {
   const enabled = !!(PUBLIC_TOKEN && PRIVATE_TOKEN);
 
   // ── Helper: verificación SERVER-SIDE del pago con ATH (regla 5) ────────────
-  // Hace POST a findPayment con { publicToken, privateToken, ecommerceId }.
+  // Hace POST a findPayment con { ecommerceId, publicToken } — EXACTO según la
+  // API oficial (ATHM-Payment-Button-API): findPayment SÓLO acepta esos dos
+  // atributos. El privateToken NO va aquí (es únicamente para /refund); enviarlo
+  // está fuera de spec y podría romper la verificación si ATH endurece la validación.
   // Devuelve { ok, status, total, referenceNumber, raw }. ok === true SÓLO si
   // data.ecommerceStatus === 'COMPLETED'. Cualquier error de red → ok:false.
-  // IMPORTANTE: NUNCA se loguea el privateToken ni el body de la petición.
   async function verifyAthPayment(ecommerceId) {
     try {
       const resp = await fetch(ATH_FIND_PAYMENT_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body: JSON.stringify({
-          publicToken: PUBLIC_TOKEN,
-          privateToken: PRIVATE_TOKEN, // sólo viaja a ATH; nunca al cliente ni al log
           ecommerceId,
+          publicToken: PUBLIC_TOKEN,
         }),
       });
       const json = await resp.json().catch(() => null);

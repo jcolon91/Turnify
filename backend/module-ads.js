@@ -179,6 +179,44 @@ function mount(app, ctx) {
   }));
 
   // ──────────────────────────────────────────────────────────────────────────
+  // DELETE /api/ads/:id — borra una campaña del negocio (y sus eventos)
+  //   Valida pertenencia. Borra ad_events (por ON DELETE CASCADE o explícito)
+  //   y la propia campaña. → { ok: true }
+  // ──────────────────────────────────────────────────────────────────────────
+  app.delete('/api/ads/:id', authRequired, businessScope, asyncH(async (req, res) => {
+    if (!isUuid(req.params.id)) return bad(res, 'ID inválido');
+
+    const client = await db.connect();
+    try {
+      await client.query('BEGIN');
+
+      // La campaña debe ser del negocio (bloquea la fila durante el borrado).
+      const cur = await client.query(
+        `SELECT id FROM ad_campaigns
+          WHERE id = $1 AND business_id = $2 FOR UPDATE`,
+        [req.params.id, req.business.id]);
+      if (!cur.rows[0]) {
+        await client.query('ROLLBACK');
+        return bad(res, 'Campaña no encontrada', 404);
+      }
+
+      // Borra eventos explícitamente (por si el FK no es ON DELETE CASCADE) y la campaña.
+      await client.query(`DELETE FROM ad_events WHERE campaign_id = $1`, [req.params.id]);
+      await client.query(`DELETE FROM ad_campaigns WHERE id = $1 AND business_id = $2`,
+        [req.params.id, req.business.id]);
+
+      await client.query('COMMIT');
+      await audit(req, 'ads.delete', 'ad_campaign', req.params.id, {});
+      res.json({ ok: true });
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+  }));
+
+  // ──────────────────────────────────────────────────────────────────────────
   // POST /api/public/ads/:id/impression — registra una impresión (SIN auth)
   //   Sólo cuenta si la campaña está 'active'. Inserta ad_event 'impression' y
   //   gasta cost_per_impression_cents del presupuesto; si se agota → 'depleted'.

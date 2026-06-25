@@ -870,7 +870,7 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
     <h3 id="athTitle">Pagar con ATH Móvil</h3>
     <div class="alert" id="athAlert"></div>
     <div id="athSummary" style="font-size:13.5px;color:var(--ink);background:var(--paper);border-radius:11px;padding:12px 14px;margin-bottom:14px;line-height:1.6"></div>
-    <p style="font-size:12.5px;color:var(--ink2);margin-bottom:12px">Confirma el pago en la app de ATH Móvil. Al completarse, tu compra se activa automáticamente.</p>
+    <p style="font-size:12.5px;color:var(--ink2);margin-bottom:12px">Te enviaremos a la app de ATH Móvil para completar el pago. Si no se abre sola, toca el botón. Al completarse, tu compra se activa automáticamente.</p>
     <!-- Contenedor donde la librería de ATH Móvil inyecta su botón -->
     <div id="ATHMovil_Checkout_Button" style="min-height:50px;margin-bottom:12px"></div>
     <div style="display:flex;gap:10px">
@@ -3460,6 +3460,7 @@ async function loadPromos(){
     var toggleBtn = '';
     if(st==='paused'){ toggleBtn = '<button class="btn btn-sm" data-promo-toggle="'+esc(c.id)+'" data-action="resume">Reanudar</button>'; }
     else { toggleBtn = '<button class="btn btn-sm btn-ghost" data-promo-toggle="'+esc(c.id)+'" data-action="pause">Pausar</button>'; }
+    const deleteBtn = '<button class="btn btn-sm btn-ghost" data-promo-delete="'+esc(c.id)+'" style="color:var(--danger,#d33);border-color:var(--danger,#d33)">Borrar</button>';
     return '<div class="card" style="display:block">'+
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">'+
         '<div><div style="font-size:12px;color:var(--ink2)">Presupuesto restante</div><b style="font-size:18px">'+money(remaining)+'</b></div>'+
@@ -3474,7 +3475,7 @@ async function loadPromos(){
       '</div>'+
       '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'+
         '<span style="font-size:12px;color:var(--ink2)">Cargar presupuesto:</span>'+budgetBtns+
-        '<span style="flex:1"></span>'+toggleBtn+
+        '<span style="flex:1"></span>'+toggleBtn+deleteBtn+
       '</div>'+
     '</div>';
   }).join('');
@@ -3490,6 +3491,16 @@ async function loadPromos(){
       const rr = await api('POST','/ads/'+b.dataset.promoToggle+'/'+b.dataset.action, {});
       if(rr.ok){ loadPromos(); }
       else { b.disabled = false; showAlert('promoAlert', (rr.data && rr.data.error) || 'No se pudo actualizar la campaña', false); }
+    };
+  });
+  list.querySelectorAll('[data-promo-delete]').forEach(function(b){
+    b.onclick = async function(){
+      clearAlert('promoAlert');
+      if(!confirm('¿Borrar esta campaña? Se eliminarán sus métricas. Esta acción no se puede deshacer.')) return;
+      b.disabled = true;
+      const rr = await api('DELETE','/ads/'+b.dataset.promoDelete);
+      if(rr.ok){ loadPromos(); }
+      else { b.disabled = false; showAlert('promoAlert', (rr.data && rr.data.error) || 'No se pudo borrar la campaña', false); }
     };
   });
 }
@@ -3628,6 +3639,24 @@ function openAthCheckout(opts){
       loadButton();
     }
   }catch(e){ console.error('ATH init', e); }
+  // Auto-envío a la app de ATH Móvil: "toca" por el usuario el botón que
+  // inyecta la librería en cuanto exista. Si el navegador lo bloquea o tarda,
+  // el botón queda visible en el modal como respaldo manual.
+  autoLaunchAthButton();
+}
+
+// Busca el botón que inyecta la librería de ATH dentro de su contenedor y lo
+// dispara (deep-link a la app en celular / QR en escritorio). Reintenta unos
+// instantes mientras la librería renderiza; no rompe nada si nunca aparece.
+function autoLaunchAthButton(){
+  var tries = 0;
+  (function tick(){
+    tries++;
+    var box = document.getElementById('ATHMovil_Checkout_Button');
+    var el = box ? box.querySelector('a,button,[role="button"],img,div[onclick]') : null;
+    if(el){ try{ el.click(); }catch(e){ /* respaldo: botón visible */ } return; }
+    if(tries < 20){ setTimeout(tick, 150); }   // ~3s máx esperando el render
+  })();
 }
 
 // Tras un 402: si ATH está disponible muestra el botón "Pagar con ATH Móvil"
