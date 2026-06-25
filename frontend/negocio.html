@@ -402,6 +402,9 @@ html[data-embed="1"] .foot{display:none}
     radial-gradient(130% 130% at 78% 86%,rgba(8,40,33,.5) 0,rgba(8,40,33,0) 55%),
     linear-gradient(140deg,#13A38F 0%,#0E8074 42%,#0A5B52 100%)}
 .bk-shot.bk-fallback span{font-family:var(--display);font-weight:800;font-size:84px;color:#fff;text-shadow:0 2px 14px rgba(0,0,0,.3)}
+.bk-shot.bk-prefab{display:grid;place-items:center}
+.bk-shot.bk-prefab span{position:relative;z-index:1;font-family:var(--display);font-weight:800;font-size:84px;color:#fff;text-shadow:0 2px 14px rgba(0,0,0,.3)}
+.bk-shot.bk-prefab.bnr-mint span,.bk-shot.bk-prefab.bnr-sand span{color:#17150F;text-shadow:none}
 html[data-theme="dark"] .bk-shot.bk-fallback{background:radial-gradient(120% 120% at 28% 22%,rgba(239,161,47,.4) 0,rgba(239,161,47,0) 46%),
     radial-gradient(130% 130% at 78% 86%,rgba(0,0,0,.45) 0,rgba(0,0,0,0) 55%),
     linear-gradient(140deg,#15A968 0%,#0E8074 44%,#0A6B49 100%)}
@@ -920,11 +923,22 @@ function renderProfile(){
   }
   // ── Galería hero estilo Booksy (cover + portafolio en scroll horizontal) ──
   renderHeroGallery();
+  // Fondo prefabricado del logo (theme.logo_bg) — debe coincidir con LOGO_BGS de panel.html
+  const LOGO_BG_GRADS = {
+    teal:  'linear-gradient(135deg,#0E8074,#0A5B52)',
+    forest:'linear-gradient(135deg,#11221E,#0d6b46)',
+    earth: 'linear-gradient(135deg,#7A5C3E,#3E2C1C)',
+    sage:  'linear-gradient(135deg,#9FE8D5,#0E8074)',
+    sand:  'linear-gradient(135deg,#E7E2D1,#B98F5A)'
+  };
+  let logoBg = null;
+  try { var _lt = (typeof b.theme==='string') ? JSON.parse(b.theme) : (b.theme||{}); logoBg = _lt && _lt.logo_bg; } catch(e){}
+  const logoBgGrad = LOGO_BG_GRADS[logoBg] || null;
   // Logo (cuadrado redondeado, estilo Booksy)
   const logo = document.getElementById('bizLogo');
   const initial = (b.name||'?').charAt(0).toUpperCase();
-  if(b.logo_url){ logo.innerHTML = '<img src="'+esc(b.logo_url)+'" alt="" width="64" height="64" decoding="async">'; }
-  else { logo.textContent = initial; }
+  if(b.logo_url){ logo.style.background=''; logo.innerHTML = '<img src="'+esc(b.logo_url)+'" alt="" width="64" height="64" decoding="async">'; }
+  else { if(logoBgGrad) logo.style.background = logoBgGrad; logo.textContent = initial; }
   // Rating + enlace "N reseñas" (baja a la sección de reseñas)
   if(b.rating_count>0){
     const el = document.getElementById('bizRating');
@@ -941,8 +955,8 @@ function renderProfile(){
   renderBadges(b);
   // Drawer head
   const dl = document.getElementById('drawerLogo');
-  if(b.logo_url){ dl.className=''; dl.innerHTML = '<img src="'+esc(b.logo_url)+'" alt="" width="46" height="46" loading="lazy" decoding="async" style="width:46px;height:46px;border-radius:50%;object-fit:cover">'; }
-  else { dl.textContent = initial; }
+  if(b.logo_url){ dl.className=''; dl.style.background=''; dl.innerHTML = '<img src="'+esc(b.logo_url)+'" alt="" width="46" height="46" loading="lazy" decoding="async" style="width:46px;height:46px;border-radius:50%;object-fit:cover">'; }
+  else { if(logoBgGrad) dl.style.background = logoBgGrad; dl.textContent = initial; }
   document.getElementById('drawerName').textContent = b.name;
 
   // ── Sobre ──
@@ -1061,9 +1075,16 @@ function renderHeroGallery(){
   if(b.cover_url) urls.push(b.cover_url);   // solo el banner/cover; el portafolio va en su propia sección (#sec-gallery)
   urls = urls.slice(0,8);
   if(urls.length===0){
-    // Sin fotos: degradado de marca con inicial del negocio
+    // Sin imagen propia: usa el banner prefabricado elegido (theme.banner) con la inicial.
     var initial = (b.name||'?').charAt(0).toUpperCase();
-    host.innerHTML = '<div class="bk-shot bk-fallback"><span>'+esc(initial)+'</span></div>';
+    if(window.BukeameBanners){
+      BukeameBanners.injectCss();
+      var bnrId = BukeameBanners.bannerId(b.theme);
+      host.innerHTML = '<div class="bk-shot bk-prefab tbanner bnr-'+bnrId+'"><span>'+esc(initial)+'</span></div>';
+    } else {
+      // Respaldo: degradado de marca con inicial del negocio
+      host.innerHTML = '<div class="bk-shot bk-fallback"><span>'+esc(initial)+'</span></div>';
+    }
     return;
   }
   var slides = urls.map(function(u){
