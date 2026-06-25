@@ -2148,6 +2148,7 @@ function buildDayTimeline(list, items, staff){
         ' data-price="'+(a.price_cents||0)+'" data-svc="'+esc(a.service_name||'')+'"'+
         ' data-name="'+esc(who)+'" data-phone="'+esc(a.client_phone||'')+'" data-when="'+esc(hourLabel(a.starts_at))+'"'+
         ' data-start="'+esc(a.starts_at)+'"'+
+        ' data-dep-id="'+esc((a.deposit&&a.deposit.id)||'')+'" data-dep-method="'+esc((a.deposit&&a.deposit.method)||'')+'" data-dep-status="'+esc((a.deposit&&a.deposit.status)||'')+'"'+
         ' style="top:'+top+'px;height:'+hgt+'px;background:'+esc(bg)+';border-left-color:'+esc(col)+'">'+
         fab+'<b>'+ico+esc(who)+'</b><small>'+esc(sub)+'</small></div>';
     });
@@ -2198,6 +2199,11 @@ function tlOpenPopover(ev){
   const id = ev.dataset.id, svc = ev.dataset.svc, price = parseInt(ev.dataset.price,10)||0;
   const st = ev.dataset.st;
   const isPending = (st==='pending_deposit');
+  // Validación manual del depósito: SOLO cuando es efectivo o ATH Móvil al número
+  // (el negocio recibe el pago y lo valida). El ATH automático y la tarjeta se
+  // confirman solos, así que ahí no aparece el botón.
+  const depId = ev.dataset.depId||'', depMethod = ev.dataset.depMethod||'', depStatus = ev.dataset.depStatus||'';
+  const needsValidation = isPending && depId && depStatus==='pending' && (depMethod==='cash' || depMethod==='ath_movil');
   const phone = String(ev.dataset.phone||'').replace(/\D/g,'');
   const arrived = TL_ARRIVED.has(String(id));
 
@@ -2208,10 +2214,12 @@ function tlOpenPopover(ev){
   const pop = document.createElement('div'); pop.className='tl-pop';
 
   // Acciones del negocio: Completar (cobra→completed), Mover (reagendar), No llegó
-  // (no_show; el cliente pierde el depósito) y Cancelar. El depósito confirma la cita
-  // automáticamente al reservar, por eso no hay botón de confirmar/pagar depósito.
+  // (no_show; el cliente pierde el depósito) y Cancelar. Para depósitos manuales
+  // (efectivo / ATH al número) aparece "Validar depósito y aceptar": el negocio
+  // confirma que recibió el pago y la cita pasa de pendiente a aceptada.
   let html = '<h5>'+esc(ev.dataset.name||'Cita')+'</h5>'+
     '<p>'+esc(ev.dataset.when||'')+(svc?(' · '+esc(svc)):'')+'</p>'+
+    (needsValidation ? '<button class="tl-validate" data-act="validate" style="width:100%;display:flex;align-items:center;justify-content:center;gap:7px;margin-bottom:10px;padding:11px;border:none;border-radius:11px;background:#0E8074;color:#fff;font-weight:700;font-size:13.5px;cursor:pointer">'+TL_SVG.done+'<span>Validar depósito y aceptar</span></button>' : '')+
     '<div class="tl-pop-main">'+
       '<button class="tl-m-done" data-act="completed">'+TL_SVG.done+'<span>Completar</span></button>'+
       '<button class="tl-m-move" data-act="move">'+TL_SVG.move+'<span>Mover</span></button>'+
@@ -2240,6 +2248,17 @@ function tlOpenPopover(ev){
       e.stopPropagation();
       const act = btn.dataset.act;
       if(act==='wa'){ tlClosePopover(); window.open('https://wa.me/'+phone,'_blank'); return; }
+      // Validar depósito manual (efectivo / ATH al número): marca el pago recibido
+      // y acepta la cita (pending_deposit → confirmed).
+      if(act==='validate'){
+        if(!confirm('¿Confirmas que RECIBISTE el depósito? La cita quedará ACEPTADA.')) return;
+        btn.disabled = true;
+        const resp = await api('PATCH','/payments/'+depId+'/confirm', {});
+        tlClosePopover();
+        if(resp.ok){ loadDashboard(); }
+        else { alert((resp.data && resp.data.error)||'No se pudo validar el depósito.'); }
+        return;
+      }
       // "Completar": cobra y completa la cita (openCobro → status:completed).
       if(act==='completed'){ tlClosePopover(); openCobro(id, svc, price); return; }
       // "Mover": reagendar la cita (modal → PATCH start_iso).

@@ -1577,9 +1577,12 @@ document.getElementById('confirmBtn').onclick = async function(){
 
 function showOkStep(appt){
   var when = new Date(state.startIso);
-  document.getElementById('okTitle').textContent = '¡Reserva confirmada!';
-  document.getElementById('okDetail').textContent =
-    state.selectedServices.map(function(s){ return s.name; }).join(' + ')+' · '+when.toLocaleDateString('es-PR',{weekday:'long',day:'numeric',month:'long'})+' a las '+when.toLocaleTimeString('es-PR',{hour:'numeric',minute:'2-digit'});
+  var a = appt || state.appt || {};
+  var pending = (a.status === 'pending_deposit');
+  document.getElementById('okTitle').textContent = pending ? 'Reserva pendiente de depósito' : '¡Reserva confirmada!';
+  document.getElementById('okDetail').textContent = pending
+    ? state.selectedServices.map(function(s){ return s.name; }).join(' + ')+' · '+when.toLocaleDateString('es-PR',{weekday:'long',day:'numeric',month:'long'})+' a las '+when.toLocaleTimeString('es-PR',{hour:'numeric',minute:'2-digit'})+'. El negocio confirmará tu cita al validar el depósito.'
+    : state.selectedServices.map(function(s){ return s.name; }).join(' + ')+' · '+when.toLocaleDateString('es-PR',{weekday:'long',day:'numeric',month:'long'})+' a las '+when.toLocaleTimeString('es-PR',{hour:'numeric',minute:'2-digit'});
   document.getElementById('okCode').textContent = (appt&&appt.confirmation_code) || (state.appt&&state.appt.confirmation_code) || '—';
   document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('on'); });
   document.getElementById('stepOk').classList.add('on');
@@ -1626,9 +1629,9 @@ function renderPayStep(appt, depCents){
     man.innerHTML =
       '<div class="paybtn" style="cursor:default;align-items:flex-start"><span class="pmico">'+ICONS.phone2+'</span>'+
       '<span class="pmtxt">Paga por ATH Móvil al <b>'+esc(athM.phone)+'</b>'+
-      '<small>Luego escribe el número de referencia para confirmar.</small></span></div>'+
+      '<small>Escribe tu número de referencia; el negocio validará tu pago y confirmará la cita.</small></span></div>'+
       '<div class="field"><label>Número de referencia ATH</label><input id="athRef" placeholder="Ej. 123456789"></div>'+
-      '<button class="btn btn-teal" id="athManualBtn">Confirmar depósito →</button>';
+      '<button class="btn btn-teal" id="athManualBtn">Reportar pago →</button>';
     host.appendChild(man);
     document.getElementById('athManualBtn').onclick = function(){
       var ref = (document.getElementById('athRef').value||'').trim();
@@ -1671,6 +1674,16 @@ function renderPayStep(appt, depCents){
     host.appendChild(sbl);
   }
 
+  // ── Efectivo (en persona): la cita queda PENDIENTE y el negocio la valida/acepta ──
+  if(cfg.cash && cfg.cash.enabled){
+    hasAny = true;
+    var cb = document.createElement('button');
+    cb.className='paybtn'; cb.type='button';
+    cb.innerHTML = '<span class="pmico">'+ICONS.card+'</span><span class="pmtxt">Pagar en persona (efectivo)<small>El negocio confirma tu cita al recibir el depósito</small></span>';
+    cb.onclick = function(){ submitCashDeposit(code, cb); };
+    host.appendChild(cb);
+  }
+
   // ── Saltar el depósito (la cita ya quedó reservada) ──
   var skip = document.createElement('div');
   skip.className='pay-skip';
@@ -1686,15 +1699,32 @@ function renderPayStep(appt, depCents){
 // POST /api/public/:slug/appointments/:code/ath/confirm {reference}
 async function submitAthConfirm(code, reference, btnEl){
   clearAlert('payAlert');
-  if(btnEl){ btnEl.disabled=true; btnEl.textContent='Confirmando…'; }
-  var res = await api('POST', '/public/'+encodeURIComponent(SLUG)+'/appointments/'+encodeURIComponent(code)+'/ath/confirm', { reference: reference });
+  if(btnEl){ btnEl.disabled=true; btnEl.textContent='Enviando…'; }
+  // ATH MANUAL: el cliente REPORTA su referencia; el NEGOCIO la valida y acepta la
+  // cita (no se auto-confirma). La cita queda pendiente hasta que el negocio valide.
+  var res = await api('POST', '/public/appointments/'+encodeURIComponent(code)+'/ath-reference', { reference: reference });
   if(res.ok){
-    showAlert('payAlert','Pago confirmado. ¡Tu cita está asegurada!');
+    showAlert('payAlert','Recibido. El negocio validará tu pago y confirmará la cita.');
     document.getElementById('payAlert').className='alert ok';
-    setTimeout(function(){ showOkStep(state.appt); }, 1100);
+    setTimeout(function(){ showOkStep(state.appt); }, 1400);
   } else {
-    if(btnEl){ btnEl.disabled=false; btnEl.textContent='Confirmar depósito →'; }
-    showAlert('payAlert', (res.data && res.data.error) || 'No pudimos confirmar el pago. Intenta de nuevo.');
+    if(btnEl){ btnEl.disabled=false; btnEl.textContent='Reportar pago →'; }
+    showAlert('payAlert', (res.data && res.data.error) || 'No pudimos registrar el pago. Intenta de nuevo.');
+  }
+}
+
+// Depósito EN EFECTIVO: la cita queda pendiente y el negocio la valida/acepta al recibirlo.
+async function submitCashDeposit(code, btnEl){
+  clearAlert('payAlert');
+  if(btnEl){ btnEl.disabled=true; }
+  var res = await api('POST', '/public/'+encodeURIComponent(SLUG)+'/appointments/'+encodeURIComponent(code)+'/deposit-cash', {});
+  if(res.ok){
+    showAlert('payAlert','Listo. Tu cita queda pendiente — el negocio la confirmará al recibir el depósito.');
+    document.getElementById('payAlert').className='alert ok';
+    setTimeout(function(){ showOkStep(state.appt); }, 1400);
+  } else {
+    if(btnEl){ btnEl.disabled=false; }
+    showAlert('payAlert', (res.data && res.data.error) || 'No se pudo registrar. Intenta de nuevo.');
   }
 }
 

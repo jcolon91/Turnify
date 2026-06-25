@@ -1490,6 +1490,13 @@ app.patch('/api/services/:id', authRequired, businessScope, asyncH(async (req, r
       await db.query(
         `INSERT INTO service_staff SELECT $1, id FROM staff WHERE id = $2 AND business_id = $3
          ON CONFLICT DO NOTHING`, [req.params.id, sid, req.business.id]);
+    // Si quedó SIN staff (lista vacía o inválida) → ligar a TODO el staff activo,
+    // para que "cualquiera" siga mostrando turnos (no dejar el servicio huérfano).
+    const hasStaff = await db.query(`SELECT 1 FROM service_staff WHERE service_id = $1 LIMIT 1`, [req.params.id]);
+    if (!hasStaff.rows[0])
+      await db.query(
+        `INSERT INTO service_staff SELECT $1, id FROM staff WHERE business_id = $2 AND is_active AND deleted_at IS NULL
+         ON CONFLICT DO NOTHING`, [req.params.id, req.business.id]);
   }
   if (!sets.length) return res.json({ ok: true });
   vals.push(req.params.id, req.business.id);
@@ -1582,11 +1589,14 @@ async function staffDaySlots(biz, staffId, dateStr, durationMin) {
 async function eligibleStaff(bizId, serviceId, dateStr) {
   const { start, end } = dayBounds(dateStr);
   const { rows } = await db.query(
-    `SELECT st.id FROM service_staff ss
-       JOIN staff st ON st.id = ss.staff_id
+    `SELECT st.id FROM staff st
        LEFT JOIN appointments a ON a.staff_id = st.id AND a.status = ANY($4)
             AND a.starts_at < $3 AND a.ends_at > $2
-      WHERE ss.service_id = $1 AND st.business_id = $5 AND st.is_active AND st.deleted_at IS NULL
+      WHERE st.business_id = $5 AND st.is_active AND st.deleted_at IS NULL
+        AND (
+          EXISTS (SELECT 1 FROM service_staff ss WHERE ss.service_id = $1 AND ss.staff_id = st.id)
+          OR NOT EXISTS (SELECT 1 FROM service_staff ss WHERE ss.service_id = $1)
+        )
       GROUP BY st.id ORDER BY count(a.id) ASC`,
     [serviceId, start, end, ALIVE, bizId]);
   return rows.map(r => r.id);
@@ -1855,6 +1865,8 @@ app.get('/api/public/:slug', publicLimiter, asyncH(async (req, res) => {
       payment_link: (stRow.config && stRow.config.stripe_payment_link) || null,
       connected: !!(stRow.config && (stRow.config.stripe_payment_link || stRow.config.stripe_account_id)),
     } : { connected: false },
+    // Efectivo: el cliente paga en persona; el negocio valida y acepta la cita.
+    cash: byProv['cash'] ? { enabled: true } : null,
   };
   res.json({
     business: biz, services: services.rows, staff: staff.rows, hours: hours.rows, reviews: reviews.rows,
@@ -2077,8 +2089,11 @@ app.post('/api/public/:slug/appointments', bookingLimiter, asyncH(async (req, re
       validFor.push(id);
   if (!validFor.length) return bad(res, 'Ese turno ya no está disponible. Escoge otro.', 409);
 
-  const depositsOn = biz.deposits_enabled && payment_method !== undefined;
-  const deposit = depositsOn ? (service.deposit_cents ?? biz.deposit_default_cents) : 0;
+  // El depósito se exige si el negocio lo tiene activo y el servicio (o el default)
+  // tiene monto > 0. NO depende de que el cliente mande payment_method (eso mataba
+  // el depósito: nunca aparecía el paso de pago al agendar).
+  const depositsOn = !!biz.deposits_enabled;
+  const deposit = depositsOn ? (service.deposit_cents || biz.deposit_default_cents || 0) : 0;
   const method = payment_method === 'card' ? 'card' : 'ath_movil';
   const phoneN = normPhone(phone);
 
@@ -2136,7 +2151,7 @@ app.post('/api/public/:slug/appointments', bookingLimiter, asyncH(async (req, re
     await client.query('COMMIT');
 
     const st = await db.query(`SELECT display_name FROM staff WHERE id = $1`, [appt.staff_id]);
-    await notify(biz.id, 'new_appointment', '📅 Nueva cita',
+    await notify(biz.id, 'new_appointment', deposit > 0 ? '📅 Nueva cita — pendiente de depósito' : '📅 Nueva cita',
       `${full_name.trim()} · ${service.name} · ${starts.toLocaleString('es-PR', { timeZone: 'America/Puerto_Rico', dateStyle: 'short', timeStyle: 'short' })}`,
       { appointment_id: appt.id });
 
@@ -2243,6 +2258,23 @@ app.post('/api/public/:slug/appointments/:code/ath/confirm', codeLimiter, asyncH
   await notify(a.business_id, 'payment', 'Pago ATH Móvil recibido',
     `Ref ${reference.trim()} · ${a.service_name}`, { appointment_id: a.id });
   res.json({ ok: true, status: 'confirmed' });
+}));
+
+// Cliente elige pagar el depósito EN EFECTIVO (en persona). Marca el método del
+// depósito como 'cash' y NOTIFICA al profesional para que valide y ACEPTE la cita.
+// NO confirma: la cita queda 'pending_deposit' hasta que el negocio la valide.
+app.post('/api/public/:slug/appointments/:code/deposit-cash', codeLimiter, asyncH(async (req, res) => {
+  const { rows } = await db.query(
+    `UPDATE payments p SET method = 'cash'
+       FROM appointments a, businesses b
+      WHERE p.appointment_id = a.id AND a.business_id = b.id
+        AND b.slug = $1 AND b.deleted_at IS NULL
+        AND a.confirmation_code = $2 AND p.kind = 'deposit' AND p.status = 'pending'
+      RETURNING a.business_id, a.id, a.service_name`, [req.params.slug, req.params.code.toUpperCase()]);
+  if (!rows[0]) return bad(res, 'Cita o depósito no encontrado', 404);
+  await notify(rows[0].business_id, 'payment', '💵 Depósito en efectivo por validar',
+    `${rows[0].service_name} · valida y acepta la cita`, { appointment_id: rows[0].id });
+  res.json({ ok: true, message: 'El negocio confirmará tu cita al recibir el depósito' });
 }));
 
 // ── ATH Móvil AUTO por API REST (mismo flujo PROBADO del cobro de plataforma) ──
@@ -2764,19 +2796,20 @@ const fmtPR = d => new Date(d).toLocaleString('es-PR',
 function buildMessage(template, ctx) {
   const { biz, appt } = ctx;
   const when = appt?.starts_at ? fmtPR(appt.starts_at) : '';
-  // Ubicación reutilizable (dirección + enlace al mapa). Se incluye en TODOS los
-  // mensajes de cita, no solo en algunos.
+  // Ubicación (dirección + enlace al mapa). SOLO va en el recordatorio de 2 horas
+  // antes (cuando el cliente va saliendo) — no en la confirmación ni en los recordatorios
+  // lejanos. Si el negocio no puso ubicación (lat/lng null), no aparece ningún pin.
   const loc = (biz.address_line ? `📍 ${biz.address_line}\n` : '')
     + (biz.lat != null && biz.lng != null ? `🗺 Cómo llegar: https://www.google.com/maps/search/?api=1&query=${biz.lat},${biz.lng}\n` : '');
   switch (template) {
     case 'confirm':
-      return `✅ *${biz.name}*\nTu cita quedó ${appt.status === 'pending_deposit' ? 'reservada (pendiente de depósito)' : 'confirmada'}:\n\n💈 ${appt.service_name}\n🗓 ${when}\n🎟 Código: ${appt.confirmation_code}\n${loc}${appt.status === 'pending_deposit' && biz.ath_phone ? `\nPara confirmar, envía el depósito de $${(appt.deposit_cents / 100).toFixed(2)} por ATH Móvil a ${biz.ath_phone} y responde con tu referencia.` : ''}`;
+      return `✅ *${biz.name}*\nTu cita quedó ${appt.status === 'pending_deposit' ? 'reservada (pendiente de depósito)' : 'confirmada'}:\n\n💈 ${appt.service_name}\n🗓 ${when}\n🎟 Código: ${appt.confirmation_code}\n${appt.status === 'pending_deposit' && biz.ath_phone ? `\nPara confirmar, envía el depósito de $${(appt.deposit_cents / 100).toFixed(2)} por ATH Móvil a ${biz.ath_phone} y responde con tu referencia.` : ''}`;
     case 'reminder_48h':
-      return `📅 *${biz.name}*\nTu cita es en 2 días:\n\n💈 ${appt.service_name}\n🗓 ${when}\n${loc}\nSi necesitas mover la fecha, este es buen momento para avisarnos. Responde aquí.`;
+      return `📅 *${biz.name}*\nTu cita es en 2 días:\n\n💈 ${appt.service_name}\n🗓 ${when}\n\nSi necesitas mover la fecha, este es buen momento para avisarnos. Responde aquí.`;
     case 'reminder_24h':
-      return `⏰ *Recordatorio — ${biz.name}*\nTu cita es mañana:\n\n💈 ${appt.service_name}\n🗓 ${when}\n${loc}\nSi no puedes llegar, avísanos respondiendo aquí. 🙏`;
+      return `⏰ *Recordatorio — ${biz.name}*\nTu cita es mañana:\n\n💈 ${appt.service_name}\n🗓 ${when}\n\nSi no puedes llegar, avísanos respondiendo aquí. 🙏`;
     case 'reminder_1h':
-      return `🔔 *${biz.name}*\n¡Te esperamos en 1 hora!\n\n💈 ${appt.service_name}\n🗓 ${when}\n${loc}`;
+      return `🔔 *${biz.name}*\n¡Te esperamos en 1 hora!\n\n💈 ${appt.service_name}\n🗓 ${when}`;
     case 'reminder_2h':
       return `🔔 *${biz.name}*\n¡Te esperamos en 2 horas!\n\n💈 ${appt.service_name}\n🗓 ${when}\n${loc}`;
     case 'manual_assign':
@@ -2999,8 +3032,8 @@ function emailAppt(template, ctx) {
     ['Servicio', svc],
     ['Fecha', when],
     code ? ['Código', code] : null,
-    addr ? ['Lugar', addr] : null,
-    mapUrl
+    (template === 'reminder_2h' && addr) ? ['Lugar', addr] : null,
+    (template === 'reminder_2h' && mapUrl)
       ? ['Cómo llegar', `<a href="${mapUrl}" style="color:#0A5B52;text-decoration:none">Ver en el mapa</a>`] : null,
   ].filter(Boolean);
   const rowsHtml = rowsArr.map(([k, v], i) =>
