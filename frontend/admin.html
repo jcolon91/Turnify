@@ -325,11 +325,12 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
       <div class="mfield">
         <div style="width:120px">
           <label>Semanas</label>
-          <input id="mgWeeks" type="number" value="4" min="1" max="52" style="width:100%">
+          <input id="mgWeeks" type="number" value="4" min="0" max="52" style="width:100%">
         </div>
         <button id="mgFeatSave" class="actbtn">Destacar</button>
+        <button id="mgUnfeat" class="actbtn" style="background:var(--card-soft);color:var(--text)">Quitar destacado</button>
       </div>
-      <p class="muted" style="font-size:11.5px;margin-top:8px">Aparece primero en su municipio y categoría por el número de semanas indicado.</p>
+      <p class="muted" style="font-size:11.5px;margin-top:8px">Aparece primero en su municipio y categoría por el número de semanas indicado. Usa 0 (o "Quitar destacado") para des-destacar el negocio.</p>
     </div>
 
     <div style="display:flex;gap:8px;margin-top:18px">
@@ -831,11 +832,10 @@ document.getElementById('mgPlanSave').onclick = async function(){
   btn.disabled = false; btn.textContent = 'Aplicar';
 };
 
-document.getElementById('mgFeatSave').onclick = async function(){
+async function mgSetFeatured(weeks, btn, restoreLabel){
   if(!mgCurrentId) return;
-  var weeks = parseInt(document.getElementById('mgWeeks').value,10) || 0;
-  if(weeks < 1 || weeks > 52){ mgFlash(false, 'Semanas entre 1 y 52'); return; }
-  var btn = this; btn.disabled = true; btn.textContent = '…';
+  if(weeks !== 0 && (weeks < 1 || weeks > 52)){ mgFlash(false, 'Semanas entre 0 y 52'); return; }
+  btn.disabled = true; var prev = btn.textContent; btn.textContent = '…';
   try{
     var r = await fetch(API + '/admin/businesses/' + mgCurrentId + '/featured', {
       method:'POST',
@@ -843,10 +843,23 @@ document.getElementById('mgFeatSave').onclick = async function(){
       body: JSON.stringify({ weeks: weeks })
     });
     var data = await r.json().catch(function(){ return {}; });
-    if(r.ok){ mgFlash(true, 'Destacado activado por ' + weeks + ' semana' + (weeks===1?'':'s')); }
-    else { mgFlash(false, data.error || 'No se pudo activar el destacado'); }
+    if(r.ok){
+      if(weeks === 0){ mgFlash(true, 'Destacado retirado'); }
+      else { mgFlash(true, 'Destacado activado por ' + weeks + ' semana' + (weeks===1?'':'s')); }
+    }
+    else { mgFlash(false, data.error || (weeks===0 ? 'No se pudo quitar el destacado' : 'No se pudo activar el destacado')); }
   }catch(e){ mgFlash(false, 'Error de conexión'); }
-  btn.disabled = false; btn.textContent = 'Destacar';
+  btn.disabled = false; btn.textContent = restoreLabel || prev;
+}
+
+document.getElementById('mgFeatSave').onclick = function(){
+  var weeks = parseInt(document.getElementById('mgWeeks').value,10);
+  if(isNaN(weeks)) weeks = 0;
+  mgSetFeatured(weeks, this, 'Destacar');
+};
+
+document.getElementById('mgUnfeat').onclick = function(){
+  mgSetFeatured(0, this, 'Quitar destacado');
 };
 
 // ── Ganancias: analytics por negocio ──

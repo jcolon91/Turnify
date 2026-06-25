@@ -1349,6 +1349,31 @@ app.post('/api/staff/:id/invite', authRequired, businessScope, asyncH(async (req
   res.status(201).json({ code });
 }));
 
+// El dueño genera un código a NIVEL DE NEGOCIO (sin atarlo a un profesional).
+// Al canjearlo se CREA un profesional nuevo ligado al usuario. Devuelve { code }.
+app.post('/api/team/invite', authRequired, businessScope, asyncH(async (req, res) => {
+  // Inserta con reintento: si el code choca (UNIQUE), genera otro.
+  // staff_id queda NULL (invite del negocio); expira en 30 días.
+  let code = null;
+  for (let i = 0; i < 5; i++) {
+    const candidate = inviteCode();
+    try {
+      const { rows } = await db.query(
+        `INSERT INTO staff_invites (business_id, staff_id, code, expires_at)
+         VALUES ($1, NULL, $2, now() + interval '30 days') RETURNING code`,
+        [req.business.id, candidate]);
+      code = rows[0].code;
+      break;
+    } catch (e) {
+      if (e.code === '23505') continue;   // colisión de code: reintenta
+      throw e;
+    }
+  }
+  if (!code) return bad(res, 'No se pudo generar el código. Intenta de nuevo.', 500);
+  await audit(req, 'team.invite', 'business', req.business.id);
+  res.status(201).json({ code });
+}));
+
 // Cualquier usuario autenticado canjea un código para unirse a un equipo.
 app.post('/api/team/join', authRequired, asyncH(async (req, res) => {
   const raw = (req.body || {}).code;
@@ -1369,9 +1394,20 @@ app.post('/api/team/join', authRequired, asyncH(async (req, res) => {
       return bad(res, 'Código inválido o expirado');
     }
     const { id, business_id, staff_id } = inv.rows[0];
-    await client.query(
-      `UPDATE staff SET user_id = $1 WHERE id = $2 AND business_id = $3`,
-      [req.user.id, staff_id, business_id]);
+    if (staff_id) {
+      // Invite viejo por-staff: liga ese profesional existente al usuario.
+      await client.query(
+        `UPDATE staff SET user_id = $1 WHERE id = $2 AND business_id = $3`,
+        [req.user.id, staff_id, business_id]);
+    } else {
+      // Invite del negocio: crea un profesional nuevo ligado al usuario.
+      // display_name (NOT NULL) usa el nombre del usuario; el resto va por default.
+      const name = (req.user.full_name || '').trim() || 'Profesional';
+      await client.query(
+        `INSERT INTO staff (business_id, user_id, display_name)
+         VALUES ($1, $2, $3)`,
+        [business_id, req.user.id, name]);
+    }
     await client.query(
       `UPDATE staff_invites SET used_at = now(), used_by_user_id = $1 WHERE id = $2`,
       [req.user.id, id]);

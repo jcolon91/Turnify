@@ -56,10 +56,23 @@ module.exports.mount = function (app, ctx) {
   // ==========================================================================
   //  ADD-ONS
   // ==========================================================================
+  // Orden de planes (gratis < pro < studio < team < grande < ilimitado).
+  const PLAN_ORDER = ['free', 'pro', 'studio', 'team', 'grande', 'ilimitado'];
+  // ¿el plan del negocio es >= al mínimo requerido?
+  const planAtLeast = (planCode, minCode) => {
+    const cur = PLAN_ORDER.indexOf(planCode);
+    const min = PLAN_ORDER.indexOf(minCode);
+    return cur >= 0 && min >= 0 && cur >= min;
+  };
+
   // "Contabilidad completa" (employee_accounting) va INCLUIDA en planes Pro o
   // superior: cualquier plan distinto de 'free'. El front deshabilita ese add-on
   // cuando accounting_included = true (ya lo tiene por el plan; no se cobra aparte).
   const accountingIncluded = planCode => planCode !== 'free';
+
+  // Add-ons de contabilidad del negocio que NO se ofrecen en el panel del negocio
+  // (la contabilidad completa va incluida desde Pro; las de empleados no aplican aquí).
+  const ACCOUNTING_ADDON_CODES = ['employee_accounting', 'advanced_reports', 'accounting', 'business_accounting'];
 
   app.get('/api/addons/catalog', asyncH(async (_req, res) => {
     // Catálogo completo: incluye automáticamente 'payroll' y 'employee_accounting'
@@ -74,13 +87,22 @@ module.exports.mount = function (app, ctx) {
       `SELECT a.code, a.status, a.price_cents, a.activated_at, c.name, c.billing, c.description
          FROM addons a JOIN addon_catalog c ON c.code = a.code
         WHERE a.business_id = $1 ORDER BY a.activated_at DESC`, [req.business.id]);
-    // Catálogo completo (incluye 'payroll' y 'employee_accounting' de la migración 17)
-    // + indicador de que la contabilidad completa ya viene con el plan Pro o superior.
+    // Catálogo completo (incluye 'payroll' y 'employee_accounting' de la migración 17).
+    // CONSISTENCIA con GET /api/account/addons (el que alimenta el panel):
+    //   · Excluimos los add-ons de contabilidad del negocio (no se ofrecen aquí;
+    //     la contabilidad completa ya viene incluida desde Pro).
+    //   · Payroll requiere Studio o superior: en planes inferiores se marca locked.
     const cat = await db.query(
       `SELECT code, name, price_cents, billing, description FROM addon_catalog ORDER BY price_cents`);
+    const studioPlus = planAtLeast(req.business.plan_code, 'studio');
+    const catalog = cat.rows
+      .filter(c => !ACCOUNTING_ADDON_CODES.includes(c.code))
+      .map(c => (c.code === 'payroll' && !studioPlus)
+        ? { ...c, locked: true, requires_plan: 'studio', locked_reason: 'Disponible desde el plan Studio' }
+        : c);
     res.json({
       addons: rows,
-      catalog: cat.rows,
+      catalog,
       accounting_included: accountingIncluded(req.business.plan_code),
     });
   }));
@@ -98,6 +120,10 @@ module.exports.mount = function (app, ctx) {
     // no se cobra como add-on a esos planes (el front también lo deshabilita).
     if (code === 'employee_accounting' && accountingIncluded(req.business.plan_code))
       return bad(res, 'La contabilidad completa ya está incluida en tu plan', 409);
+
+    // Payroll ($9.99) requiere plan Studio o superior. En gratis/pro se rechaza.
+    if (code === 'payroll' && !planAtLeast(req.business.plan_code, 'studio'))
+      return bad(res, 'Disponible desde el plan Studio', 403);
 
     const price = cat.rows[0].price_cents;
 
@@ -526,32 +552,51 @@ module.exports.mount = function (app, ctx) {
   }));
 
   // ==========================================================================
-  //  DESTACADOS PAGADOS (featured) — por semana, por pueblo+categoría
+  //  DESTACADOS PAGADOS (featured) — por BLOQUE de 3 días, por pueblo+categoría
+  // --------------------------------------------------------------------------
+  //  Precio: $45 por bloque de 3 días (4500 centavos / 3 días). El parámetro
+  //  `weeks` del body representa el número de BLOQUES de 3 días (compatibilidad
+  //  con el panel, que sigue enviando `weeks` y multiplica el precio por ese
+  //  número). El campo `week_price_cents` que devuelve /status es el precio POR
+  //  BLOQUE para que el monto ATH del panel cuadre. No dependemos del catálogo:
+  //  el precio del bloque es fijo en el backend (4500) para no requerir cambio
+  //  de schema en addon_catalog.
   // ==========================================================================
+  const FEATURED_BLOCK_DAYS = 3;
+  const FEATURED_BLOCK_CENTS = 4500; // $45 por bloque de 3 días
+
   app.get('/api/featured/status', authRequired, businessScope, asyncH(async (req, res) => {
     const { rows } = await db.query(
       `SELECT id, municipality_id, category_id, starts_at, ends_at
          FROM featured_listings
         WHERE business_id = $1 AND ends_at > now() ORDER BY ends_at DESC`, [req.business.id]);
-    const wp = await db.query(`SELECT price_cents FROM addon_catalog WHERE code = 'featured'`);
-    res.json({ active: rows, week_price_cents: wp.rows[0] ? wp.rows[0].price_cents : 0 });
+    // week_price_cents = precio por bloque (3 días); se conserva el nombre del campo
+    // por compatibilidad con el panel, que lo usa como precio unitario para el ATH.
+    res.json({
+      active: rows,
+      week_price_cents: FEATURED_BLOCK_CENTS,
+      block_price_cents: FEATURED_BLOCK_CENTS,
+      block_days: FEATURED_BLOCK_DAYS,
+    });
   }));
 
   app.post('/api/featured/purchase', authRequired, businessScope, asyncH(async (req, res) => {
+    // `weeks` = cantidad de bloques de 3 días (lo manda el panel con ese nombre).
     const { weeks } = req.body || {};
-    if (!Number.isInteger(weeks) || weeks < 1 || weeks > 12) return bad(res, 'Entre 1 y 12 semanas');
+    const blocks = weeks;
+    if (!Number.isInteger(blocks) || blocks < 1 || blocks > 12) return bad(res, 'Entre 1 y 12 bloques de 3 días');
     if (!req.business.municipality_id) return bad(res, 'Configura el municipio de tu negocio primero');
 
-    const price = await db.query(`SELECT price_cents FROM addon_catalog WHERE code = 'featured'`);
-    const total = price.rows[0].price_cents * weeks;
+    const total = FEATURED_BLOCK_CENTS * blocks;
+    const days = FEATURED_BLOCK_DAYS * blocks;
 
     // SEGURIDAD: el destacado afecta a TODO el marketplace. NO se concede sin pago
     // confirmado; el admin lo activa al cobrar (POST /api/admin/businesses/:id/featured).
     // SIEMPRE 402 → "si no pagas, no lo tienes".
-    await audit(req, 'featured.request', 'featured', null, { weeks, total });
+    await audit(req, 'featured.request', 'featured', null, { blocks, days, total });
     await notify(req.business.id, 'system', 'Solicitud de destacado recibida',
-      `Pediste ${weeks} semana(s) de destacado. Te lo activamos al confirmar el pago.`, { weeks });
-    return bad(res, `Para destacar tu negocio ${weeks} semana(s) ($${(total / 100).toFixed(2)}) confirma el pago. Te lo activamos enseguida.`, 402);
+      `Pediste ${blocks} bloque(s) de 3 días (${days} días) de destacado. Te lo activamos al confirmar el pago.`, { blocks, days });
+    return bad(res, `Para destacar tu negocio ${blocks} bloque(s) de 3 días ($${(total / 100).toFixed(2)}) confirma el pago. Te lo activamos enseguida.`, 402);
   }));
 
   console.log('  ✓ módulo revenue montado (productos, gift cards, add-ons, destacados)');

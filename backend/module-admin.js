@@ -365,13 +365,28 @@ function mount(app, { db, authRequired, h }) {
   // ── POST /api/admin/businesses/:id/featured ───────────────────────────────
   // Conceder destacado por N semanas TRAS confirmar el pago.
   // Body: { weeks, municipality_id?, category_id? }
+  // Des-destacar: { weeks: 0 } ó { unfeature: true } → expira destacados vigentes
+  // y pone businesses.is_featured = false.
   app.post('/api/admin/businesses/:id/featured', authRequired, adminRequired, asyncH(async (req, res) => {
     if (!isUuid(req.params.id)) return bad(res, 'ID inválido');
     const weeks = Number.isInteger(req.body?.weeks) ? req.body.weeks : 0;
-    if (weeks < 1 || weeks > 52) return bad(res, 'Semanas entre 1 y 52');
+    const unfeature = req.body?.unfeature === true || weeks === 0;
+    if (!unfeature && (weeks < 1 || weeks > 52)) return bad(res, 'Semanas entre 1 y 52');
     const biz = await db.query(
       `SELECT id, municipality_id FROM businesses WHERE id = $1 AND deleted_at IS NULL`, [req.params.id]);
     if (!biz.rows[0]) return bad(res, 'Negocio no encontrado', 404);
+
+    // Des-destacar: expira los listings vigentes y baja la bandera.
+    if (unfeature) {
+      const upd = await db.query(
+        `UPDATE featured_listings SET ends_at = now()
+          WHERE business_id = $1 AND ends_at > now()`, [req.params.id]);
+      await db.query(`UPDATE businesses SET is_featured = false WHERE id = $1`, [req.params.id]);
+      await notify(req.params.id, 'system', 'Destacado retirado',
+        'Tu negocio ya no aparece destacado en su municipio y categoría.', {});
+      await audit(req, 'admin.featured.revoke', 'business', req.params.id, { expired: upd.rowCount });
+      return res.json({ ok: true, unfeatured: true, expired: upd.rowCount });
+    }
 
     const muni = Number.isInteger(req.body?.municipality_id) ? req.body.municipality_id : biz.rows[0].municipality_id;
     let catId = Number.isInteger(req.body?.category_id) ? req.body.category_id : null;

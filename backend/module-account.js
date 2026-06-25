@@ -138,10 +138,30 @@ module.exports.mount = function (app, ctx) {
     return res.status(402).json({ error: 'El cambio a un plan de pago se activa al confirmar el pago.', pending: true });
   }));
 
+  // Helper de rango de plan: ¿el plan del negocio es >= al mínimo requerido?
+  // Usa PLAN_ORDER (gratis < pro < studio < team < grande < ilimitado).
+  const planAtLeast = (planCode, minCode) => {
+    const cur = PLAN_ORDER.indexOf(planCode);
+    const min = PLAN_ORDER.indexOf(minCode);
+    return cur >= 0 && min >= 0 && cur >= min;
+  };
+
+  // Add-ons de CONTABILIDAD del negocio que NO deben ofrecerse en el panel del
+  // negocio: la contabilidad completa va INCLUIDA desde el plan Pro, y
+  // 'employee_accounting' es SOLO para empleados (no para el panel del negocio).
+  // 'advanced_reports' (si existe en el catálogo) sería un duplicado confuso.
+  const ACCOUNTING_ADDON_CODES = ['employee_accounting', 'advanced_reports', 'accounting', 'business_accounting'];
+
   // ──────────────────────────────────────────────────────────────────────────
   // GET /api/account/addons — catálogo de add-ons + estado del negocio
   //   → [{ code, name, price_cents, billing, description, is_active }]
   //   is_active = el negocio tiene ese add-on con status 'active'.
+  //   REGLAS de negocio (alimenta el panel — loadAddons en panel.html):
+  //     · Contabilidad: NO se ofrece como add-on (incluida desde Pro; las de
+  //       empleados no van en el panel del negocio) → se EXCLUYE del listado.
+  //     · Payroll ($9.99): solo activable desde el plan Studio o superior; en
+  //       planes inferiores se devuelve con locked=true para que el panel lo
+  //       muestre bloqueado en vez de activable.
   // ──────────────────────────────────────────────────────────────────────────
   app.get('/api/account/addons', authRequired, businessScope, asyncH(async (req, res) => {
     const { rows } = await db.query(
@@ -153,7 +173,23 @@ module.exports.mount = function (app, ctx) {
                AND a.business_id = $1
                AND a.status = 'active'
         ORDER BY c.price_cents`, [req.business.id]);
-    res.json({ addons: rows });
+
+    const studioPlus = planAtLeast(req.business.plan_code, 'studio');
+
+    const addons = rows
+      // Excluir cualquier add-on de contabilidad del negocio (no se ofrece aquí).
+      .filter(a => !ACCOUNTING_ADDON_CODES.includes(a.code))
+      .map(a => {
+        // Payroll requiere plan Studio o superior: en planes inferiores se marca
+        // bloqueado (locked) con el motivo, para que el panel no permita activarlo.
+        if (a.code === 'payroll' && !studioPlus) {
+          return { ...a, locked: true, requires_plan: 'studio',
+            locked_reason: 'Disponible desde el plan Studio' };
+        }
+        return a;
+      });
+
+    res.json({ addons });
   }));
 
   // ──────────────────────────────────────────────────────────────────────────

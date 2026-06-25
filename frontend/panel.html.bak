@@ -408,27 +408,7 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
           <div><h1>Equipo</h1><p>Los profesionales de tu negocio.</p></div>
           <button class="btn btn-teal btn-sm" id="addStaffBtn">+ Añadir</button>
         </div>
-        <!-- Código de invitación a nivel del negocio (un solo código para todo el equipo) -->
-        <div style="background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:16px">
-          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:space-between">
-            <div style="font-size:13.5px;color:var(--ink2);line-height:1.5">Invita a una persona a unirse a tu negocio como empleado.</div>
-            <button class="btn btn-teal btn-sm" id="teamInviteBtn" type="button" style="flex:none">Generar código de invitación</button>
-          </div>
-          <div id="teamInviteBox" style="display:none;margin-top:12px;background:var(--green-soft);border-radius:10px;padding:12px 14px">
-            <div style="font-family:var(--mono);font-size:18px;font-weight:800;color:var(--green);letter-spacing:1px;word-break:break-all" id="teamInviteCode"></div>
-            <p style="font-size:13px;color:var(--ink2);margin-top:8px;line-height:1.5">Dale este código a la persona para que se una a tu negocio desde su cuenta (cliente.html → ¿Eres empleado?).</p>
-          </div>
-          <div class="alert" id="teamInviteAlert"></div>
-        </div>
         <div id="staffList"></div>
-
-        <!-- Payroll: visible solo cuando el add-on 'payroll' está activo -->
-        <div id="payrollSection" style="display:none;margin-top:28px;padding-top:20px;border-top:1px solid var(--line)">
-          <div class="seclabel">Pagos al equipo (Payroll)</div>
-          <p style="font-size:13px;color:var(--ink2);margin-bottom:12px">Informa cuánto le pagas a cada persona del equipo.</p>
-          <div id="payrollList"></div>
-          <div class="alert" id="payrollAlert"></div>
-        </div>
       </section>
 
       <section class="view" id="view-clientes">
@@ -764,13 +744,13 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
         <!-- Destacar mi negocio -->
         <div class="card">
           <div class="seclabel">Destacar mi negocio</div>
-          <p style="font-size:13px;color:var(--ink2);margin-bottom:6px">Aparece arriba en el buscador y en el inicio por los períodos de 3 días que elijas. Desde $45 por 3 días.</p>
+          <p style="font-size:13px;color:var(--ink2);margin-bottom:6px">Aparece arriba en el buscador por las semanas que elijas.</p>
           <div class="alert" id="featAlert"></div>
           <div id="featStatus" style="font-size:13px;color:var(--ink2);margin-bottom:12px"></div>
           <div id="featPrice" style="font-family:var(--mono);font-size:13.5px;color:var(--green);font-weight:700;margin-bottom:12px;display:none"></div>
           <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
             <div class="field" style="margin-bottom:0;max-width:160px">
-              <label>Períodos (3 días c/u)</label>
+              <label>Semanas</label>
               <select id="featWeeks"></select>
             </div>
             <button class="btn btn-teal btn-sm" id="featBuyBtn" style="padding:11px 18px">Destacar</button>
@@ -1041,27 +1021,6 @@ let PLAN_NAME = 'Tu plan';
 let FEAT_WEEK_CENTS = 0;          // precio por semana de destacado (informativo, lo valida el backend)
 const ADDON_HIDDEN = ['sms','custom_domain'];   // no se usan aún: no mostrar
 const ADDON_STORE = ['store_10','store_25'];    // tiendas: avisar si se activan ambas
-// Add-ons de contabilidad del NEGOCIO: NO son add-ons, son feature de plan (Pro+).
-// 'employee_accounting' es solo para empleados. Se filtran del panel del negocio.
-const ADDON_ACCOUNTING = ['advanced_reports','employee_accounting','accounting','contabilidad'];
-// Orden de planes: gratis < pro < studio < team < grande < ilimitado
-const PLAN_ORDER = ['free','gratis','pro','studio','team','grande','ilimitado','unlimited'];
-function planRank(code){
-  var c = (code || 'free').toLowerCase();
-  if(c === 'gratis') c = 'free';
-  if(c === 'unlimited') c = 'ilimitado';
-  var idx = PLAN_ORDER.indexOf(c);
-  // tratar gratis/free como mismo nivel 0
-  if(c === 'free') return 0;
-  if(c === 'pro') return 1;
-  if(c === 'studio') return 2;
-  if(c === 'team') return 3;
-  if(c === 'grande') return 4;
-  if(c === 'ilimitado') return 5;
-  return idx === -1 ? 0 : idx;
-}
-// ¿El plan actual está en Studio o superior?
-function planIsStudioPlus(){ return planRank(BIZ && BIZ.plan_code) >= planRank('studio'); }
 
 // ── Días libres / bloqueos ─────────────────────────────────────────────────
 async function loadBlocks(){
@@ -1319,10 +1278,27 @@ async function loadStaff(){
     var av = s.avatar_url
       ? '<img src="'+esc(s.avatar_url)+'" alt="" style="width:46px;height:46px;border-radius:50%;object-fit:cover;flex:none">'
       : '<div style="width:46px;height:46px;border-radius:50%;background:var(--green-soft);color:var(--green);display:grid;place-items:center;font-family:var(--display);font-weight:800;flex:none">'+esc((s.display_name||'?').charAt(0).toUpperCase())+'</div>';
-    return '<div class="svc">'+av+'<div class="grow"><h4>'+esc(s.display_name)+'</h4><p>'+(s.bio?esc(s.bio):'Profesional')+'</p></div>'+
+    return '<div class="svc">'+av+'<div class="grow"><h4>'+esc(s.display_name)+'</h4><p>'+(s.bio?esc(s.bio):'Profesional')+'</p>'+
+      '<div class="st-invite-code" data-id="'+esc(s.id)+'" style="display:none;margin-top:6px;font-family:var(--mono);font-size:13px;color:var(--teal-ink);background:var(--paper);border-radius:8px;padding:6px 10px;word-break:break-all"></div></div>'+
+      '<button class="btn btn-ghost btn-sm st-invite" data-id="'+esc(s.id)+'">Generar código de invitación</button>'+
       '<button class="btn btn-ghost btn-sm st-photo" data-id="'+esc(s.id)+'">Foto</button>'+
       '<button class="del" data-id="'+esc(s.id)+'">Quitar</button></div>';
   }).join('');
+  // Generar código de invitación para que el empleado se una
+  list.querySelectorAll('.st-invite').forEach(function(b){
+    b.onclick = async function(){
+      b.disabled = true; b.textContent = '…';
+      const rr = await api('POST','/staff/'+b.dataset.id+'/invite');
+      b.disabled = false; b.textContent = 'Generar código de invitación';
+      if(rr.ok && rr.data && (rr.data.code || rr.data.invite_code)){
+        const code = rr.data.code || rr.data.invite_code;
+        const box = list.querySelector('.st-invite-code[data-id="'+b.dataset.id+'"]');
+        if(box){ box.textContent = 'Código: '+code+' — dáselo al empleado para que se una.'; box.style.display = 'block'; }
+      } else {
+        alert((rr.data && rr.data.error) || 'No se pudo generar el código.');
+      }
+    };
+  });
   // Subir/cambiar foto del profesional (FormData, sin forzar Content-Type JSON)
   list.querySelectorAll('.st-photo').forEach(function(b){
     b.onclick = function(){
@@ -1351,62 +1327,7 @@ async function loadStaff(){
       else alert(r.data.error||'No se pudo quitar.');
     };
   });
-  // Sección de Payroll (solo si el add-on 'payroll' está activo)
-  loadPayroll(staff);
 }
-
-// ── Payroll: aparece cuando el add-on 'payroll' está activo ────────────────────
-async function loadPayroll(staff){
-  const section = document.getElementById('payrollSection');
-  const list = document.getElementById('payrollList');
-  if(!section || !list) return;
-  // ¿Está activo el add-on 'payroll'? Se consulta a /account/addons.
-  let payrollActive = false;
-  try {
-    const r = await api('GET','/account/addons');
-    const addons = (r.ok && Array.isArray(r.data)) ? r.data : (r.ok && r.data.addons ? r.data.addons : []);
-    payrollActive = addons.some(function(a){ return a.code === 'payroll' && a.is_active; });
-  } catch(e){ payrollActive = false; }
-  if(!payrollActive){ section.style.display = 'none'; return; }
-  section.style.display = 'block';
-  if(!staff || staff.length === 0){
-    list.innerHTML = '<div class="empty">Añade profesionales para informar sus pagos.</div>';
-    return;
-  }
-  list.innerHTML = staff.map(function(s){
-    return '<div class="svc"><div class="grow"><h4>'+esc(s.display_name)+'</h4>'+
-      '<p>'+(s.bio?esc(s.bio):'Profesional')+'</p></div>'+
-      '<div style="display:flex;align-items:center;gap:6px;flex:none">'+
-        '<span style="font-family:var(--mono);color:var(--ink2)">$</span>'+
-        '<input type="number" min="0" step="0.01" inputmode="decimal" class="pay-amount" data-id="'+esc(s.id)+'" placeholder="0.00" '+
-        'style="width:110px;padding:9px;border:1.5px solid var(--line);border-radius:9px;font-family:var(--mono)">'+
-      '</div></div>';
-  }).join('');
-  // Aviso: aún no hay endpoint para guardar los pagos.
-  list.innerHTML += '<div style="margin-top:12px;background:var(--warn-bg);border:1px solid var(--warn-border);border-radius:10px;padding:12px 14px;font-size:13px;color:var(--warn-ink)">'+
-    'Próximamente podrás guardar los pagos del equipo.'+
-    '</div>';
-}
-// Código de invitación a nivel del NEGOCIO (un solo botón para todo el equipo).
-(function(){
-  const teamBtn = document.getElementById('teamInviteBtn');
-  if(!teamBtn) return;
-  teamBtn.onclick = async function(){
-    clearAlert('teamInviteAlert');
-    teamBtn.disabled = true; teamBtn.textContent = '…';
-    const rr = await api('POST','/team/invite');
-    teamBtn.disabled = false; teamBtn.textContent = 'Generar código de invitación';
-    if(rr.ok && rr.data && (rr.data.code || rr.data.invite_code)){
-      const code = rr.data.code || rr.data.invite_code;
-      const box = document.getElementById('teamInviteBox');
-      const codeEl = document.getElementById('teamInviteCode');
-      if(codeEl) codeEl.textContent = code;
-      if(box) box.style.display = 'block';
-    } else {
-      showAlert('teamInviteAlert', (rr.data && rr.data.error) || 'No se pudo generar el código.', false);
-    }
-  };
-})();
 const staffModal = document.getElementById('staffModal');
 document.getElementById('addStaffBtn').onclick = function(){ clearAlert('staffAlert'); document.getElementById('stName').value=''; document.getElementById('stBio').value=''; staffModal.classList.add('on'); };
 document.getElementById('stCancel').onclick = function(){ staffModal.classList.remove('on'); };
@@ -3037,21 +2958,13 @@ async function loadAddons(){
   const wrap = document.getElementById('addonList');
   const r = await api('GET','/account/addons');
   const addons = (r.ok && Array.isArray(r.data)) ? r.data : (r.ok && r.data.addons ? r.data.addons : []);
-  // 'featured' tiene su propia tarjeta; 'sms' y 'custom_domain' no se usan aún → ocultos.
-  // Los add-ons de contabilidad del negocio (advanced_reports, employee_accounting, etc.)
-  // NO van aquí: la contabilidad completa es feature de plan (Pro+), no add-on. Se ocultan.
-  const rows = addons.filter(function(a){
-    return a.code !== 'featured'
-      && ADDON_HIDDEN.indexOf(a.code) === -1
-      && ADDON_ACCOUNTING.indexOf(a.code) === -1;
-  });
+  // 'featured' tiene su propia tarjeta; 'sms' y 'custom_domain' no se usan aún → ocultos
+  const rows = addons.filter(function(a){ return a.code !== 'featured' && ADDON_HIDDEN.indexOf(a.code) === -1; });
 
   // Add-on Payroll (nómina de varios empleados). Si el backend aún no lo lista, lo añadimos como activable.
   if(!rows.some(function(a){ return a.code === 'payroll'; })){
     rows.push({ code:'payroll', name:'Payroll', description:'Gestiona la nómina de varios empleados.', price_cents:999, billing:'monthly', is_active:false });
   }
-  // Payroll solo se activa desde el plan Studio en adelante.
-  const payrollLocked = !planIsStudioPlus();
 
   renderAddonTotal(rows);
   if(rows.length === 0){ wrap.innerHTML = '<p style="font-size:13px;color:var(--ink2)">No hay add-ons disponibles.</p>'; return; }
@@ -3081,14 +2994,6 @@ async function loadAddons(){
   if(availRows.length || accountingRowHtml){
     html += '<div style="font-size:12px;color:var(--ink2);margin-bottom:8px;font-weight:600">Disponibles</div>';
     html += availRows.map(function(a){
-      // Payroll bloqueado en gratis/pro: tarjeta deshabilitada con aviso de plan Studio.
-      if(a.code === 'payroll' && payrollLocked){
-        return '<div class="addon-row" style="opacity:.6">'+
-          '<input type="checkbox" disabled style="width:18px;height:18px;flex:none">'+
-          '<div class="grow"><h4>'+esc(a.name||a.code)+'</h4>'+
-          (a.description?'<p>'+esc(a.description)+'</p>':'')+
-          '<span class="addon-pending">Disponible desde el plan Studio</span></div></div>';
-      }
       return '<label class="addon-row" style="cursor:pointer">'+
         '<input type="checkbox" class="addon-sel" data-code="'+esc(a.code)+'" data-cents="'+(a.price_cents||0)+'" style="width:18px;height:18px;flex:none;accent-color:var(--teal)">'+
         '<div class="grow"><h4>'+esc(a.name||a.code)+'</h4>'+
@@ -3180,14 +3085,14 @@ function renderFeatTotal(){
   const sel = document.getElementById('featWeeks');
   const weeks = sel ? (parseInt(sel.value,10) || 1) : 1;
   totalEl.style.display = 'block';
-  totalEl.innerHTML = 'Total por '+(weeks*3)+' días: '+
+  totalEl.innerHTML = 'Total por '+weeks+(weeks===1?' semana':' semanas')+': '+
     '<b style="font-family:var(--mono);color:var(--green)">'+money(FEAT_WEEK_CENTS*weeks)+'</b>';
 }
 async function loadFeatured(){
   const sel = document.getElementById('featWeeks');
   if(sel && !sel.options.length){
     let opts = '';
-    for(let i=1;i<=12;i++){ opts += '<option value="'+i+'">'+(i*3)+' días</option>'; }
+    for(let i=1;i<=12;i++){ opts += '<option value="'+i+'">'+i+' '+(i===1?'semana':'semanas')+'</option>'; }
     sel.innerHTML = opts;
     sel.onchange = renderFeatTotal;
   }
@@ -3198,7 +3103,7 @@ async function loadFeatured(){
     // Guarda el precio por semana (centavos) si el backend lo expone, para el monto ATH
     FEAT_WEEK_CENTS = r.data.week_price_cents || r.data.price_cents || r.data.weekly_price_cents || FEAT_WEEK_CENTS;
     if(priceEl){
-      if(FEAT_WEEK_CENTS){ priceEl.style.display='block'; priceEl.textContent = money(FEAT_WEEK_CENTS)+' / 3 días'; }
+      if(FEAT_WEEK_CENTS){ priceEl.style.display='block'; priceEl.textContent = money(FEAT_WEEK_CENTS)+' / semana'; }
       else { priceEl.style.display='none'; }
     }
     if(r.data.active && r.data.featured_until){
@@ -3219,7 +3124,7 @@ document.getElementById('featBuyBtn').onclick = async function(){
   if(r.ok){ showAlert('featAlert','¡Listo! Tu negocio está destacado.', true); loadFeatured(); return; }
   if(r.status===402){
     const amount = (FEAT_WEEK_CENTS||0) * weeks;
-    offerAthPay('featAlert', { kind:'featured', code:'featured', weeks:weeks, amountCents:amount, title:'Destacado · '+(weeks*3)+' días' });
+    offerAthPay('featAlert', { kind:'featured', code:'featured', weeks:weeks, amountCents:amount, title:'Destacado · '+weeks+(weeks===1?' semana':' semanas') });
     return;
   }
   showAlert('featAlert', (r.data&&r.data.error)||'No se pudo destacar.', false);
