@@ -280,10 +280,13 @@ function mount(app, ctx) {
     if (!enabled) return bad(res, 'El cobro por ATH Móvil no está disponible', 503);
     gcPending();
 
-    const { kind, phoneNumber } = req.body || {};
+    const { kind } = req.body || {};
     if (!['plan', 'addon', 'addons', 'featured', 'ad_budget'].includes(kind)) return bad(res, 'Tipo de cobro inválido');
-    const phone = athPhone(phoneNumber);
-    if (!phone) return bad(res, 'Escribe un número de ATH Móvil válido (10 dígitos)');
+    // El teléfono del que paga lo SUPLE el comercio (NO lo escribe el usuario; así lo
+    // documenta el repo oficial). Se toma de su cuenta/negocio. ATH manda la push a
+    // ese número para confirmar. El dinero va al negocio identificado por el publicToken.
+    const phone = athPhone((req.user && req.user.phone) || req.business.whatsapp || req.business.phone);
+    if (!phone) return bad(res, 'Agrega tu teléfono de ATH Móvil en tu perfil para poder pagar por ATH.', 400);
 
     let exp;
     try { exp = await computeExpected(kind, req.body); }

@@ -877,11 +877,10 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
     <h3 id="athTitle">Pagar con ATH Móvil</h3>
     <div class="alert" id="athAlert"></div>
     <div id="athSummary" style="font-size:13.5px;color:var(--ink);background:var(--paper);border-radius:11px;padding:12px 14px;margin-bottom:14px;line-height:1.6"></div>
-    <!-- Paso 1: número de ATH Móvil del que paga -->
-    <div id="athPhoneStep">
-      <p style="font-size:12.5px;color:var(--ink2);margin-bottom:10px">Escribe tu número de ATH Móvil. Te llegará una notificación a tu app para confirmar el pago.</p>
-      <div class="field"><label>Número de ATH Móvil</label><input id="athPhone" type="tel" inputmode="numeric" placeholder="787-555-1234" style="background:#FFFFFF;color:#17150F"></div>
-      <button type="button" class="btn btn-teal" id="athPayBtn" style="width:100%">Enviar pago a mi ATH Móvil</button>
+    <!-- Paso 1: confirmar (sin número — lo suple el servidor) -->
+    <div id="athPayStep">
+      <p style="font-size:12.5px;color:var(--ink2);margin-bottom:12px">Al continuar, te llegará una notificación a tu app de ATH Móvil para confirmar el pago. Tu compra se activa sola al confirmar.</p>
+      <button type="button" class="btn btn-teal" id="athPayBtn" style="width:100%">Pagar con ATH Móvil</button>
     </div>
     <!-- Paso 2: esperando que confirmes en tu app (polling) -->
     <div id="athPollStep" style="display:none;text-align:center;padding:6px 0 4px">
@@ -3641,33 +3640,29 @@ function openAthCheckout(opts){
       '<span>'+esc(opts.title||'Compra')+'</span>'+
       '<b style="font-family:var(--mono,monospace)">$'+dollars+'</b>'+
     '</div>';
-  document.getElementById('athPhoneStep').style.display = '';
+  document.getElementById('athPayStep').style.display = '';
   document.getElementById('athPollStep').style.display = 'none';
-  var pb = document.getElementById('athPayBtn'); pb.disabled = false; pb.textContent = 'Enviar pago a mi ATH Móvil';
-  var ph = document.getElementById('athPhone');
-  if(!ph.value && typeof BIZ !== 'undefined' && BIZ){ ph.value = BIZ.ath_phone || BIZ.whatsapp || BIZ.phone || ''; }
+  var pb = document.getElementById('athPayBtn'); pb.disabled = false; pb.textContent = 'Pagar con ATH Móvil';
   document.getElementById('athModal').classList.add('on');
 }
 
 // Paso 1 → crear el pago (manda push a la app del dueño) y pasar al polling.
 document.getElementById('athPayBtn').onclick = async function(){
   clearAlert('athAlert');
-  var phone = (document.getElementById('athPhone').value||'').trim();
-  if(phone.replace(/\D/g,'').length < 10){ showAlert('athAlert','Escribe un número de ATH Móvil válido (10 dígitos).', false); return; }
   var p = ATH_PENDING || {};
-  var body = { kind:p.kind, phoneNumber:phone };
+  var body = { kind:p.kind };   // el teléfono lo suple el backend (de tu cuenta)
   if(p.kind === 'addons'){ body.codes = p.codes || []; }
   else if(p.kind === 'ad_budget'){ body.campaign_id = p.campaign_id; body.amount = p.amountCents; }
   else { body.code = p.code; }
   if(p.kind === 'featured' && p.weeks){ body.weeks = p.weeks; }
-  this.disabled = true; this.textContent = 'Enviando…';
+  this.disabled = true; this.textContent = 'Conectando con ATH Móvil…';
   var r = await api('POST','/billing/ath/create', body);
   if(!r.ok || !r.data || !r.data.ecommerceId){
-    this.disabled = false; this.textContent = 'Enviar pago a mi ATH Móvil';
+    this.disabled = false; this.textContent = 'Pagar con ATH Móvil';
     showAlert('athAlert', (r.data && r.data.error) || 'No se pudo iniciar el pago.', false);
     return;
   }
-  document.getElementById('athPhoneStep').style.display = 'none';
+  document.getElementById('athPayStep').style.display = 'none';
   document.getElementById('athPollStep').style.display = '';
   startAthPolling(r.data.ecommerceId, p);
 };
