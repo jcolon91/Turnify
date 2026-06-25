@@ -883,8 +883,10 @@ app.delete('/api/businesses/me/logo', authRequired, businessScope, asyncH(async 
   res.json({ business: rows[0] });
 }));
 
-// Subir / reemplazar el BANNER (cover) del negocio — solo planes de pago
-// Medida estándar: 1600x400 (4:1). El free usa patrones predefinidos (sin subir).
+// Subir / reemplazar el BANNER (cover) del negocio — solo planes de pago.
+// SIN recorte: fit:'inside' conserva la imagen COMPLETA a su proporción (no corta).
+// Recomendado 1600x400 (4:1) para el mejor look; cualquier imagen ancha se ve completa.
+// El free usa patrones predefinidos (sin subir).
 app.post('/api/businesses/me/cover', authRequired, businessScope,
   (req, res, next) => {
     if (req.business.plan_code === 'free')
@@ -901,7 +903,7 @@ app.post('/api/businesses/me/cover', authRequired, businessScope,
     const filepath = path.join(COVER_DIR, filename);
     try {
       await sharp(req.file.buffer, { limitInputPixels: 24000000, failOn: 'error' })
-        .resize(1600, 400, { fit: 'cover', position: 'centre' })
+        .resize(1600, 1000, { fit: 'inside', withoutEnlargement: true })
         .webp({ quality: 84 })
         .toFile(filepath);
     } catch (e) {
