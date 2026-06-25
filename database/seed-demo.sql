@@ -184,6 +184,20 @@ BEGIN
   ON CONFLICT (service_id, staff_id) DO NOTHING;
 
   -- --------------------------------------------------------------------------
+  -- 3b. HORARIO DEL NEGOCIO (business_hours) — sin esto la reserva no muestra
+  --     turnos. Los staff no tienen staff_hours propios → heredan este horario
+  --     (disponibilidad = staff_hours, y si no hay, business_hours).
+  --     Lun–Sáb con receso de almuerzo (dos filas/día: 9–12 y 1–6); domingo
+  --     cerrado. day_of_week: 0=domingo … 6=sábado. Idempotente (borra/re-inserta).
+  -- --------------------------------------------------------------------------
+  DELETE FROM business_hours WHERE business_id = v_biz;
+  INSERT INTO business_hours (business_id, day_of_week, opens, closes)
+  SELECT v_biz, d, t.opens, t.closes
+  FROM generate_series(1, 6) AS d
+  CROSS JOIN (VALUES ('09:00'::time, '12:00'::time),
+                     ('13:00'::time, '18:00'::time)) AS t(opens, closes);
+
+  -- --------------------------------------------------------------------------
   -- 4. PRODUCTOS (precio + stock; campos rich del schema 13)
   -- --------------------------------------------------------------------------
   SELECT id INTO v_prod_pom FROM products WHERE business_id = v_biz AND name = 'Pomada mate' LIMIT 1;
@@ -450,5 +464,5 @@ BEGIN
     RAISE NOTICE 'SEED DEMO: tabla ad_campaigns no existe — se omiten los ads.';
   END IF;
 
-  RAISE NOTICE 'SEED DEMO: listo. Negocio publicado con 5 servicios, 3 staff, 4 productos, 5 clientes, 11 citas, 3 reseñas de cita, 3 órdenes, 2 reseñas de producto, 4 gastos.';
+  RAISE NOTICE 'SEED DEMO: listo. Negocio publicado con horario Lun-Sab, 5 servicios, 3 staff, 4 productos, 5 clientes, 11 citas, 3 reseñas de cita, 3 órdenes, 2 reseñas de producto, 4 gastos.';
 END $$;

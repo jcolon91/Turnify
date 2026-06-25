@@ -42,11 +42,14 @@ html[data-theme="dark"]{color-scheme:dark;
 body{font-family:var(--body);color:var(--ink);background:var(--paper);-webkit-font-smoothing:antialiased}
 button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
 input,select,textarea{font:inherit}
-/* Contraste del menú nativo de los <select> (p.ej. "Profesional (opcional)"):
-   fondo y texto sólidos del tema para que las opciones siempre se lean. */
-select{color-scheme:light}
-html[data-theme="dark"] select{color-scheme:dark}
-select option{background:var(--card);color:var(--text)}
+/* Contraste del menú nativo de los <select> (p.ej. "Profesional (opcional)").
+   En móvil (iOS Safari / Android Chrome) el popup nativo IGNORA color/background
+   en <option> y sólo respeta color-scheme; y como la página arranca en tema
+   OSCURO por defecto, --text es casi blanco → texto blanco sobre el popup claro
+   = invisible. Solución a prueba de balas: fijar los <select> a esquema CLARO
+   (texto oscuro #17150F sobre blanco) en AMBOS temas, sí o sí. */
+select{color-scheme:light !important;background:#FFFFFF !important;color:#17150F !important}
+select option{background:#FFFFFF !important;color:#17150F !important}
 .bootload{min-height:100vh;display:grid;place-items:center;color:var(--ink2);font-size:14px;padding:20px;text-align:center}
 .wrap{max-width:640px;margin:0 auto;padding:0 18px}
 
@@ -814,8 +817,8 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
   <div class="sheet-body">
     <div id="waitForm">
       <div class="alert" id="waitAlert"></div>
-      <div class="field"><label>Servicio (opcional)</label><select id="wService" class="pvar" style="width:100%;padding:13px;border:1.5px solid var(--border);border-radius:12px;background:var(--card);color:var(--text)"></select></div>
-      <div class="field"><label>Profesional (opcional)</label><select id="wStaff" class="pvar" style="width:100%;padding:13px;border:1.5px solid var(--border);border-radius:12px;background:var(--card);color:var(--text)"></select></div>
+      <div class="field"><label>Servicio (opcional)</label><select id="wService" class="pvar" style="width:100%;padding:13px;border:1.5px solid var(--border);border-radius:12px;background:#FFFFFF;color:#17150F"></select></div>
+      <div class="field"><label>Profesional (opcional)</label><select id="wStaff" class="pvar" style="width:100%;padding:13px;border:1.5px solid var(--border);border-radius:12px;background:#FFFFFF;color:#17150F"></select></div>
       <div class="field"><label>Desde *</label><input id="wFrom" type="date"></div>
       <div class="field"><label>Hasta *</label><input id="wTo" type="date"></div>
       <div class="field"><label>Tu nombre *</label><input id="wName" placeholder="Tu nombre completo"></div>

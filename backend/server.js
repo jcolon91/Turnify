@@ -1460,6 +1460,13 @@ app.post('/api/services', authRequired, businessScope, asyncH(async (req, res) =
 
 app.patch('/api/services/:id', authRequired, businessScope, asyncH(async (req, res) => {
   if (!isUuid(req.params.id)) return bad(res, 'ID inválido');
+  // Pertenencia ANTES de tocar service_staff (service_staff no tiene business_id):
+  // si el servicio no es de ESTE negocio → 404, para que un dueño no pueda borrar
+  // los enlaces servicio↔staff de OTRO negocio (IDOR de escritura cross-tenant).
+  const own = await db.query(
+    `SELECT 1 FROM services WHERE id = $1 AND business_id = $2 AND deleted_at IS NULL`,
+    [req.params.id, req.business.id]);
+  if (!own.rows[0]) return bad(res, 'Servicio no encontrado', 404);
   const allowed = ['name','description','duration_min','price_cents','deposit_cents','photo_url','is_active','is_featured','sort_order'];
   const sets = [], vals = [];
   for (const k of allowed) if (k in (req.body || {})) { vals.push(req.body[k]); sets.push(`${k} = $${vals.length}`); }
@@ -1577,6 +1584,31 @@ async function eligibleStaff(bizId, serviceId, dateStr) {
 app.get('/api/public/categories', asyncH(async (_req, res) => {
   const { rows } = await db.query(`SELECT id, name_es, name_en, slug, icon FROM categories ORDER BY sort_order`);
   res.json({ categories: rows });
+}));
+
+// Solicitar una PROFESIÓN/CATEGORÍA que aún no existe en el catálogo. Queda
+// 'pending' para que un admin la apruebe (panel admin). authRequired (no
+// businessScope): el dueño puede pedirla incluso en el onboarding, antes de
+// tener negocio. business_id se llena si ya tiene uno (puede ser null).
+app.post('/api/categories/request', authRequired, asyncH(async (req, res) => {
+  const name_es = String(req.body?.name_es || '').trim();
+  const note = (String(req.body?.note || '').trim().slice(0, 300)) || null;
+  if (name_es.length < 2 || name_es.length > 60)
+    return bad(res, 'Escribe el nombre de la profesión (2 a 60 caracteres).');
+  const b = await db.query(
+    `SELECT id FROM businesses WHERE owner_user_id = $1 AND deleted_at IS NULL LIMIT 1`, [req.user.id]);
+  const bizId = b.rows[0]?.id || null;
+  // No dupliques una solicitud pendiente del mismo usuario con el mismo nombre.
+  const dup = await db.query(
+    `SELECT 1 FROM category_requests
+      WHERE requested_by = $1 AND lower(name_es) = lower($2) AND status = 'pending'`,
+    [req.user.id, name_es]);
+  if (dup.rows[0]) return res.json({ ok: true, already: true });
+  await db.query(
+    `INSERT INTO category_requests (business_id, requested_by, name_es, note)
+     VALUES ($1,$2,$3,$4)`, [bizId, req.user.id, name_es, note]);
+  await audit(req, 'category.request', 'category_request', null, { name_es });
+  res.json({ ok: true });
 }));
 
 app.get('/api/public/municipalities', asyncH(async (_req, res) => {
@@ -2615,20 +2647,21 @@ const fmtPR = d => new Date(d).toLocaleString('es-PR',
 function buildMessage(template, ctx) {
   const { biz, appt } = ctx;
   const when = appt?.starts_at ? fmtPR(appt.starts_at) : '';
+  // Ubicación reutilizable (dirección + enlace al mapa). Se incluye en TODOS los
+  // mensajes de cita, no solo en algunos.
+  const loc = (biz.address_line ? `📍 ${biz.address_line}\n` : '')
+    + (biz.lat != null && biz.lng != null ? `🗺 Cómo llegar: https://www.google.com/maps/search/?api=1&query=${biz.lat},${biz.lng}\n` : '');
   switch (template) {
-    case 'confirm': {
-      const loc = (biz.address_line ? `📍 ${biz.address_line}\n` : '')
-        + (biz.lat != null && biz.lng != null ? `🗺 Cómo llegar: https://www.google.com/maps/search/?api=1&query=${biz.lat},${biz.lng}\n` : '');
-      return `✅ *${biz.name}*\nTu cita quedó ${appt.status === 'pending_deposit' ? 'reservada (pendiente de depósito)' : 'confirmada'}:\n\n💈 ${appt.service_name}\n🗓 ${when}\n🎟 Código: ${appt.confirmation_code}\n${loc}\n${appt.status === 'pending_deposit' && biz.ath_phone ? `Para confirmar, envía el depósito de $${(appt.deposit_cents / 100).toFixed(2)} por ATH Móvil a ${biz.ath_phone} y responde con tu referencia.\n\n` : ''}Para cancelar o mover tu cita, responde a este mensaje.`;
-    }
+    case 'confirm':
+      return `✅ *${biz.name}*\nTu cita quedó ${appt.status === 'pending_deposit' ? 'reservada (pendiente de depósito)' : 'confirmada'}:\n\n💈 ${appt.service_name}\n🗓 ${when}\n🎟 Código: ${appt.confirmation_code}\n${loc}${appt.status === 'pending_deposit' && biz.ath_phone ? `\nPara confirmar, envía el depósito de $${(appt.deposit_cents / 100).toFixed(2)} por ATH Móvil a ${biz.ath_phone} y responde con tu referencia.` : ''}`;
     case 'reminder_48h':
-      return `📅 *${biz.name}*\nTu cita es en 2 días:\n\n💈 ${appt.service_name}\n🗓 ${when}\n\nSi necesitas mover la fecha, este es buen momento para avisarnos. Responde aquí.`;
+      return `📅 *${biz.name}*\nTu cita es en 2 días:\n\n💈 ${appt.service_name}\n🗓 ${when}\n${loc}\nSi necesitas mover la fecha, este es buen momento para avisarnos. Responde aquí.`;
     case 'reminder_24h':
-      return `⏰ *Recordatorio — ${biz.name}*\nTu cita es mañana:\n\n💈 ${appt.service_name}\n🗓 ${when}\n\nSi no puedes llegar, avísanos respondiendo aquí. 🙏`;
+      return `⏰ *Recordatorio — ${biz.name}*\nTu cita es mañana:\n\n💈 ${appt.service_name}\n🗓 ${when}\n${loc}\nSi no puedes llegar, avísanos respondiendo aquí. 🙏`;
     case 'reminder_1h':
-      return `🔔 *${biz.name}*\n¡Te esperamos en 1 hora!\n\n💈 ${appt.service_name}\n🗓 ${when}\n📍 ${biz.address_line || ''}`;
+      return `🔔 *${biz.name}*\n¡Te esperamos en 1 hora!\n\n💈 ${appt.service_name}\n🗓 ${when}\n${loc}`;
     case 'reminder_2h':
-      return `🔔 *${biz.name}*\n¡Te esperamos en 2 horas!\n\n💈 ${appt.service_name}\n🗓 ${when}\n📍 ${biz.address_line || ''}`;
+      return `🔔 *${biz.name}*\n¡Te esperamos en 2 horas!\n\n💈 ${appt.service_name}\n🗓 ${when}\n${loc}`;
     case 'manual_assign':
       return `✅ *${biz.name}*\n¡Te conseguimos turno!\n\n💈 ${appt.service_name}\n🗓 ${when}\n🎟 ${appt.confirmation_code}\n\nNos vemos. Si no puedes, avísanos respondiendo aquí.`;
     case 'waitlist_offer':
@@ -2792,7 +2825,7 @@ function emailAppt(template, ctx) {
     ['Fecha', when],
     code ? ['Código', code] : null,
     addr ? ['Lugar', addr] : null,
-    (template === 'confirm' && mapUrl)
+    mapUrl
       ? ['Cómo llegar', `<a href="${mapUrl}" style="color:#0A5B52;text-decoration:none">Ver en el mapa</a>`] : null,
   ].filter(Boolean);
   const rowsHtml = rowsArr.map(([k, v], i) =>

@@ -820,6 +820,12 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
         <div class="field"><label>Nombre de tu negocio *</label><input id="onbName" placeholder="Barbería Los Compadres"></div>
         <div class="field"><label>Categoría</label>
           <select id="onbCat"><option value="">Selecciona…</option></select>
+          <a id="reqProfLink" style="display:inline-block;margin-top:7px;font-size:12.5px;color:var(--teal-ink);font-weight:600;cursor:pointer">¿No está tu profesión? Solicítala</a>
+          <div id="reqProfBox" style="display:none;margin-top:8px">
+            <input id="reqProfName" maxlength="60" placeholder="Ej: Tatuador, Manicurista, Masajista…" style="width:100%;padding:11px;border:1px solid var(--line);border-radius:10px;background:var(--paper);color:var(--ink)">
+            <button type="button" class="btn btn-ghost btn-sm" id="reqProfSend" style="margin-top:8px">Enviar solicitud</button>
+            <p style="font-size:11.5px;color:var(--ink2);margin-top:6px">La revisamos y, si la aprobamos, la añadimos al catálogo.</p>
+          </div>
         </div>
         <div class="row2">
           <div class="field"><label>Teléfono</label><input id="onbPhone" placeholder="787-555-1234"></div>
@@ -870,9 +876,13 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
     <h3 id="athTitle">Pagar con ATH Móvil</h3>
     <div class="alert" id="athAlert"></div>
     <div id="athSummary" style="font-size:13.5px;color:var(--ink);background:var(--paper);border-radius:11px;padding:12px 14px;margin-bottom:14px;line-height:1.6"></div>
-    <p style="font-size:12.5px;color:var(--ink2);margin-bottom:12px">Te enviaremos a la app de ATH Móvil para completar el pago. Si no se abre sola, toca el botón. Al completarse, tu compra se activa automáticamente.</p>
-    <!-- Contenedor donde la librería de ATH Móvil inyecta su botón -->
-    <div id="ATHMovil_Checkout_Button" style="min-height:50px;margin-bottom:12px"></div>
+    <p style="font-size:12.5px;color:var(--ink2);margin-bottom:12px">Toca el botón de ATH Móvil, escribe tu número y te llegará una notificación a tu app de ATH Móvil para confirmar el pago. Al completarse, tu compra se activa automáticamente.</p>
+    <!-- Contenedor donde la librería de ATH Móvil inyecta su botón.
+         OJO: el id DEBE ser exactamente "ATHMovil_Checkout_Button_payment"
+         (con sufijo _payment). Es el id que busca athmovil_base.js para
+         renderizar su botón; sin él, la librería NO inyecta nada y el pago
+         nunca abre la app. -->
+    <div id="ATHMovil_Checkout_Button_payment" style="min-height:50px;margin-bottom:12px"></div>
     <div style="display:flex;gap:10px">
       <button type="button" class="btn btn-ghost btn-sm" id="athCancel" style="flex:1">Cancelar</button>
     </div>
@@ -1603,6 +1613,30 @@ async function loadOnboardingOptions(){
     (munis.municipalities||[]).forEach(m=>{ const o=document.createElement('option'); o.value=m.id; o.textContent=m.name; muniSel.appendChild(o); });
   }catch(e){}
 }
+
+// Solicitar una profesión que no está en el catálogo (no usa prompt(): se
+// bloquea en navegadores dentro de apps). Muestra un mini-formulario y envía.
+(function(){
+  var link = document.getElementById('reqProfLink');
+  var box  = document.getElementById('reqProfBox');
+  var send = document.getElementById('reqProfSend');
+  if(!link || !box || !send) return;
+  link.onclick = function(){ box.style.display = (box.style.display==='none' || !box.style.display) ? 'block' : 'none'; };
+  send.onclick = async function(){
+    clearAlert('onbAlert');
+    var name = document.getElementById('reqProfName').value.trim();
+    if(name.length < 2){ showAlert('onbAlert','Escribe el nombre de la profesión.', false); return; }
+    send.disabled = true; send.textContent = 'Enviando…';
+    var r = await api('POST','/categories/request', { name_es:name });
+    send.disabled = false; send.textContent = 'Enviar solicitud';
+    if(r.ok){
+      showAlert('onbAlert','¡Solicitud enviada! La revisamos y te avisamos.', true);
+      box.style.display = 'none'; document.getElementById('reqProfName').value = '';
+    } else {
+      showAlert('onbAlert', (r.data && r.data.error) || 'No se pudo enviar la solicitud.', false);
+    }
+  };
+})();
 
 document.getElementById('createBizBtn').onclick = async ()=>{
   clearAlert('onbAlert');
@@ -3494,9 +3528,24 @@ async function loadPromos(){
     };
   });
   list.querySelectorAll('[data-promo-delete]').forEach(function(b){
+    var origText = b.textContent, armed = false, armTimer = null;
+    function disarm(){ armed = false; if(armTimer){ clearTimeout(armTimer); armTimer = null; } b.textContent = origText; b.style.background = ''; b.style.color = 'var(--danger,#d33)'; }
     b.onclick = async function(){
       clearAlert('promoAlert');
-      if(!confirm('¿Borrar esta campaña? Se eliminarán sus métricas. Esta acción no se puede deshacer.')) return;
+      // Confirmación en 2 toques (NO usamos confirm() nativo: se bloquea/queda en
+      // false dentro de navegadores de apps como WhatsApp/Instagram, y por eso en
+      // móvil no borraba). Primer toque arma; segundo toque (4s) borra.
+      if(!armed){
+        armed = true;
+        b.textContent = 'Confirmar borrar';
+        b.style.background = 'var(--danger,#d33)';
+        b.style.color = '#fff';
+        showAlert('promoAlert', 'Toca "Confirmar borrar" otra vez para eliminar la campaña. Esta acción no se puede deshacer.', false);
+        armTimer = setTimeout(disarm, 4000);
+        return;
+      }
+      disarm();
+      clearAlert('promoAlert');
       b.disabled = true;
       const rr = await api('DELETE','/ads/'+b.dataset.promoDelete);
       if(rr.ok){ loadPromos(); }
@@ -3560,7 +3609,6 @@ function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, function
 // ════════════════════════ ATH MÓVIL (pago) ════════════════════════
 // Config pública del backend (SOLO publicToken; nunca el token privado).
 var ATH_CFG = { enabled:false, env:'production', publicToken:'' };
-var ATH_SCRIPT_LOADED = false;
 // Compra en curso para el modal ATH: { kind, code, weeks?, amountCents, title }
 var ATH_PENDING = null;
 
@@ -3571,19 +3619,29 @@ async function loadAthConfig(){
       ATH_CFG.enabled = !!r.data.enabled;
       ATH_CFG.env = r.data.env || 'production';
       ATH_CFG.publicToken = r.data.publicToken || '';
-      if(ATH_CFG.enabled && ATH_CFG.publicToken){ loadAthScript(); }
+      // El script de ATH NO se carga aquí: se (re)inyecta en CADA compra
+      // (mountAthButton), porque la librería lee ATHM_Checkout AL CARGAR y el
+      // monto cambia por compra (no hay forma documentada de actualizarlo luego).
     }
   }catch(e){ /* sin ATH: se queda el flujo actual de "pago pendiente" */ }
 }
 
-// Carga el script de ATH Móvil una sola vez (solo si enabled=true).
-function loadAthScript(){
-  if(ATH_SCRIPT_LOADED) return;
-  ATH_SCRIPT_LOADED = true;
+// Monta (o re-monta) el botón OFICIAL de ATH Móvil con el checkout ACTUAL.
+// La librería athmovil_base.js lee el global ATHM_Checkout AL CARGAR y pinta su
+// botón en #ATHMovil_Checkout_Button_payment; su doc oficial NO expone forma de
+// actualizar el monto después. Por eso, para montos variables, re-inyectamos el
+// script en cada compra (tras fijar ATHM_Checkout) y la librería renderiza un
+// botón nuevo con el monto correcto. El usuario lo toca para pagar.
+function mountAthButton(){
+  var box = document.getElementById('ATHMovil_Checkout_Button_payment');
+  if(box) box.innerHTML = '';                         // limpia el botón anterior
+  var old = document.getElementById('athmovil-base-js');
+  if(old) old.remove();                               // quita el script anterior
   var s = document.createElement('script');
+  s.id = 'athmovil-base-js';
   s.src = 'https://payments.athmovil.com/api/modal/js/athmovil_base.js';
   s.async = true;
-  document.head.appendChild(s);
+  document.body.appendChild(s);                        // al cargar lee ATHM_Checkout y pinta el botón
 }
 
 // ¿Mostrar botón "Pagar con ATH Móvil"? Solo si el backend dijo enabled.
@@ -3631,32 +3689,11 @@ function openAthCheckout(opts){
     }]
   };
   document.getElementById('athModal').classList.add('on');
-  // (Re)inicializa el botón de ATH según la librería.
-  try{
-    if(typeof ATHM !== 'undefined' && ATHM && typeof ATHM.setCheckout === 'function'){
-      ATHM.setCheckout(window.ATHM_Checkout);
-    } else if(typeof loadButton === 'function'){
-      loadButton();
-    }
-  }catch(e){ console.error('ATH init', e); }
-  // Auto-envío a la app de ATH Móvil: "toca" por el usuario el botón que
-  // inyecta la librería en cuanto exista. Si el navegador lo bloquea o tarda,
-  // el botón queda visible en el modal como respaldo manual.
-  autoLaunchAthButton();
-}
-
-// Busca el botón que inyecta la librería de ATH dentro de su contenedor y lo
-// dispara (deep-link a la app en celular / QR en escritorio). Reintenta unos
-// instantes mientras la librería renderiza; no rompe nada si nunca aparece.
-function autoLaunchAthButton(){
-  var tries = 0;
-  (function tick(){
-    tries++;
-    var box = document.getElementById('ATHMovil_Checkout_Button');
-    var el = box ? box.querySelector('a,button,[role="button"],img,div[onclick]') : null;
-    if(el){ try{ el.click(); }catch(e){ /* respaldo: botón visible */ } return; }
-    if(tries < 20){ setTimeout(tick, 150); }   // ~3s máx esperando el render
-  })();
+  // Re-inyecta el script de ATH para que renderice un botón NUEVO leyendo el
+  // ATHM_Checkout que acabamos de fijar (monto correcto de ESTA compra). NO se
+  // dispara por código: el usuario toca el botón; ATH abre su propio modal, pide
+  // su número de ATH Móvil y le manda una push a su app para confirmar el pago.
+  mountAthButton();
 }
 
 // Tras un 402: si ATH está disponible muestra el botón "Pagar con ATH Móvil"
