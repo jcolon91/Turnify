@@ -1,287 +1,368 @@
 // ============================================================================
 //  BUKEAME · module-platform-billing.js
 //  Cobro de PLATAFORMA por ATH Móvil Business (Evertec) con la cuenta de WIFNIX.
-//  Membresía (plan) · add-ons · destacado — el dinero va a la plataforma.
+//  Membresía (plan) · add-ons · destacado · presupuesto de anuncios.
 // ----------------------------------------------------------------------------
-//  Se ENCHUFA al server.js base, igual que los otros módulos:
+//  FLUJO REST oficial (ATHM-Payment-Button-API) — el MISMO que usa Wifnix y que
+//  SÍ abre la app de ATH Móvil. NO usa el botón JS (ese es otro producto):
+//    1) POST /payment  { publicToken, total, phoneNumber, ... }  → { ecommerceId, auth_token }
+//       → ATH manda una PUSH a la app del que paga (el dueño del negocio).
+//    2) El dueño CONFIRMA en su app de ATH Móvil.
+//    3) POST /findPayment { ecommerceId, publicToken } (Bearer auth_token)
+//       → polling hasta ecommerceStatus === 'CONFIRM'.
+//    4) POST /authorization (Bearer auth_token, body vacío) → 'COMPLETED' + referenceNumber.
+//
+//  Se ENCHUFA al server.js base:
 //    require('./module-platform-billing').mount(app, { db, authRequired, businessScope, h: sharedHelpers });
 //
-//  Reusa los helpers del server base (no los redefine):
-//    asyncH, bad, isStr, isUuid, audit, notify
-//
-//  SEGURIDAD (dinero real, producción) — reglas inviolables:
-//   1) El MONTO se calcula SIEMPRE en el servidor (plans / addon_catalog). Tras
-//      verificar con ATH se exige Math.round(total*100) === monto_esperado_cents.
-//      NUNCA se confía en el "total" del cliente.
-//   2) IDEMPOTENCIA: cada referenceNumber se inserta en platform_ath_payments con un
-//      índice único; un 2.º intento con el mismo referenceNumber → 409, no reactiva.
-//   3) El privateToken vive SOLO en process.env; NUNCA va al frontend, ni se
-//      loguea, ni aparece en respuestas. /config expone SÓLO el público.
-//   4) /confirm es authRequired + businessScope: el negocio sólo paga LO SUYO
-//      (req.business.id).
-//   5) Sólo se activa si data.ecommerceStatus === 'COMPLETED'.
+//  SEGURIDAD (dinero real) — reglas inviolables:
+//   1) El MONTO se calcula SIEMPRE en el servidor (plans / addon_catalog). El pago
+//      verificado por ATH DEBE igualar ese monto antes de activar. Nunca se confía
+//      en el "total" del cliente.
+//   2) IDEMPOTENCIA: cada referenceNumber es único en platform_ath_payments; un 2.º
+//      intento con el mismo referenceNumber no reactiva (devuelve already).
+//   3) El privateToken vive SOLO en process.env; sólo se usa para /refund. /config no
+//      lo expone. El auth_token vive SOLO en el servidor (mapa en memoria), nunca al front.
+//   4) /create y /status son authRequired + businessScope: el negocio sólo paga LO SUYO.
+//   5) Sólo se activa cuando ATH confirma COMPLETED y el monto coincide.
 //   6) Sin secretos hardcodeados; SQL siempre con parámetros $n.
 // ============================================================================
 
-// URL oficial de verificación server-side (producción) — ATH Móvil Business.
-const ATH_FIND_PAYMENT_URL =
-  'https://payments.athmovil.com/api/business-transaction/ecommerce/business/findPayment';
+const ATH_BASE         = 'https://payments.athmovil.com/api/business-transaction/ecommerce';
+const ATH_PAYMENT_URL  = ATH_BASE + '/payment';
+const ATH_FIND_URL     = ATH_BASE + '/business/findPayment';
+const ATH_AUTH_URL     = ATH_BASE + '/authorization';
+
+// Normaliza un teléfono a 10 dígitos (formato que espera ATH, p.ej. "7875551234").
+function athPhone(raw) {
+  let d = String(raw == null ? '' : raw).replace(/\D/g, '');
+  if (d.length === 11 && d[0] === '1') d = d.slice(1);
+  return d.length === 10 ? d : null;
+}
 
 function mount(app, ctx) {
   const { db, authRequired, businessScope, h } = ctx;
   const { asyncH, bad, isStr, isUuid, audit, notify } = h;
 
-  // ── Config desde el entorno (regla 3 y 6: secretos sólo en process.env) ────
-  const ATHM_ENV = process.env.ATHM_ENV || 'production';
-  const PUBLIC_TOKEN = process.env.ATHM_PLATFORM_PUBLIC_TOKEN || '';
-  const PRIVATE_TOKEN = process.env.ATHM_PLATFORM_PRIVATE_TOKEN || '';
-  const enabled = !!(PUBLIC_TOKEN && PRIVATE_TOKEN);
+  // ── Config desde el entorno (secretos sólo en process.env) ─────────────────
+  const ATHM_ENV      = process.env.ATHM_ENV || 'production';
+  const PUBLIC_TOKEN  = process.env.ATHM_PLATFORM_PUBLIC_TOKEN || '';
+  const PRIVATE_TOKEN = process.env.ATHM_PLATFORM_PRIVATE_TOKEN || ''; // sólo para /refund (futuro)
+  const enabled       = !!PUBLIC_TOKEN; // el flujo REST de cobro sólo necesita el público
 
-  // ── Helper: verificación SERVER-SIDE del pago con ATH (regla 5) ────────────
-  // Hace POST a findPayment con { ecommerceId, publicToken } — EXACTO según la
-  // API oficial (ATHM-Payment-Button-API): findPayment SÓLO acepta esos dos
-  // atributos. El privateToken NO va aquí (es únicamente para /refund); enviarlo
-  // está fuera de spec y podría romper la verificación si ATH endurece la validación.
-  // Devuelve { ok, status, total, referenceNumber, raw }. ok === true SÓLO si
-  // data.ecommerceStatus === 'COMPLETED'. Cualquier error de red → ok:false.
-  async function verifyAthPayment(ecommerceId) {
+  // Pagos ATH EN CURSO (servidor, en memoria; proceso único PM2). Mapea
+  // ecommerceId → { businessId, authToken, kind, refCode, codesArr, campaignId,
+  // weeksVal, montoEsperadoCents, createdAt }. TTL corto; se limpia al terminar.
+  // Si el server reinicia, se pierde el pendiente: ATH no debita hasta /authorization,
+  // así que no se pierde dinero — el dueño sólo reintenta.
+  const pendingAth = new Map();
+  const PENDING_TTL_MS = 12 * 60 * 1000;
+  function gcPending() {
+    const cutoff = Date.now() - PENDING_TTL_MS;
+    for (const [id, v] of pendingAth) if (v.createdAt < cutoff) pendingAth.delete(id);
+  }
+
+  // ── Helper genérico POST a ATH (JSON). body puede ser objeto o string ('' p/ authorization).
+  async function athPost(url, body, authToken) {
     try {
-      const resp = await fetch(ATH_FIND_PAYMENT_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({
-          ecommerceId,
-          publicToken: PUBLIC_TOKEN,
-        }),
-      });
+      const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
+      if (authToken) headers['Authorization'] = 'Bearer ' + authToken;
+      const payload = typeof body === 'string' ? body : JSON.stringify(body || {});
+      const resp = await fetch(url, { method: 'POST', headers, body: payload });
       const json = await resp.json().catch(() => null);
-      const data = json && json.data ? json.data : null;
-      const completed = !!data && data.ecommerceStatus === 'COMPLETED';
-      return {
-        ok: completed,
-        status: data ? data.ecommerceStatus : null,
-        total: data ? Number(data.total) : null,
-        referenceNumber: data ? data.referenceNumber : null,
-        raw: data || null,
-      };
+      return { ok: !!(json && json.status === 'success'), data: json && json.data ? json.data : null, raw: json };
     } catch (e) {
-      // Falla cerrado ante error de red (NO se loguea el privateToken).
-      console.error('ath.findPayment:', e.message);
-      return { ok: false, status: null, total: null, referenceNumber: null, raw: null };
+      console.error('ath.post', e.message);
+      return { ok: false, data: null, raw: null };
     }
   }
 
-  // ==========================================================================
-  //  GET /api/billing/ath/config — SÓLO el token público (regla 3)
-  // ==========================================================================
-  app.get('/api/billing/ath/config', asyncH(async (_req, res) => {
-    res.json({
-      enabled,
+  // Crea el pago en ATH (manda push al teléfono). Devuelve { ecommerceId, authToken } o null.
+  async function athCreate(cents, phone, metadata1, metadata2, itemName) {
+    const dollars = (cents / 100).toFixed(2);
+    const body = {
       env: ATHM_ENV,
-      publicToken: enabled ? PUBLIC_TOKEN : null, // el privado JAMÁS sale de aquí
-    });
-  }));
+      publicToken: PUBLIC_TOKEN,
+      timeout: '600',
+      total: dollars,
+      subtotal: dollars,
+      tax: '0.00',
+      metadata1: String(metadata1 || '').slice(0, 40),
+      metadata2: String(metadata2 || '').slice(0, 40),
+      phoneNumber: phone,
+      items: [{
+        name: String(itemName || 'Compra Bukeame').slice(0, 40),
+        description: String(itemName || 'Compra Bukeame').slice(0, 40),
+        quantity: '1', price: dollars, tax: '0.00', metadata: '',
+      }],
+    };
+    const r = await athPost(ATH_PAYMENT_URL, body);
+    if (r.ok && r.data && r.data.ecommerceId && r.data.auth_token)
+      return { ecommerceId: r.data.ecommerceId, authToken: r.data.auth_token };
+    return null;
+  }
 
-  // ==========================================================================
-  //  POST /api/billing/ath/confirm — verifica el pago y activa la función
-  //  authRequired + businessScope (regla 4: sólo activa LO SUYO).
-  //  body: { kind:'plan'|'addon'|'featured'|'ad_budget', code, weeks?, campaign_id?, amount?, ecommerceId, referenceNumber }
-  // ==========================================================================
-  app.post('/api/billing/ath/confirm', authRequired, businessScope, asyncH(async (req, res) => {
-    if (!enabled) return bad(res, 'El cobro por ATH Móvil no está disponible', 503);
+  // Consulta el estado del pago. Devuelve la data de ATH (ecommerceStatus, total, ...) o null.
+  async function athFind(ecommerceId, authToken) {
+    const r = await athPost(ATH_FIND_URL, { ecommerceId, publicToken: PUBLIC_TOKEN }, authToken);
+    return r.data;
+  }
 
-    const { kind, code, codes, weeks, campaign_id, amount, ecommerceId, referenceNumber } = req.body || {};
+  // Autoriza (captura) el pago confirmado. Devuelve la data (COMPLETED + referenceNumber) o null.
+  async function athAuthorize(authToken) {
+    const r = await athPost(ATH_AUTH_URL, '', authToken);
+    return r.data;
+  }
 
-    // ── Validación de entrada ───────────────────────────────────────────────
-    if (!['plan', 'addon', 'addons', 'featured', 'ad_budget'].includes(kind)) return bad(res, 'Tipo de cobro inválido');
-    if (!isStr(ecommerceId, 200)) return bad(res, 'ecommerceId inválido');
-    if (!isStr(referenceNumber, 200)) return bad(res, 'referenceNumber inválido');
+  // ── MONTO ESPERADO calculado EN EL SERVIDOR (regla 1) ──────────────────────
+  // Valida la entrada y devuelve { montoEsperadoCents, refCode, codesArr, weeksVal, title }
+  // o lanza un Error con .userMsg/.httpStatus para responder bad().
+  async function computeExpected(kind, body) {
+    const { code, codes, campaign_id, amount, weeks } = body || {};
+    const fail = (msg, status) => { const e = new Error(msg); e.userMsg = msg; e.httpStatus = status || 400; throw e; };
 
-    // 'addons' (plural) = varios add-ons en un solo pago; los demás usan un solo 'code'.
-    // 'ad_budget' = recarga de presupuesto de una campaña; usa campaign_id + amount.
-    let codesArr = [];
+    let codesArr = [], weeksVal = null, refCode, montoEsperadoCents, title;
+
     if (kind === 'addons') {
-      if (!Array.isArray(codes) || codes.length < 1 || codes.length > 10)
-        return bad(res, 'Selecciona entre 1 y 10 add-ons');
+      if (!Array.isArray(codes) || codes.length < 1 || codes.length > 10) fail('Selecciona entre 1 y 10 add-ons');
       codesArr = [...new Set(codes.map(c => String(c == null ? '' : c).trim()).filter(c => c && c.length <= 60))];
-      if (!codesArr.length) return bad(res, 'Códigos de add-ons inválidos');
-    } else if (kind === 'ad_budget') {
-      if (!isUuid(campaign_id)) return bad(res, 'Campaña inválida');
-      if (!Number.isInteger(amount) || amount <= 0 || amount > 100000000)
-        return bad(res, 'Monto de presupuesto inválido');
-    } else if (!isStr(code, 60)) {
-      return bad(res, 'Código inválido');
-    }
-
-    let weeksVal = null;
-    if (kind === 'featured') {
-      weeksVal = Number.isInteger(weeks) ? weeks : 0;
-      if (weeksVal < 1 || weeksVal > 12) return bad(res, 'Semanas entre 1 y 12');
-    }
-
-    const refCode = kind === 'addons' ? codesArr.join(',')
-      : kind === 'ad_budget' ? campaign_id
-      : code.trim();
-
-    // ── (a) MONTO ESPERADO calculado EN EL SERVIDOR (regla 1) ────────────────
-    let montoEsperadoCents;
-    if (kind === 'plan') {
-      if (refCode === 'free') return bad(res, 'El plan gratis no se cobra');
-      const p = await db.query(`SELECT price_monthly_cents FROM plans WHERE code = $1`, [refCode]);
-      if (!p.rows[0]) return bad(res, 'Plan no existe', 404);
-      montoEsperadoCents = p.rows[0].price_monthly_cents;
-      if (!Number.isInteger(montoEsperadoCents) || montoEsperadoCents <= 0)
-        return bad(res, 'Este plan no es cobrable', 400);
-    } else if (kind === 'addon') {
-      const a = await db.query(`SELECT name, price_cents FROM addon_catalog WHERE code = $1`, [refCode]);
-      if (!a.rows[0]) return bad(res, 'Add-on no existe', 404);
-      montoEsperadoCents = a.rows[0].price_cents;
-    } else if (kind === 'addons') {
-      // suma de los precios de cada add-on seleccionado (servidor, nunca el cliente)
-      const a = await db.query(
-        `SELECT code, price_cents FROM addon_catalog WHERE code = ANY($1::text[])`, [codesArr]);
-      if (a.rows.length !== codesArr.length) return bad(res, 'Algún add-on no existe', 404);
+      if (!codesArr.length) fail('Códigos de add-ons inválidos');
+      const a = await db.query(`SELECT code, price_cents FROM addon_catalog WHERE code = ANY($1::text[])`, [codesArr]);
+      if (a.rows.length !== codesArr.length) fail('Algún add-on no existe', 404);
       montoEsperadoCents = a.rows.reduce((s, r) => s + r.price_cents, 0);
+      refCode = codesArr.join(',');
+      title = 'Add-ons (' + codesArr.length + ')';
     } else if (kind === 'ad_budget') {
-      // El monto lo elige el negocio (recarga). La regla 1 sigue valiendo: el pago
-      // verificado por ATH DEBE igualar este monto (chequeo más abajo).
+      if (!isUuid(campaign_id)) fail('Campaña inválida');
+      if (!Number.isInteger(amount) || amount <= 0 || amount > 100000000) fail('Monto de presupuesto inválido');
       montoEsperadoCents = amount;
-    } else { // featured
-      if (refCode !== 'featured') return bad(res, 'Código de destacado inválido');
+      refCode = campaign_id;
+      title = 'Presupuesto de anuncio';
+    } else if (kind === 'plan') {
+      if (!isStr(code, 60)) fail('Código inválido');
+      refCode = code.trim();
+      if (refCode === 'free') fail('El plan gratis no se cobra');
+      const p = await db.query(`SELECT name, price_monthly_cents FROM plans WHERE code = $1`, [refCode]);
+      if (!p.rows[0]) fail('Plan no existe', 404);
+      montoEsperadoCents = p.rows[0].price_monthly_cents;
+      if (!Number.isInteger(montoEsperadoCents) || montoEsperadoCents <= 0) fail('Este plan no es cobrable');
+      title = 'Plan ' + (p.rows[0].name || refCode);
+    } else if (kind === 'addon') {
+      if (!isStr(code, 60)) fail('Código inválido');
+      refCode = code.trim();
+      const a = await db.query(`SELECT name, price_cents FROM addon_catalog WHERE code = $1`, [refCode]);
+      if (!a.rows[0]) fail('Add-on no existe', 404);
+      montoEsperadoCents = a.rows[0].price_cents;
+      title = a.rows[0].name || 'Add-on';
+    } else if (kind === 'featured') {
+      if (!isStr(code, 60) || code.trim() !== 'featured') fail('Código de destacado inválido');
+      refCode = 'featured';
+      weeksVal = Number.isInteger(weeks) ? weeks : 0;
+      if (weeksVal < 1 || weeksVal > 12) fail('Semanas entre 1 y 12');
       const f = await db.query(`SELECT price_cents FROM addon_catalog WHERE code = 'featured'`);
-      if (!f.rows[0]) return bad(res, 'Destacado no disponible', 404);
+      if (!f.rows[0]) fail('Destacado no disponible', 404);
       montoEsperadoCents = f.rows[0].price_cents * weeksVal;
+      title = 'Destacado';
+    } else {
+      fail('Tipo de cobro inválido');
     }
+    return { montoEsperadoCents, refCode, codesArr, weeksVal, title };
+  }
 
-    // ── (b) Verificar el pago con ATH (regla 5) ──────────────────────────────
-    const v = await verifyAthPayment(ecommerceId);
-    if (!v.ok) return bad(res, 'No pudimos verificar el pago con ATH Móvil', 402);
+  // ── ACTIVAR la compra (mismos patrones SQL que el grant del admin) ─────────
+  // Corre dentro de una transacción (client). Devuelve la fila activada. Lanza
+  // Error (.userMsg/.httpStatus) en los casos raros de no-encontrado.
+  async function activatePurchase(client, business, kind, refCode, codesArr, campaignId, weeksVal, montoEsperadoCents) {
+    const fail = (msg, status) => { const e = new Error(msg); e.userMsg = msg; e.httpStatus = status || 404; throw e; };
 
-    // ── (c) El monto verificado DEBE coincidir con el esperado (regla 1) ─────
-    if (Math.round(v.total * 100) !== montoEsperadoCents)
-      return bad(res, 'El monto del pago no coincide', 400);
-
-    // ── (d) Transacción: registrar el pago (idempotente) y activar (regla 2) ─
-    const client = await db.connect();
-    try {
-      await client.query('BEGIN');
-
-      // INSERT del pago; el índice único (provider, reference_number) garantiza
-      // que un 2.º intento con el mismo referenceNumber falle con 23505.
-      let payRow;
-      try {
-        const ins = await client.query(
-          `INSERT INTO platform_ath_payments
-             (business_id, provider, ecommerce_id, reference_number, kind, ref_code, weeks, amount_cents, status, raw)
-           VALUES ($1,'athmovil',$2,$3,$4,$5,$6,$7,'completed',$8)
-           RETURNING id`,
-          [req.business.id, ecommerceId, referenceNumber, kind, refCode,
-           weeksVal, montoEsperadoCents, v.raw ? JSON.stringify(v.raw) : null]);
-        payRow = ins.rows[0];
-      } catch (e) {
-        if (e.code === '23505') {
-          await client.query('ROLLBACK');
-          return bad(res, 'Este pago ya fue procesado', 409); // idempotente
-        }
-        throw e;
-      }
-
-      // ── ACTIVAR según kind (mismos patrones SQL que module-admin.js) ───────
-      let activated;
-      if (kind === 'plan') {
-        // 1 mes de suscripción (espeja POST /api/admin/businesses/:id/plan, months=1).
+    if (kind === 'plan') {
+      const up = await client.query(
+        `UPDATE subscriptions
+            SET plan_code = $2::plan_code, status = 'active',
+                current_period_start = now(), current_period_end = now() + interval '1 month',
+                cancel_at_period_end = false, trial_ends_at = NULL
+          WHERE business_id = $1
+          RETURNING plan_code, status, current_period_end`,
+        [business.id, refCode]);
+      if (!up.rows[0]) fail('El negocio no tiene suscripción registrada');
+      return up.rows[0];
+    }
+    if (kind === 'addon') {
+      const up = await client.query(
+        `INSERT INTO addons (business_id, code, price_cents) VALUES ($1,$2,$3)
+         ON CONFLICT (business_id, code)
+         DO UPDATE SET status = 'active', cancelled_at = NULL, price_cents = $3, activated_at = now()
+         RETURNING code, status, price_cents`,
+        [business.id, refCode, montoEsperadoCents]);
+      return up.rows[0];
+    }
+    if (kind === 'addons') {
+      const acts = [];
+      for (const c of codesArr) {
+        const pr = await client.query(`SELECT price_cents FROM addon_catalog WHERE code = $1`, [c]);
+        const cents = pr.rows[0] ? pr.rows[0].price_cents : 0;
         const up = await client.query(
-          `UPDATE subscriptions
-              SET plan_code = $2::plan_code, status = 'active',
-                  current_period_start = now(),
-                  current_period_end = now() + interval '1 month',
-                  cancel_at_period_end = false, trial_ends_at = NULL
-            WHERE business_id = $1
-            RETURNING plan_code, status, current_period_end`,
-          [req.business.id, refCode]);
-        if (!up.rows[0]) {
-          await client.query('ROLLBACK');
-          return bad(res, 'El negocio no tiene suscripción registrada', 404);
-        }
-        activated = up.rows[0];
-      } else if (kind === 'addon') {
-        // INSERT ... ON CONFLICT (espeja el grant de add-on del admin).
-        const up = await client.query(
-          `INSERT INTO addons (business_id, code, price_cents)
-           VALUES ($1,$2,$3)
+          `INSERT INTO addons (business_id, code, price_cents) VALUES ($1,$2,$3)
            ON CONFLICT (business_id, code)
            DO UPDATE SET status = 'active', cancelled_at = NULL, price_cents = $3, activated_at = now()
            RETURNING code, status, price_cents`,
-          [req.business.id, refCode, montoEsperadoCents]);
-        activated = up.rows[0];
-      } else if (kind === 'addons') {
-        // Activa TODOS los add-ons pagados (uno por código), mismo patrón ON CONFLICT.
-        const acts = [];
-        for (const c of codesArr) {
-          const pr = await client.query(`SELECT price_cents FROM addon_catalog WHERE code = $1`, [c]);
-          const cents = pr.rows[0] ? pr.rows[0].price_cents : 0;
-          const up = await client.query(
-            `INSERT INTO addons (business_id, code, price_cents)
-             VALUES ($1,$2,$3)
-             ON CONFLICT (business_id, code)
-             DO UPDATE SET status = 'active', cancelled_at = NULL, price_cents = $3, activated_at = now()
-             RETURNING code, status, price_cents`,
-            [req.business.id, c, cents]);
-          acts.push(up.rows[0]);
-        }
-        activated = acts;
-      } else if (kind === 'ad_budget') {
-        // Recarga el presupuesto de la campaña y, si estaba pausada, la reactiva.
-        // Valida pertenencia: WHERE id = $1 AND business_id = $2 (aislamiento multi-tenant).
-        const up = await client.query(
-          `UPDATE ad_campaigns
-              SET budget_cents = budget_cents + $3,
-                  status = CASE WHEN status = 'paused' THEN 'active' ELSE status END
-            WHERE id = $1 AND business_id = $2
-            RETURNING id, status, budget_cents`,
-          [campaign_id, req.business.id, montoEsperadoCents]);
-        if (!up.rows[0]) {
-          await client.query('ROLLBACK');
-          return bad(res, 'Campaña no encontrada', 404);
-        }
-        activated = up.rows[0];
-      } else { // featured
-        // INSERT featured_listings + marca businesses.is_featured (espeja el admin).
-        let catId = null;
-        const c = await client.query(
-          `SELECT category_id FROM business_categories WHERE business_id = $1 ORDER BY category_id LIMIT 1`,
-          [req.business.id]);
-        catId = c.rows[0] ? c.rows[0].category_id : null;
-        // NOTA: featured_listings.payment_id es FK a la tabla vieja platform_payments,
-        // no a platform_ath_payments; por eso lo dejamos NULL (igual que el grant del admin).
-        const fl = await client.query(
-          `INSERT INTO featured_listings (business_id, municipality_id, category_id, ends_at)
-           VALUES ($1, $2, $3, now() + ($4 || ' weeks')::interval)
-           RETURNING id, ends_at`,
-          [req.business.id, req.business.municipality_id || null, catId, String(weeksVal)]);
-        await client.query(`UPDATE businesses SET is_featured = true WHERE id = $1`, [req.business.id]);
-        activated = fl.rows[0];
+          [business.id, c, cents]);
+        acts.push(up.rows[0]);
       }
+      return acts;
+    }
+    if (kind === 'ad_budget') {
+      const up = await client.query(
+        `UPDATE ad_campaigns
+            SET budget_cents = budget_cents + $3,
+                status = CASE WHEN status = 'paused' THEN 'active' ELSE status END
+          WHERE id = $1 AND business_id = $2
+          RETURNING id, status, budget_cents`,
+        [campaignId, business.id, montoEsperadoCents]);
+      if (!up.rows[0]) fail('Campaña no encontrada');
+      return up.rows[0];
+    }
+    // featured
+    const c = await client.query(
+      `SELECT category_id FROM business_categories WHERE business_id = $1 ORDER BY category_id LIMIT 1`,
+      [business.id]);
+    const catId = c.rows[0] ? c.rows[0].category_id : null;
+    const fl = await client.query(
+      `INSERT INTO featured_listings (business_id, municipality_id, category_id, ends_at)
+       VALUES ($1, $2, $3, now() + ($4 || ' weeks')::interval)
+       RETURNING id, ends_at`,
+      [business.id, business.municipality_id || null, catId, String(weeksVal)]);
+    await client.query(`UPDATE businesses SET is_featured = true WHERE id = $1`, [business.id]);
+    return fl.rows[0];
+  }
 
+  // Registra el pago (idempotente por referenceNumber) y activa la compra en UNA
+  // transacción. Devuelve { activated } o { already:true }.
+  async function recordAndActivate(business, kind, refCode, codesArr, campaignId, weeksVal, montoEsperadoCents, ecommerceId, referenceNumber, raw) {
+    const client = await db.connect();
+    try {
+      await client.query('BEGIN');
+      try {
+        await client.query(
+          `INSERT INTO platform_ath_payments
+             (business_id, provider, ecommerce_id, reference_number, kind, ref_code, weeks, amount_cents, status, raw)
+           VALUES ($1,'athmovil',$2,$3,$4,$5,$6,$7,'completed',$8)`,
+          [business.id, ecommerceId, referenceNumber, kind, refCode, weeksVal, montoEsperadoCents,
+           raw ? JSON.stringify(raw) : null]);
+      } catch (e) {
+        if (e.code === '23505') { await client.query('ROLLBACK'); return { already: true }; }
+        throw e;
+      }
+      const activated = await activatePurchase(client, business, kind, refCode, codesArr, campaignId, weeksVal, montoEsperadoCents);
       await client.query('COMMIT');
-
-      // ── (e) Auditoría + notificación ────────────────────────────────────────
-      await audit(req, 'billing.ath.' + kind, 'platform_payment', payRow.id,
-        { code: refCode, weeks: weeksVal, amount_cents: montoEsperadoCents, reference_number: referenceNumber });
-      await notify(req.business.id, 'payment', 'Pago recibido',
-        `Recibimos tu pago de $${(montoEsperadoCents / 100).toFixed(2)} por ATH Móvil. ¡Gracias!`,
-        { kind, code: refCode });
-
-      res.json({ ok: true, kind, activated });
+      return { activated };
     } catch (e) {
       await client.query('ROLLBACK');
       throw e;
     } finally {
       client.release();
     }
+  }
+
+  // ==========================================================================
+  //  GET /api/billing/ath/config — sólo si ATH está disponible (sin secretos)
+  // ==========================================================================
+  app.get('/api/billing/ath/config', asyncH(async (_req, res) => {
+    res.json({ enabled, env: ATHM_ENV });
   }));
 
-  console.log('  ✓ módulo billing ATH montado');
+  // ==========================================================================
+  //  POST /api/billing/ath/create — inicia el pago (manda push a la app del dueño)
+  //  authRequired + businessScope. body: { kind, code?|codes?|campaign_id?, amount?, weeks?, phoneNumber }
+  //  → { ecommerceId }
+  // ==========================================================================
+  app.post('/api/billing/ath/create', authRequired, businessScope, asyncH(async (req, res) => {
+    if (!enabled) return bad(res, 'El cobro por ATH Móvil no está disponible', 503);
+    gcPending();
+
+    const { kind, phoneNumber } = req.body || {};
+    if (!['plan', 'addon', 'addons', 'featured', 'ad_budget'].includes(kind)) return bad(res, 'Tipo de cobro inválido');
+    const phone = athPhone(phoneNumber);
+    if (!phone) return bad(res, 'Escribe un número de ATH Móvil válido (10 dígitos)');
+
+    let exp;
+    try { exp = await computeExpected(kind, req.body); }
+    catch (e) { if (e.userMsg) return bad(res, e.userMsg, e.httpStatus); throw e; }
+
+    const created = await athCreate(
+      exp.montoEsperadoCents, phone,
+      String(req.business.id), kind + ':' + exp.refCode, exp.title);
+    if (!created) return bad(res, 'ATH Móvil no aceptó el pago. Verifica el número e intenta de nuevo.', 502);
+
+    pendingAth.set(created.ecommerceId, {
+      businessId: req.business.id,
+      authToken: created.authToken,
+      kind, refCode: exp.refCode, codesArr: exp.codesArr,
+      campaignId: kind === 'ad_budget' ? exp.refCode : null,
+      weeksVal: exp.weeksVal, montoEsperadoCents: exp.montoEsperadoCents,
+      createdAt: Date.now(),
+    });
+    await audit(req, 'billing.ath.create', 'platform_payment', null,
+      { kind, code: exp.refCode, amount_cents: exp.montoEsperadoCents });
+    res.json({ ecommerceId: created.ecommerceId, amount_cents: exp.montoEsperadoCents });
+  }));
+
+  // ==========================================================================
+  //  POST /api/billing/ath/status — polling: consulta ATH y, al confirmar, autoriza
+  //  y ACTIVA la compra. authRequired + businessScope. body: { ecommerceId }
+  //  → { status: 'pending' | 'completed' | 'cancelled', activated? }
+  // ==========================================================================
+  app.post('/api/billing/ath/status', authRequired, businessScope, asyncH(async (req, res) => {
+    if (!enabled) return bad(res, 'El cobro por ATH Móvil no está disponible', 503);
+    const { ecommerceId } = req.body || {};
+    if (!isStr(ecommerceId, 200)) return bad(res, 'ecommerceId inválido');
+
+    const pend = pendingAth.get(ecommerceId);
+    if (!pend || pend.businessId !== req.business.id) return bad(res, 'Pago no encontrado', 404);
+
+    // 1) Estado actual en ATH.
+    const found = await athFind(ecommerceId, pend.authToken);
+    const st = found && found.ecommerceStatus;
+
+    if (st === 'CANCEL') { pendingAth.delete(ecommerceId); return res.json({ status: 'cancelled' }); }
+    if (st !== 'CONFIRM' && st !== 'COMPLETED') return res.json({ status: 'pending' }); // OPEN / null → seguir
+
+    // 2) Capturar (authorization) si aún no está COMPLETED.
+    let fin = found;
+    if (st === 'CONFIRM') {
+      fin = await athAuthorize(pend.authToken);
+      if (!fin || fin.ecommerceStatus !== 'COMPLETED')
+        return res.json({ status: 'pending' }); // reintenta en el próximo poll
+    }
+
+    // 3) El monto verificado DEBE coincidir con el esperado (regla 1).
+    const total = Number(fin.total);
+    if (!Number.isFinite(total) || Math.round(total * 100) !== pend.montoEsperadoCents)
+      return bad(res, 'El monto del pago no coincide', 400);
+
+    // 4) Registrar (idempotente) + activar.
+    let result;
+    try {
+      result = await recordAndActivate(
+        req.business, pend.kind, pend.refCode, pend.codesArr, pend.campaignId,
+        pend.weeksVal, pend.montoEsperadoCents, ecommerceId, fin.referenceNumber || ecommerceId, fin);
+    } catch (e) {
+      if (e.userMsg) return bad(res, e.userMsg, e.httpStatus);
+      throw e;
+    }
+    pendingAth.delete(ecommerceId);
+
+    if (!result.already) {
+      await audit(req, 'billing.ath.' + pend.kind, 'platform_payment', null,
+        { code: pend.refCode, weeks: pend.weeksVal, amount_cents: pend.montoEsperadoCents, reference_number: fin.referenceNumber });
+      await notify(req.business.id, 'payment', 'Pago recibido',
+        `Recibimos tu pago de $${(pend.montoEsperadoCents / 100).toFixed(2)} por ATH Móvil. ¡Gracias!`,
+        { kind: pend.kind, code: pend.refCode });
+    }
+    res.json({ status: 'completed', kind: pend.kind, activated: result.activated || null });
+  }));
+
+  console.log('  ✓ módulo billing ATH montado (flujo REST: create → poll → authorize)');
 }
 
 module.exports = { mount };

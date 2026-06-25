@@ -873,14 +873,22 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
 <!-- Pago con ATH Móvil -->
 <div class="modal" id="athModal" role="dialog" aria-modal="true" aria-labelledby="athTitle">
   <div class="box">
+    <style>@keyframes athspin{to{transform:rotate(360deg)}}</style>
     <h3 id="athTitle">Pagar con ATH Móvil</h3>
     <div class="alert" id="athAlert"></div>
     <div id="athSummary" style="font-size:13.5px;color:var(--ink);background:var(--paper);border-radius:11px;padding:12px 14px;margin-bottom:14px;line-height:1.6"></div>
-    <p style="font-size:12.5px;color:var(--ink2);margin-bottom:12px">Toca el botón de ATH Móvil para pagar. Se abrirá tu app de ATH Móvil para confirmar. Al completarse, tu compra se activa automáticamente.</p>
-    <!-- Contenedor del botón oficial de ATH Móvil V3 (lo renderiza athmovilV3.js
-         en este id, igual que negocio.html / cita.html). -->
-    <div id="ATHMovil_Checkout_Button" style="min-height:50px;margin-bottom:12px"></div>
-    <div style="display:flex;gap:10px">
+    <!-- Paso 1: número de ATH Móvil del que paga -->
+    <div id="athPhoneStep">
+      <p style="font-size:12.5px;color:var(--ink2);margin-bottom:10px">Escribe tu número de ATH Móvil. Te llegará una notificación a tu app para confirmar el pago.</p>
+      <div class="field"><label>Número de ATH Móvil</label><input id="athPhone" type="tel" inputmode="numeric" placeholder="787-555-1234" style="background:#FFFFFF;color:#17150F"></div>
+      <button type="button" class="btn btn-teal" id="athPayBtn" style="width:100%">Enviar pago a mi ATH Móvil</button>
+    </div>
+    <!-- Paso 2: esperando que confirmes en tu app (polling) -->
+    <div id="athPollStep" style="display:none;text-align:center;padding:6px 0 4px">
+      <div style="width:34px;height:34px;border:3px solid var(--line);border-top-color:var(--teal);border-radius:50%;margin:6px auto 12px;animation:athspin 0.9s linear infinite"></div>
+      <p id="athPollMsg" style="font-size:13px;color:var(--ink);line-height:1.5">Abre tu app de ATH Móvil y confirma el pago…</p>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:12px">
       <button type="button" class="btn btn-ghost btn-sm" id="athCancel" style="flex:1">Cancelar</button>
     </div>
   </div>
@@ -3603,96 +3611,95 @@ document.getElementById('exportBtn').onclick = async function(){
 
 function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 
-// ════════════════════════ ATH MÓVIL (pago) ════════════════════════
-// Config pública del backend (SOLO publicToken; nunca el token privado).
-var ATH_CFG = { enabled:false, env:'production', publicToken:'' };
-// Compra en curso para el modal ATH: { kind, code, weeks?, amountCents, title }
-var ATH_PENDING = null;
+// ════════════════════ ATH MÓVIL (pago — flujo REST con polling) ════════════════════
+// Igual que Wifnix: el backend crea el pago (/billing/ath/create) y ATH manda una
+// PUSH a la app del dueño; el dueño confirma en SU app; el front hace polling a
+// /billing/ath/status hasta que el backend autoriza y activa la compra. NO usa el
+// botón JS (ese es otro producto distinto y no abre la app de forma fiable).
+var ATH_CFG = { enabled:false };
+var ATH_PENDING = null;     // { kind, code?, codes?, weeks?, campaign_id?, amountCents, title }
+var ATH_POLL = null;        // id del setInterval del polling en curso
 
 async function loadAthConfig(){
   try{
     var r = await api('GET','/billing/ath/config');
-    if(r.ok && r.data){
-      ATH_CFG.enabled = !!r.data.enabled;
-      ATH_CFG.env = r.data.env || 'production';
-      ATH_CFG.publicToken = r.data.publicToken || '';
-      // El SDK de ATH lo carga renderAthButton (mismo patrón que negocio.html).
-    }
-  }catch(e){ /* sin ATH: se queda el flujo actual de "pago pendiente" */ }
+    if(r.ok && r.data){ ATH_CFG.enabled = !!r.data.enabled; }
+  }catch(e){ /* sin ATH: se queda el flujo de "pago pendiente" */ }
 }
 
-// Renderiza el botón OFICIAL de ATH Móvil V3 — EXACTAMENTE el mismo patrón que
-// negocio.html / cita.html (que SÍ abren la app de ATH). El SDK athmovilV3.js lee
-// window.ATHM_Checkout (ya fijado en openAthCheckout) y pinta el botón en
-// #ATHMovil_Checkout_Button. Para montos variables: si el SDK ya cargó, se
-// re-renderiza con window.loadButtonATHM(). El usuario toca el botón → ATH abre
-// su app para confirmar el pago (no se auto-dispara).
-var __athLoaded = false;
-function renderAthButton(){
-  if(__athLoaded){
-    if(typeof window.loadButtonATHM === 'function'){ try{ window.loadButtonATHM(); }catch(e){} }
-    return;
-  }
-  var s = document.createElement('script');
-  s.src = 'https://www.athmovil.com/api/js/v3/athmovilV3.js';
-  s.async = true;
-  s.onload = function(){ __athLoaded = true; };
-  s.onerror = function(){ showAlert('athAlert','No se pudo cargar ATH Móvil. Intenta de nuevo.', false); };
-  document.body.appendChild(s);
-}
+function athAvailable(){ return !!ATH_CFG.enabled; }
 
-// ¿Mostrar botón "Pagar con ATH Móvil"? Solo si el backend dijo enabled.
-function athAvailable(){ return ATH_CFG.enabled && !!ATH_CFG.publicToken; }
-
-// Abre el modal de checkout ATH reutilizable.
-// opts: { kind:'plan'|'addon'|'addons'|'featured', code?, codes?, weeks?, amountCents, title }
+// Abre el modal de pago ATH (paso 1: número del que paga).
 function openAthCheckout(opts){
   if(!athAvailable()){ return; }
   ATH_PENDING = opts;
   clearAlert('athAlert');
+  if(ATH_POLL){ clearInterval(ATH_POLL); ATH_POLL = null; }
   var dollars = ((opts.amountCents||0)/100).toFixed(2);
-  var meta2;
-  if(opts.kind==='addons'){
-    meta2 = 'addons:' + (opts.codes||[]).join(',');
-  } else if(opts.kind==='ad_budget'){
-    meta2 = 'ad_budget:' + opts.campaign_id;
-  } else {
-    meta2 = opts.kind + ':' + opts.code + (opts.kind==='featured' && opts.weeks ? ':'+opts.weeks : '');
-  }
   document.getElementById('athSummary').innerHTML =
     '<div style="display:flex;justify-content:space-between;align-items:baseline">'+
       '<span>'+esc(opts.title||'Compra')+'</span>'+
       '<b style="font-family:var(--mono,monospace)">$'+dollars+'</b>'+
     '</div>';
-  // Configuración global que lee la librería de ATH Móvil.
-  window.ATHM_Checkout = {
-    env: ATH_CFG.env,
-    publicToken: ATH_CFG.publicToken,
-    timeout: 600,
-    theme: 'btn',
-    lang: 'es',
-    total: Number(dollars),
-    subtotal: Number(dollars),
-    tax: 0,
-    metadata1: String((BIZ && BIZ.id) || ''),
-    metadata2: meta2,
-    items: [{
-      name: opts.title || 'Compra Bukéame',
-      description: opts.title || 'Compra Bukéame',
-      quantity: '1',
-      price: dollars,
-      tax: '0',
-      metadata: ''
-    }]
-  };
+  document.getElementById('athPhoneStep').style.display = '';
+  document.getElementById('athPollStep').style.display = 'none';
+  var pb = document.getElementById('athPayBtn'); pb.disabled = false; pb.textContent = 'Enviar pago a mi ATH Móvil';
+  var ph = document.getElementById('athPhone');
+  if(!ph.value && typeof BIZ !== 'undefined' && BIZ){ ph.value = BIZ.ath_phone || BIZ.whatsapp || BIZ.phone || ''; }
   document.getElementById('athModal').classList.add('on');
-  // Renderiza el botón oficial V3 con este checkout. El usuario lo toca y ATH
-  // abre su app para confirmar el pago (igual que en negocio.html/cita.html).
-  renderAthButton();
 }
 
-// Tras un 402: si ATH está disponible muestra el botón "Pagar con ATH Móvil"
-// en el alert dado; si no, deja el mensaje de "pago pendiente" de siempre.
+// Paso 1 → crear el pago (manda push a la app del dueño) y pasar al polling.
+document.getElementById('athPayBtn').onclick = async function(){
+  clearAlert('athAlert');
+  var phone = (document.getElementById('athPhone').value||'').trim();
+  if(phone.replace(/\D/g,'').length < 10){ showAlert('athAlert','Escribe un número de ATH Móvil válido (10 dígitos).', false); return; }
+  var p = ATH_PENDING || {};
+  var body = { kind:p.kind, phoneNumber:phone };
+  if(p.kind === 'addons'){ body.codes = p.codes || []; }
+  else if(p.kind === 'ad_budget'){ body.campaign_id = p.campaign_id; body.amount = p.amountCents; }
+  else { body.code = p.code; }
+  if(p.kind === 'featured' && p.weeks){ body.weeks = p.weeks; }
+  this.disabled = true; this.textContent = 'Enviando…';
+  var r = await api('POST','/billing/ath/create', body);
+  if(!r.ok || !r.data || !r.data.ecommerceId){
+    this.disabled = false; this.textContent = 'Enviar pago a mi ATH Móvil';
+    showAlert('athAlert', (r.data && r.data.error) || 'No se pudo iniciar el pago.', false);
+    return;
+  }
+  document.getElementById('athPhoneStep').style.display = 'none';
+  document.getElementById('athPollStep').style.display = '';
+  startAthPolling(r.data.ecommerceId, p);
+};
+
+// Polling: consulta /billing/ath/status cada 3s. Cuando el backend autoriza y
+// activa → status='completed'. Máx ~3 min.
+function startAthPolling(ecommerceId, p){
+  var tries = 0, max = 60;   // 60 × 3s = 3 min
+  var msg = document.getElementById('athPollMsg');
+  if(ATH_POLL){ clearInterval(ATH_POLL); }
+  ATH_POLL = setInterval(async function(){
+    tries++;
+    if(tries > max){ clearInterval(ATH_POLL); ATH_POLL=null; msg.innerHTML = 'El pago expiró. Cierra y vuelve a intentar.'; return; }
+    var r = await api('POST','/billing/ath/status', { ecommerceId: ecommerceId });
+    if(!r.ok){ return; }  // error transitorio: sigue intentando
+    var st = r.data && r.data.status;
+    if(st === 'completed'){
+      clearInterval(ATH_POLL); ATH_POLL = null;
+      closeAthCheckout();
+      if(p.kind === 'plan'){ showAlert('acctMsg','¡Pago recibido! Tu plan está activo.', true); loadAccount(); }
+      else if(p.kind === 'addon' || p.kind === 'addons'){ showAlert('addonAlert','¡Pago recibido! Add-ons activados.', true); loadAddons(); }
+      else if(p.kind === 'featured'){ showAlert('featAlert','¡Pago recibido! Tu negocio está destacado.', true); loadFeatured(); }
+      else if(p.kind === 'ad_budget'){ showAlert('promoAlert','¡Pago recibido! Presupuesto cargado a tu campaña.', true); loadPromos(); }
+    } else if(st === 'cancelled'){
+      clearInterval(ATH_POLL); ATH_POLL = null;
+      msg.innerHTML = '<span style="color:var(--danger,#d33)">Pago cancelado. Cierra y vuelve a intentar.</span>';
+    }
+    // st === 'pending' → seguir esperando
+  }, 3000);
+}
+
+// Tras un 402: muestra el botón "Pagar con ATH Móvil" en el alert dado.
 function offerAthPay(alertId, opts){
   if(!athAvailable()){
     showAlert(alertId,'Pago pendiente. Confirma el pago para activar.', false);
@@ -3715,55 +3722,11 @@ function offerAthPay(alertId, opts){
 }
 
 function closeAthCheckout(){
+  if(ATH_POLL){ clearInterval(ATH_POLL); ATH_POLL = null; }
   document.getElementById('athModal').classList.remove('on');
   ATH_PENDING = null;
 }
 document.getElementById('athCancel').onclick = closeAthCheckout;
-
-// ── Callbacks globales que invoca la librería de ATH Móvil ──
-// Pago COMPLETADO: confirma server-side y activa la compra.
-window.authorizationATHM = async function(response){
-  try{
-    // V3 invoca authorizationATHM(response) SOLO cuando el pago se completó; el
-    // response trae ecommerceId/referenceNumber. El backend RE-VERIFICA con el
-    // token privado (findPayment) antes de activar nada, así que esto es seguro.
-    var data = response || {};
-    var p = ATH_PENDING || {};
-    var body = {
-      kind: p.kind,
-      ecommerceId: data.ecommerceId,
-      referenceNumber: data.referenceNumber
-    };
-    if(p.kind === 'addons'){ body.codes = p.codes || []; }
-    else if(p.kind === 'ad_budget'){ body.campaign_id = p.campaign_id; body.amount = p.amountCents; }
-    else { body.code = p.code; }
-    if(p.kind === 'featured' && p.weeks){ body.weeks = p.weeks; }
-    var cr = await api('POST','/billing/ath/confirm', body);
-    if(cr.ok && cr.data && cr.data.ok){
-      closeAthCheckout();
-      if(p.kind === 'plan'){
-        showAlert('acctMsg','¡Pago recibido! Tu plan está activo.', true);
-        loadAccount();
-      } else if(p.kind === 'addon' || p.kind === 'addons'){
-        showAlert('addonAlert','¡Pago recibido! Add-ons activados.', true);
-        loadAddons();
-      } else if(p.kind === 'featured'){
-        showAlert('featAlert','¡Pago recibido! Tu negocio está destacado.', true);
-        loadFeatured();
-      } else if(p.kind === 'ad_budget'){
-        showAlert('promoAlert','¡Pago recibido! Presupuesto cargado a tu campaña.', true);
-        loadPromos();
-      }
-    } else {
-      showAlert('athAlert', (cr.data && cr.data.error) || 'No se pudo confirmar el pago.', false);
-    }
-  }catch(e){
-    console.error('authorizationATHM', e);
-    showAlert('athAlert','Ocurrió un error al confirmar el pago.', false);
-  }
-};
-window.cancelATHM = function(){ showAlert('athAlert','Pago cancelado.', false); };
-window.expiredATHM = function(){ showAlert('athAlert','El pago expiró. Intenta de nuevo.', false); };
 
 loadAthConfig();
 boot();
