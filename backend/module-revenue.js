@@ -20,6 +20,84 @@ module.exports.mount = function (app, ctx) {
   const cents = v => Number.isInteger(v) && v >= 0 && v <= 100000000; // ≤ $1M
   const posInt = v => Number.isInteger(v) && v > 0;
 
+  // ---- Pago de órdenes de tienda (espeja la infra de depósitos) ----
+  const athRest = require('./ath-rest');
+  // ecommerceId → { slug, orderId, businessId, authToken, publicToken, expectedCents, createdAt }
+  const athOrderPending = new Map();
+  setInterval(() => {
+    const cutoff = Date.now() - 12 * 60_000;
+    for (const [k, v] of athOrderPending) if (v.createdAt < cutoff) athOrderPending.delete(k);
+  }, 60_000);
+
+  // EL ÚNICO lugar donde el inventario se descuenta y la gift card se redime: SOLO al
+  // CONFIRMAR el pago (AUTO verificado o MANUAL validado por el negocio). Atómico +
+  // idempotente (guard 'committed'; cubre órdenes legacy ya descontadas). FOR UPDATE
+  // serializa dos confirmaciones simultáneas (poll AUTO + validar manual).
+  // Devuelve { applied | alreadyCommitted | oversell+item | missing }.
+  async function confirmOrderPayment(orderId, businessId, opts = {}) {
+    const client = await db.connect();
+    try {
+      await client.query('BEGIN');
+      const o = await client.query(
+        `SELECT id, items, total_cents, gift_card_id, status, committed
+           FROM product_orders WHERE id = $1 AND business_id = $2 FOR UPDATE`, [orderId, businessId]);
+      const ord = o.rows[0];
+      if (!ord) { await client.query('ROLLBACK'); return { missing: true }; }
+      // Guard idempotente: si ya se aplicó stock+gift (o es legacy), solo sella 'paid'.
+      if (ord.committed) {
+        await client.query(
+          `UPDATE product_orders SET status = CASE WHEN status = 'pending' THEN 'paid' ELSE status END,
+                  paid_at = COALESCE(paid_at, now()) WHERE id = $1`, [orderId]);
+        await client.query('COMMIT');
+        return { alreadyCommitted: true };
+      }
+      // Descontar inventario con el MISMO guard anti-sobreventa que el flujo viejo
+      // (stock NULL = ilimitado → nunca bloquea).
+      const items = Array.isArray(ord.items) ? ord.items : [];
+      for (const it of items) {
+        const u = await client.query(
+          `UPDATE products SET stock = stock - $1
+            WHERE id = $2 AND business_id = $3 AND (stock IS NULL OR stock >= $1)`,
+          [it.qty, it.product_id, businessId]);
+        if (u.rowCount === 0) { await client.query('ROLLBACK'); return { oversell: true, item: it.name }; }
+      }
+      // Redimir gift card (si hay) con lock + guard de saldo. CHECK(amount_cents>0) del
+      // schema → SOLO insertamos la redención si giftApplied > 0.
+      let giftApplied = 0;
+      if (ord.gift_card_id) {
+        const gl = await client.query(
+          `SELECT balance_cents, status FROM gift_cards WHERE id = $1 AND business_id = $2 FOR UPDATE`,
+          [ord.gift_card_id, businessId]);
+        const gc = gl.rows[0];
+        if (gc && ['active', 'partial'].includes(gc.status) && gc.balance_cents > 0) {
+          giftApplied = Math.min(gc.balance_cents, ord.total_cents);
+          if (giftApplied > 0) {
+            await client.query(`INSERT INTO gift_card_redemptions (gift_card_id, amount_cents) VALUES ($1,$2)`,
+              [ord.gift_card_id, giftApplied]);
+            await client.query(
+              `UPDATE gift_cards SET balance_cents = balance_cents - $1,
+                  status = CASE WHEN balance_cents - $1 <= 0 THEN 'redeemed' ELSE 'partial' END
+                WHERE id = $2 AND balance_cents >= $1`, [giftApplied, ord.gift_card_id]);
+          }
+        }
+      }
+      await client.query(
+        `UPDATE product_orders SET status = 'paid', paid_at = now(), committed = true WHERE id = $1`, [orderId]);
+      await client.query('COMMIT');
+      // Si el cobro AUTO se calculó con un estimado de gift distinto del real, avisa al
+      // negocio para que cobre/reembolse la diferencia (no bloquea la confirmación).
+      if (opts.expectedBalanceDue != null && (ord.total_cents - giftApplied) !== opts.expectedBalanceDue) {
+        const diff = (Math.abs((ord.total_cents - giftApplied) - opts.expectedBalanceDue) / 100).toFixed(2);
+        try {
+          await notify(businessId, 'order', '⚠️ Gift card de orden cambió',
+            `La gift card cubrió distinto de lo estimado · diferencia $${diff} · ajusta el cobro`, { order_id: orderId });
+        } catch (e) {}
+      }
+      return { applied: true, giftApplied };
+    } catch (e) { await client.query('ROLLBACK'); throw e; }
+    finally { client.release(); }
+  }
+
   // SEGURIDAD (monetización): NINGUNA función paga se concede sin pago confirmado —
   // ni planes, ni add-ons, ni destacado. El cobro es manual (ATH/transferencia) y la
   // función se concede SOLO cuando el admin confirma el dinero recibido vía
@@ -317,7 +395,7 @@ module.exports.mount = function (app, ctx) {
   //  PEDIDOS de productos (público — el cliente compra en la página)
   // ==========================================================================
   app.post('/api/public/:slug/orders', bookingLimiter, asyncH(async (req, res) => {
-    const { items, buyer_name, buyer_phone, buyer_email, fulfillment, gift_code, ad_campaign_id } = req.body || {};
+    const { items, buyer_name, buyer_phone, buyer_email, fulfillment, gift_code, ad_campaign_id, payment_method } = req.body || {};
     if (!isStr(buyer_name, 120)) return bad(res, 'Tu nombre es requerido');
     if (!Array.isArray(items) || !items.length || items.length > 50) return bad(res, 'Carrito inválido');
 
@@ -358,67 +436,135 @@ module.exports.mount = function (app, ctx) {
       giftId = g.rows[0].id;
     }
 
-    const client = await db.connect();
+    // El inventario y la gift card NO se mueven al crear: solo al CONFIRMAR el pago
+    // (confirmOrderPayment). Aquí solo se valida disponibilidad y se crea 'pending'.
+    // Método de pago elegido por el cliente → enum + bandera manual_validate:
+    //   ath_business/card = AUTO (paga antes de reservar) · ath_manual/cash = MANUAL
+    //   (el negocio valida). Sin método válido → manual (el negocio gestiona).
+    const PM = {
+      ath_business: { method: 'ath_movil', manual: false },
+      card:         { method: 'card',      manual: false },
+      ath_manual:   { method: 'ath_movil', manual: true },
+      cash:         { method: 'cash',      manual: true },
+    };
+    const pmSel = PM[payment_method] || { method: null, manual: true };
+    let pmMethod = pmSel.method, pmManual = pmSel.manual;
+
+    // Estimado de gift card (lectura, sin redimir): fija el monto a cobrar en AUTO.
+    let giftEstimate = 0;
+    if (giftId) {
+      const gl = await db.query(`SELECT balance_cents FROM gift_cards WHERE id = $1 AND business_id = $2`, [giftId, biz.id]);
+      if (gl.rows[0]) giftEstimate = Math.min(gl.rows[0].balance_cents || 0, total);
+    }
+    const balanceDue = total - giftEstimate;
+    // Si la gift card cubre todo (nada que cobrar en línea) → forzar MANUAL: el negocio
+    // confirma (redime la gift + descuenta stock); así el worker de expiración no la toca.
+    if (balanceDue <= 0) { pmManual = true; }
+
+    const { rows } = await db.query(
+      `INSERT INTO product_orders (business_id, buyer_name, buyer_phone, buyer_email,
+          items, total_cents, fulfillment, gift_card_id, status, payment_method, manual_validate)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending',$9,$10) RETURNING id`,
+      [biz.id, buyer_name.trim(),
+       isPhone(buyer_phone) ? normPhone(buyer_phone) : null,
+       isEmail(buyer_email) ? buyer_email.toLowerCase() : null,
+       JSON.stringify(validItems), total,
+       fulfillment === 'shipping' ? 'shipping' : 'pickup', giftId, pmMethod, pmManual]);
+    const orderId = rows[0].id;
+
+    await notify(biz.id, 'order', pmManual ? '🛒 Nueva orden — valida el pago' : 'Nueva venta de producto',
+      `${buyer_name.trim()} · $${(total / 100).toFixed(2)}`, { order_id: orderId });
+
+    // Atribución de conversión si la compra vino de un anuncio promocionado.
+    if (isUuid(ad_campaign_id)) {
+      try { await require('./module-ads').recordConversion(db, ad_campaign_id, orderId); } catch (e) {}
+    }
+
+    res.status(201).json({
+      order_id: orderId,
+      total_cents: total,
+      gift_applied_cents: giftEstimate,
+      balance_due_cents: balanceDue,
+      payment_method: pmMethod,
+      manual_validate: pmManual,
+    });
+  }));
+
+  // ── Pago AUTO de orden por ATH Móvil (REST) — espeja el depósito de cita ──────
+  // El cobro va DIRECTO a la cuenta del negocio (su publicToken). Verifica el monto
+  // (== balance_due) y al completar llama confirmOrderPayment (descuenta stock+gift).
+  app.post('/api/public/:slug/orders/:id/ath/start', codeLimiter, asyncH(async (req, res) => {
+    if (!isUuid(req.params.id)) return bad(res, 'ID inválido');
+    const { rows } = await db.query(
+      `SELECT o.id, o.business_id, o.total_cents, o.gift_card_id, o.status, o.committed, o.buyer_phone,
+              pp.config->>'ath_public_token' AS public_token
+         FROM product_orders o
+         JOIN businesses b ON b.id = o.business_id AND b.slug = $1 AND b.deleted_at IS NULL
+         LEFT JOIN payment_providers pp ON pp.business_id = o.business_id
+              AND pp.provider = 'ath_movil_business' AND pp.is_enabled
+        WHERE o.id = $2`, [req.params.slug, req.params.id]);
+    const o = rows[0];
+    if (!o) return bad(res, 'Orden no encontrada', 404);
+    if (o.committed || o.status !== 'pending') return bad(res, 'Esta orden ya no acepta pago', 409);
+    if (!o.public_token) return bad(res, 'Este negocio no tiene ATH Móvil automático', 400);
+    // monto a cobrar = total - gift estimada (lectura)
+    let giftEstimate = 0;
+    if (o.gift_card_id) {
+      const gl = await db.query(`SELECT balance_cents FROM gift_cards WHERE id = $1 AND business_id = $2`, [o.gift_card_id, o.business_id]);
+      if (gl.rows[0]) giftEstimate = Math.min(gl.rows[0].balance_cents || 0, o.total_cents);
+    }
+    const balanceDue = o.total_cents - giftEstimate;
+    if (balanceDue <= 0) return bad(res, 'La gift card cubre el total; el negocio confirmará tu pedido', 400);
+    const phone = athRest.athPhone(o.buyer_phone);
+    if (!phone) return bad(res, 'El teléfono de la orden no sirve para ATH Móvil', 400);
+
+    const created = await athRest.create(
+      o.public_token, process.env.ATHM_ENV || 'production',
+      balanceDue, phone, String(o.business_id), 'orden:' + req.params.id, 'Compra de productos');
+    if (!created) return bad(res, 'ATH Móvil no aceptó el pago. Intenta de nuevo.', 502);
+    athOrderPending.set(created.ecommerceId, {
+      slug: req.params.slug, orderId: o.id, businessId: o.business_id,
+      authToken: created.authToken, publicToken: o.public_token,
+      expectedCents: balanceDue, createdAt: Date.now(),
+    });
+    res.json({ ok: true, ecommerceId: created.ecommerceId });
+  }));
+
+  app.post('/api/public/:slug/orders/:id/ath/poll', codeLimiter, asyncH(async (req, res) => {
+    const { ecommerceId } = req.body || {};
+    if (!isStr(ecommerceId, 200)) return bad(res, 'ecommerceId inválido');
+    const pend = athOrderPending.get(ecommerceId);
+    if (!pend || pend.slug !== req.params.slug || pend.orderId !== req.params.id)
+      return bad(res, 'Pago no encontrado', 404);
+
+    const found = await athRest.find(pend.publicToken, ecommerceId, pend.authToken);
+    const st = found && found.ecommerceStatus;
+    if (st === 'CANCEL') { athOrderPending.delete(ecommerceId); return res.json({ status: 'cancelled' }); }
+    if (st !== 'CONFIRM' && st !== 'COMPLETED') return res.json({ status: 'pending' });
+    let fin = found;
+    if (st === 'CONFIRM') {
+      fin = await athRest.authorize(pend.authToken);
+      if (!fin || fin.ecommerceStatus !== 'COMPLETED') return res.json({ status: 'pending' });
+    }
+    const total = Number(fin.total);
+    if (!Number.isFinite(total) || Math.round(total * 100) !== pend.expectedCents)
+      return bad(res, 'El monto del pago no coincide', 400);
+
+    const r = await confirmOrderPayment(pend.orderId, pend.businessId, { expectedBalanceDue: pend.expectedCents });
+    athOrderPending.delete(ecommerceId);
+    if (r.oversell) {
+      // El pago entró pero ya no hay inventario → avisar al negocio para reembolsar.
+      try {
+        await notify(pend.businessId, 'order', '⚠️ Pago de orden sin inventario',
+          `Se cobró pero faltó ${r.oversell ? r.item : ''} · contacta al cliente para reembolsar`, { order_id: pend.orderId });
+      } catch (e) {}
+      return res.json({ status: 'completed', warning: 'stock' });
+    }
     try {
-      await client.query('BEGIN');
-      // descontar inventario; si algún producto ya no alcanza, abortar (no sobrevender)
-      for (const it of validItems) {
-        const u = await client.query(
-          `UPDATE products SET stock = stock - $1
-            WHERE id = $2 AND (stock IS NULL OR stock >= $1)`, [it.qty, it.product_id]);
-        if (u.rowCount === 0) {
-          await client.query('ROLLBACK');
-          return bad(res, `Sin suficiente inventario de ${it.name}`, 409);
-        }
-      }
-
-      // Aplicar gift card con BLOQUEO de fila + guard de saldo (anti doble-gasto)
-      let giftApplied = 0;
-      if (giftId) {
-        const gl = await client.query(
-          `SELECT balance_cents, status FROM gift_cards
-            WHERE id = $1 AND business_id = $2 FOR UPDATE`, [giftId, biz.id]);
-        const gc = gl.rows[0];
-        if (gc && ['active', 'partial'].includes(gc.status) && gc.balance_cents > 0) {
-          giftApplied = Math.min(gc.balance_cents, total);
-          await client.query(
-            `INSERT INTO gift_card_redemptions (gift_card_id, amount_cents) VALUES ($1,$2)`,
-            [giftId, giftApplied]);
-          await client.query(
-            `UPDATE gift_cards SET balance_cents = balance_cents - $1,
-                status = CASE WHEN balance_cents - $1 <= 0 THEN 'redeemed' ELSE 'partial' END
-              WHERE id = $2 AND balance_cents >= $1`, [giftApplied, giftId]);
-        }
-      }
-
-      const { rows } = await client.query(
-        `INSERT INTO product_orders (business_id, buyer_name, buyer_phone, buyer_email,
-            items, total_cents, fulfillment, gift_card_id, status)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending') RETURNING id, total_cents`,
-        [biz.id, buyer_name.trim(),
-         isPhone(buyer_phone) ? normPhone(buyer_phone) : null,
-         isEmail(buyer_email) ? buyer_email.toLowerCase() : null,
-         JSON.stringify(validItems), total,
-         fulfillment === 'shipping' ? 'shipping' : 'pickup', giftId]);
-
-      await client.query('COMMIT');
-
-      await notify(biz.id, 'order', 'Nueva venta de producto',
-        `${buyer_name.trim()} · $${(total / 100).toFixed(2)}`, { order_id: rows[0].id });
-
-      // Atribución de conversión si la compra vino de un anuncio promocionado.
-      if (isUuid(ad_campaign_id)) {
-        try { await require('./module-ads').recordConversion(db, ad_campaign_id, rows[0].id); } catch (e) {}
-      }
-
-      res.status(201).json({
-        order_id: rows[0].id,
-        total_cents: total,
-        gift_applied_cents: giftApplied,
-        balance_due_cents: total - giftApplied,
-      });
-    } catch (e) { await client.query('ROLLBACK'); throw e; }
-    finally { client.release(); }
+      await notify(pend.businessId, 'order', 'Pago de orden recibido',
+        `Orden pagada por ATH Móvil`, { order_id: pend.orderId });
+    } catch (e) {}
+    res.json({ status: 'completed' });
   }));
 
   // NOTA: el detalle público del producto y la reseña gateada por compra
@@ -427,7 +573,8 @@ module.exports.mount = function (app, ctx) {
 
   app.get('/api/orders', authRequired, businessScope, asyncH(async (req, res) => {
     const { rows } = await db.query(
-      `SELECT id, buyer_name, buyer_phone, items, total_cents, fulfillment, status, created_at
+      `SELECT id, buyer_name, buyer_phone, items, total_cents, fulfillment, status, created_at,
+              payment_method, paid_at, manual_validate, committed
          FROM product_orders WHERE business_id = $1
         ORDER BY created_at DESC LIMIT 50`, [req.business.id]);
     res.json({ orders: rows });
@@ -436,9 +583,34 @@ module.exports.mount = function (app, ctx) {
   app.patch('/api/orders/:id', authRequired, businessScope, asyncH(async (req, res) => {
     if (!isUuid(req.params.id)) return bad(res, 'ID inválido');
     const { status } = req.body || {};
-    if (!['paid', 'preparing', 'ready', 'fulfilled', 'cancelled'].includes(status)) return bad(res, 'Estado inválido');
-    await db.query(`UPDATE product_orders SET status = $1 WHERE id = $2 AND business_id = $3`,
+    // 'paid' YA NO se setea a mano: el pago lo confirma confirmOrderPayment (que mueve
+    // stock+gift). Aquí solo estados de gestión. Cancelar siempre se permite; preparar/
+    // listo/entregado SOLO si la orden está pagada (committed=true) — así no se despacha
+    // sin haber confirmado el pago (y descontado inventario).
+    if (!['preparing', 'ready', 'fulfilled', 'cancelled'].includes(status)) return bad(res, 'Estado inválido');
+    if (status === 'cancelled') {
+      await db.query(`UPDATE product_orders SET status = 'cancelled' WHERE id = $1 AND business_id = $2`,
+        [req.params.id, req.business.id]);
+      return res.json({ ok: true });
+    }
+    const u = await db.query(
+      `UPDATE product_orders SET status = $1 WHERE id = $2 AND business_id = $3 AND committed = true RETURNING id`,
       [status, req.params.id, req.business.id]);
+    if (!u.rows[0]) return bad(res, 'La orden debe estar pagada antes de prepararla o entregarla', 409);
+    res.json({ ok: true });
+  }));
+
+  // negocio: VALIDAR el pago de una orden MANUAL (efectivo / ATH al número). Es el
+  // único disparador manual de confirmOrderPayment → descuenta stock + redime gift +
+  // marca 'paid'. Idempotente; si ya no hay inventario, queda 'pending' para gestionar.
+  app.post('/api/orders/:id/confirm-payment', authRequired, businessScope, asyncH(async (req, res) => {
+    if (!isUuid(req.params.id)) return bad(res, 'ID inválido');
+    const r = await confirmOrderPayment(req.params.id, req.business.id);
+    if (r.missing) return bad(res, 'Orden no encontrada', 404);
+    if (r.oversell) return bad(res, `Ya no hay inventario suficiente de ${r.item}`, 409);
+    await audit(req, 'order.confirm_payment', 'order', req.params.id);
+    await notify(req.business.id, 'order', 'Pago de orden validado',
+      `La orden quedó pagada y lista para preparar.`, { order_id: req.params.id });
     res.json({ ok: true });
   }));
 
@@ -613,4 +785,5 @@ module.exports.mount = function (app, ctx) {
   }));
 
   console.log('  ✓ módulo revenue montado (productos, gift cards, add-ons, destacados)');
+  return { confirmOrderPayment };
 };
