@@ -1824,15 +1824,15 @@ app.get('/api/public/:slug', publicLimiter, asyncH(async (req, res) => {
   // NUNCA hay secretos aquí (ni privateToken de ATH, ni llaves de Stripe).
   const byProv = {};
   for (const r of payMethods.rows) byProv[r.provider] = r;
-  const athRow = byProv['ath_movil'];
+  const athRow = byProv['ath_movil'];            // ATH manual (el negocio valida)
+  const athBiz = byProv['ath_movil_business'];   // ATH Negocios (automático por API)
   const ppRow  = byProv['paypal'];
   const stRow  = byProv['stripe'];
   const payment_config = {
-    ath: athRow ? {
-      mode: (athRow.config && athRow.config.ath_mode) || 'manual',
-      public_token: (athRow.config && athRow.config.ath_public_token) || null,
-      phone: athRow.account_ref || null,
-    } : null,
+    // ATH manual: el cliente paga al número y el negocio valida (como cash).
+    ath_manual: athRow ? { phone: athRow.account_ref || null } : null,
+    // ATH Negocios: automático por API. NO se expone el token (vive en el servidor).
+    ath_business: athBiz ? { enabled: true } : null,
     paypal: ppRow ? {
       handle: (ppRow.config && ppRow.config.paypal_handle) || ppRow.account_ref || null,
     } : null,
@@ -2228,6 +2228,89 @@ app.post('/api/public/:slug/appointments/:code/ath/confirm', codeLimiter, asyncH
   await notify(a.business_id, 'payment', 'Pago ATH Móvil recibido',
     `Ref ${reference.trim()} · ${a.service_name}`, { appointment_id: a.id });
   res.json({ ok: true, status: 'confirmed' });
+}));
+
+// ── ATH Móvil AUTO por API REST (mismo flujo PROBADO del cobro de plataforma) ──
+// El depósito va DIRECTO a la cuenta ATH del NEGOCIO (su publicToken de
+// payment_providers). El backend crea el pago → ATH manda push al CLIENTE (su
+// teléfono ya está en la cita) → polling → authorize → marca depósito 'paid'.
+// El cliente NO escribe ningún número. Map en memoria (proceso único PM2).
+const athRest = require('./ath-rest');
+const athDepositPending = new Map();
+function gcAthDeposits() {
+  const cut = Date.now() - 12 * 60 * 1000;
+  for (const [k, v] of athDepositPending) if (v.createdAt < cut) athDepositPending.delete(k);
+}
+
+// POST .../ath/start → crea el pago (push al cliente). → { ecommerceId } o { status:'completed' }
+app.post('/api/public/:slug/appointments/:code/ath/start', codeLimiter, asyncH(async (req, res) => {
+  gcAthDeposits();
+  const { rows } = await db.query(
+    `SELECT a.id, a.business_id, a.deposit_cents, a.status, a.service_name,
+            c.phone AS client_phone,
+            pp.config->>'ath_public_token' AS public_token,
+            p.id AS payment_id, p.status AS pay_status
+       FROM appointments a
+       JOIN businesses b ON b.id = a.business_id AND b.slug = $1 AND b.deleted_at IS NULL
+       JOIN clients c ON c.id = a.client_id
+       LEFT JOIN payment_providers pp ON pp.business_id = a.business_id AND pp.provider = 'ath_movil_business' AND pp.is_enabled
+       LEFT JOIN payments p ON p.appointment_id = a.id AND p.kind = 'deposit' AND p.method = 'ath_movil'
+      WHERE a.confirmation_code = $2`, [req.params.slug, req.params.code.toUpperCase()]);
+  const a = rows[0];
+  if (!a) return bad(res, 'Cita no encontrada', 404);
+  if (a.pay_status === 'paid' || a.status === 'confirmed')
+    return res.json({ ok: true, status: 'completed', already: true });
+  if (a.status !== 'pending_deposit' || !(a.deposit_cents > 0)) return bad(res, 'Esta cita no tiene depósito pendiente', 400);
+  if (!a.public_token) return bad(res, 'Este negocio no tiene ATH Móvil automático configurado', 400);
+  const phone = athRest.athPhone(a.client_phone);
+  if (!phone) return bad(res, 'El teléfono de la cita no sirve para ATH Móvil', 400);
+
+  const created = await athRest.create(
+    a.public_token, process.env.ATHM_ENV || 'production',
+    a.deposit_cents, phone, String(a.business_id), 'deposito:' + req.params.code.toUpperCase(), 'Depósito de cita');
+  if (!created) return bad(res, 'ATH Móvil no aceptó el pago. Intenta de nuevo.', 502);
+
+  athDepositPending.set(created.ecommerceId, {
+    slug: req.params.slug, code: req.params.code.toUpperCase(),
+    businessId: a.business_id, authToken: created.authToken, publicToken: a.public_token,
+    appointmentId: a.id, paymentId: a.payment_id, expectedCents: a.deposit_cents, serviceName: a.service_name,
+    createdAt: Date.now(),
+  });
+  res.json({ ok: true, ecommerceId: created.ecommerceId });
+}));
+
+// POST .../ath/poll → consulta + autoriza + marca pagado. → { status: pending|completed|cancelled }
+app.post('/api/public/:slug/appointments/:code/ath/poll', codeLimiter, asyncH(async (req, res) => {
+  const { ecommerceId } = req.body || {};
+  if (!isStr(ecommerceId, 200)) return bad(res, 'ecommerceId inválido');
+  const pend = athDepositPending.get(ecommerceId);
+  if (!pend || pend.slug !== req.params.slug || pend.code !== req.params.code.toUpperCase())
+    return bad(res, 'Pago no encontrado', 404);
+
+  const found = await athRest.find(pend.publicToken, ecommerceId, pend.authToken);
+  const st = found && found.ecommerceStatus;
+  if (st === 'CANCEL') { athDepositPending.delete(ecommerceId); return res.json({ status: 'cancelled' }); }
+  if (st !== 'CONFIRM' && st !== 'COMPLETED') return res.json({ status: 'pending' });
+
+  let fin = found;
+  if (st === 'CONFIRM') {
+    fin = await athRest.authorize(pend.authToken);
+    if (!fin || fin.ecommerceStatus !== 'COMPLETED') return res.json({ status: 'pending' });
+  }
+  const total = Number(fin.total);
+  if (!Number.isFinite(total) || Math.round(total * 100) !== pend.expectedCents)
+    return bad(res, 'El monto del pago no coincide', 400);
+
+  // Marcar pagado (mismo patrón que /ath/confirm). Idempotente.
+  const ref = fin.referenceNumber || ecommerceId;
+  if (pend.paymentId)
+    await db.query(`UPDATE payments SET status='paid', paid_at=now(), external_ref=$2 WHERE id=$1 AND status<>'paid'`,
+      [pend.paymentId, ref]);
+  await db.query(`UPDATE appointments SET status='confirmed' WHERE id=$1 AND status='pending_deposit'`, [pend.appointmentId]);
+  await notify(pend.businessId, 'payment', 'Pago ATH Móvil recibido',
+    `Ref ${ref} · ${pend.serviceName}`, { appointment_id: pend.appointmentId });
+  athDepositPending.delete(ecommerceId);
+  res.json({ status: 'completed' });
 }));
 
 // ============================================================================

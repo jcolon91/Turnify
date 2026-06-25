@@ -1594,7 +1594,8 @@ function renderPayStep(appt, depCents){
     '<div class="row tot"><span>Depósito</span><b>'+money(depCents)+'</b></div>';
 
   var cfg = state.payment_config || {};
-  var ath = cfg.ath || {};
+  var athM = cfg.ath_manual || {};     // ATH manual (el negocio valida)
+  var athB = cfg.ath_business || {};   // ATH Negocios (automático por API)
   var paypal = cfg.paypal || {};
   var stripe = cfg.stripe || {};
   var dollars = (depCents/100).toFixed(2);
@@ -1602,23 +1603,25 @@ function renderPayStep(appt, depCents){
   host.innerHTML = '';
   var hasAny = false;
 
-  // ── ATH Móvil AUTO: botón oficial client-side hacia la cuenta del negocio ──
-  if(ath && ath.mode==='auto' && ath.public_token){
+  // ── ATH Móvil AUTO (API REST): el depósito va DIRECTO a la cuenta del negocio.
+  //    El cliente recibe una push a su app para confirmar (NO escribe número). ──
+  if(athB && athB.enabled){
     hasAny = true;
-    var w = document.createElement('div'); w.id='athWidget';
-    // Contenedor oficial del botón ATH Móvil
-    w.innerHTML = '<div id="ATHMovil_Checkout_Button"></div>';
+    var w = document.createElement('div');
+    w.innerHTML =
+      '<button class="btn btn-teal" id="athAutoBtn" style="width:100%;margin-bottom:8px">Pagar depósito con ATH Móvil</button>'+
+      '<div id="athAutoMsg" style="display:none;text-align:center;font-size:13px;color:var(--text);padding:6px 0;line-height:1.5"></div>';
     host.appendChild(w);
-    loadAthMovilButton(ath.public_token, depCents, code, appt);
+    document.getElementById('athAutoBtn').onclick = function(){ startAthDeposit(code, this); };
   }
 
   // ── ATH Móvil MANUAL: teléfono + referencia (flujo actual EXACTO) ──
-  if(ath && ath.mode==='manual' && ath.phone){
+  if(athM && athM.phone){
     hasAny = true;
     var man = document.createElement('div');
     man.innerHTML =
       '<div class="paybtn" style="cursor:default;align-items:flex-start"><span class="pmico">'+ICONS.phone2+'</span>'+
-      '<span class="pmtxt">Paga por ATH Móvil al <b>'+esc(ath.phone)+'</b>'+
+      '<span class="pmtxt">Paga por ATH Móvil al <b>'+esc(athM.phone)+'</b>'+
       '<small>Luego escribe el número de referencia para confirmar.</small></span></div>'+
       '<div class="field"><label>Número de referencia ATH</label><input id="athRef" placeholder="Ej. 123456789"></div>'+
       '<button class="btn btn-teal" id="athManualBtn">Confirmar depósito →</button>';
@@ -1706,47 +1709,37 @@ async function startStripeCheckout(code, btnEl){
   showAlert('payAlert', (res.data && res.data.error) || 'No pudimos iniciar el pago con tarjeta. Usa otro método o paga el depósito más tarde.');
 }
 
-// Carga el botón oficial de ATH Móvil (athmovil-javascript-api).
-// NOTA: la URL del SDK y la forma del objeto ATHM_Checkout/callbacks siguen la
-// athmovil-javascript-api y deben confirmarse contra los docs vigentes de ATH.
-// El publicToken NO es secreto (se usa client-side). El privateToken NUNCA va en el front.
-var __athLoaded = false;
-function loadAthMovilButton(publicToken, depCents, code, appt){
-  var total = +(depCents/100).toFixed(2);
-  // Objeto global que el SDK de ATH lee para construir el botón
-  window.ATHM_Checkout = {
-    env: 'production',
-    publicToken: publicToken,
-    timeout: 600,
-    theme: 'btn',
-    lang: 'es',
-    total: total,
-    subtotal: total,
-    tax: 0.00,
-    metadata1: code || '',
-    metadata2: (appt && appt.id) ? String(appt.id) : '',
-    items: [{ name: 'Depósito de cita', description: code||'', quantity: '1', price: total.toFixed(2), tax: '0.00', metadata: code||'' }]
-  };
-  // Callbacks globales que invoca el SDK de ATH
-  window.authorizationATHM = function(response){
-    try{
-      var ref = (response && (response.referenceNumber || response.ecommerceId || response.reference)) || '';
-      if(ref){ submitAthConfirm(code, ref, null); }
-      else { showAlert('payAlert','Pago recibido. Verificando…'); document.getElementById('payAlert').className='alert ok'; }
-    }catch(e){ showAlert('payAlert','Pago recibido, pero no pudimos leer la referencia.'); }
-  };
-  window.cancelATHM = function(){ showAlert('payAlert','Cancelaste el pago. Tu cita sigue reservada; puedes pagar el depósito más tarde.'); };
-  window.expiredATHM = function(){ showAlert('payAlert','El pago expiró. Intenta de nuevo o paga el depósito más tarde.'); };
-  if(__athLoaded){
-    if(typeof window.loadButtonATHM==='function'){ try{ window.loadButtonATHM(); }catch(e){} }
-    return;
+// ATH Móvil AUTO por API REST (mismo flujo probado del panel): el backend crea el
+// pago con el token del NEGOCIO y manda push al cliente; aquí solo lanzamos y
+// hacemos polling. El depósito va directo a la cuenta del negocio.
+async function startAthDeposit(code, btnEl){
+  clearAlert('payAlert');
+  if(btnEl){ btnEl.disabled=true; btnEl.textContent='Conectando con ATH Móvil…'; }
+  var r = await api('POST', '/public/'+encodeURIComponent(SLUG)+'/appointments/'+encodeURIComponent(code)+'/ath/start', {});
+  if(!r.ok || !r.data || (!r.data.ecommerceId && r.data.status!=='completed')){
+    if(btnEl){ btnEl.disabled=false; btnEl.textContent='Pagar depósito con ATH Móvil'; }
+    showAlert('payAlert', (r.data && r.data.error) || 'No se pudo iniciar el pago.'); return;
   }
-  var s = document.createElement('script');
-  s.src = 'https://www.athmovil.com/api/js/v3/athmovilV3.js';
-  s.async = true;
-  s.onload = function(){ __athLoaded = true; };
-  s.onerror = function(){ showAlert('payAlert','No se pudo cargar ATH Móvil. Usa otro método o paga el depósito más tarde.'); };
-  document.body.appendChild(s);
+  var msg = document.getElementById('athAutoMsg');
+  if(r.data.status==='completed'){
+    showAlert('payAlert','¡Pago confirmado! Tu cita está asegurada.'); document.getElementById('payAlert').className='alert ok';
+    setTimeout(function(){ showOkStep(state.appt); }, 1100); return;
+  }
+  if(btnEl) btnEl.style.display='none';
+  if(msg){ msg.style.display='block'; msg.textContent='Abre tu app de ATH Móvil y confirma el pago…'; }
+  pollAthDeposit(code, r.data.ecommerceId, msg);
+}
+function pollAthDeposit(code, ecommerceId, msg){
+  var tries=0, max=60;   // 60 × 3s = 3 min
+  var t=setInterval(async function(){
+    tries++;
+    if(tries>max){ clearInterval(t); if(msg) msg.textContent='El pago expiró. Intenta de nuevo.'; return; }
+    var r = await api('POST', '/public/'+encodeURIComponent(SLUG)+'/appointments/'+encodeURIComponent(code)+'/ath/poll', { ecommerceId: ecommerceId });
+    if(!r.ok) return;
+    var st = r.data && r.data.status;
+    if(st==='completed'){ clearInterval(t); if(msg){ msg.textContent='¡Pago confirmado!'; } setTimeout(function(){ showOkStep(state.appt); }, 1100); }
+    else if(st==='cancelled'){ clearInterval(t); if(msg) msg.textContent='Pago cancelado. Intenta de nuevo.'; }
+  }, 3000);
 }
 
 // ═══════════ TIENDA (productos + carrito) ═══════════

@@ -2816,16 +2816,19 @@ function payCard(p, ath){
   } else if(p.plan_locked){
     act = '<span style="font-size:12px;color:var(--ink2)">Disponible desde el plan Pro</span>';
   } else if(p.provider==='ath_movil'){
-    act = '<div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;width:100%;max-width:320px">'+
+    // ATH Móvil MANUAL: el negocio pone su número y VALIDA los pagos él mismo (como Efectivo).
+    act = '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end;max-width:320px">'+
+            '<input type="tel" id="athInput" placeholder="787-555-1234" value="'+(ath?esc(ath):'')+'" style="padding:9px 12px;border:1.5px solid var(--line);border-radius:10px;font-size:13px;max-width:160px">'+
+            '<button class="btn btn-teal btn-sm pay-conn" data-p="ath_movil">Conectar</button>'+
+          '</div>';
+  } else if(p.provider==='ath_movil_business'){
+    // ATH Móvil NEGOCIOS (automático): el negocio pega su Public Token de ATH Business.
+    act = '<div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;width:100%;max-width:340px">'+
             '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end;width:100%">'+
-              '<input type="tel" id="athInput" placeholder="787-555-1234" value="'+(ath?esc(ath):'')+'" style="padding:9px 12px;border:1.5px solid var(--line);border-radius:10px;font-size:13px;max-width:160px">'+
-              '<button class="btn btn-teal btn-sm pay-conn" data-p="ath_movil">Conectar</button>'+
+              '<input type="text" id="athBizToken" placeholder="Public Token (de tu app ATH Business)" autocomplete="off" style="padding:9px 12px;border:1.5px solid var(--line);border-radius:10px;font-size:13px;width:100%;box-sizing:border-box">'+
+              '<button class="btn btn-teal btn-sm pay-conn" data-p="ath_movil_business">Conectar</button>'+
             '</div>'+
-            '<label style="display:flex;gap:7px;align-items:center;font-size:12.5px;cursor:pointer;align-self:flex-start"><input type="checkbox" id="athAutoToggle"> Automatizar cobros (avanzado)</label>'+
-            '<div id="athAutoBox" style="display:none;width:100%">'+
-              '<input type="text" id="athPublicToken" placeholder="Public Token (de tu app ATH Business)" autocomplete="off" style="padding:9px 12px;border:1.5px solid var(--line);border-radius:10px;font-size:13px;width:100%;box-sizing:border-box">'+
-              '<p style="font-size:11.5px;color:var(--ink2);margin:6px 0 0;line-height:1.55">El Public Token no es secreto: se usa en el botón de cobro. Nunca pongas aquí tu Private Token. Los reembolsos se hacen en tu app ATH Business.</p>'+
-            '</div>'+
+            '<p style="font-size:11.5px;color:var(--ink2);margin:0;line-height:1.55;text-align:right">Cobro automático: al cliente le llega una notificación a su app de ATH Móvil. El Public Token NO es secreto. Nunca pongas aquí tu Private Token.</p>'+
           '</div>';
   } else if(p.provider==='paypal'){
     act = '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end;max-width:320px">'+
@@ -2856,24 +2859,17 @@ function payCard(p, ath){
     '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+act+'</div></div>';
 }
 function wirePayments(){
-  // ATH Móvil: toggle de modo automático (Public Token)
-  var athToggle = document.getElementById('athAutoToggle');
-  if(athToggle){ athToggle.onchange = function(){
-    var box = document.getElementById('athAutoBox');
-    if(box) box.style.display = athToggle.checked ? 'block' : 'none';
-  }; }
   document.querySelectorAll('.pay-conn').forEach(function(b){ b.onclick = async function(){
     const provider = b.dataset.p; const body = {};
     if(provider==='ath_movil'){
       const v=(document.getElementById('athInput').value||'').trim();
       if(!v){ showAlert('payAlert','Pon tu número de ATH Móvil.', false); return; }
       body.ath_phone=v;
-      const tog=document.getElementById('athAutoToggle');
-      if(tog && tog.checked){
-        const tk=(document.getElementById('athPublicToken').value||'').trim();
-        if(!tk){ showAlert('payAlert','Pon tu Public Token o desactiva la automatización.', false); return; }
-        body.ath_public_token=tk;   // modo auto (el Public Token NO es secreto)
-      }
+    }
+    if(provider==='ath_movil_business'){
+      const tk=(document.getElementById('athBizToken').value||'').trim();
+      if(!tk){ showAlert('payAlert','Pega tu Public Token de ATH Móvil Business.', false); return; }
+      body.ath_public_token=tk;   // el Public Token NO es secreto
     }
     if(provider==='paypal'){
       const h=(document.getElementById('paypalInput').value||'').trim();

@@ -26,12 +26,13 @@ module.exports.mount = function (app, ctx) {
 
   // Catálogo de proveedores. external=true → requiere onboarding con cuenta externa.
   const PROVIDERS = {
-    stripe:    { name: 'Stripe · Tarjetas · Klarna', external: true },
-    paypal:    { name: 'PayPal',     external: true },
-    ath_movil: { name: 'ATH Móvil',  external: false },
-    cash:      { name: 'Efectivo',   external: false },
+    stripe:             { name: 'Stripe · Tarjetas · Klarna', external: true },
+    paypal:             { name: 'PayPal',     external: true },
+    ath_movil:          { name: 'ATH Móvil (tú validas)',  external: false },
+    ath_movil_business: { name: 'ATH Móvil Negocios (automático)', external: false },
+    cash:               { name: 'Efectivo',   external: false },
   };
-  const ORDER = ['stripe', 'paypal', 'ath_movil', 'cash'];
+  const ORDER = ['stripe', 'paypal', 'ath_movil', 'ath_movil_business', 'cash'];
 
   // ¿La PLATAFORMA (Bukeame) ya tiene las credenciales para este proveedor?
   // Stripe sigue gateado (OAuth necesita el client_id + secret de la plataforma).
@@ -91,10 +92,8 @@ module.exports.mount = function (app, ctx) {
 
   // Datos PÚBLICOS de config que la UI necesita (nunca secretos)
   const publicConfig = (provider, cfg = {}) => {
-    if (provider === 'ath_movil') return {
-      ath_mode: cfg.ath_mode || 'manual',
-      ath_public_token: cfg.ath_public_token || null,   // público: va en el botón client-side
-    };
+    if (provider === 'ath_movil') return {};   // manual: solo el número (account_hint)
+    if (provider === 'ath_movil_business') return { has_token: !!cfg.ath_public_token }; // NO exponemos el token
     if (provider === 'paypal')  return { paypal_handle: cfg.paypal_handle || null };
     if (provider === 'stripe')  return {
       stripe_payment_link: cfg.stripe_payment_link || null,   // público: es para compartir
@@ -173,34 +172,40 @@ module.exports.mount = function (app, ctx) {
       return res.json({ ok: true, status: 'connected' });
     }
 
-    // ATH Móvil: dos modos.
-    //   · manual → body {ath_phone}: el cliente paga al teléfono y reporta la referencia.
-    //   · auto   → body {ath_phone, ath_public_token}: el botón ATH (client-side) cobra
-    //              directo a la cuenta del negocio con su publicToken (NO secreto).
-    //   NUNCA pedimos ni guardamos el privateToken (reembolsos = app ATH Business).
+    // ATH Móvil MANUAL: el cliente paga al teléfono del negocio y reporta la
+    // referencia; el NEGOCIO valida el pago (como Efectivo, pero por ATH). Solo
+    // se guarda el teléfono. NUNCA pedimos token ni privateToken aquí.
     if (provider === 'ath_movil') {
       const phone = req.body?.ath_phone;
       if (!isPhone(phone)) return bad(res, 'Pon tu número de ATH Móvil (PR/US, 10 dígitos)');
       const norm = normPhone(phone);
-
-      const rawToken = req.body?.ath_public_token;
-      const auto = rawToken !== undefined && rawToken !== null && String(rawToken).trim() !== '';
-      let config = { ath_mode: 'manual' };
-      if (auto) {
-        // El publicToken se usa en el botón client-side; lo validamos como string corto.
-        if (!isStr(rawToken, 200)) return bad(res, 'Public token de ATH inválido');
-        config = { ath_mode: 'auto', ath_public_token: String(rawToken).trim() };
-      }
-
       await db.query(`UPDATE businesses SET ath_phone = $2 WHERE id = $1`, [req.business.id, norm]);
       await db.query(
         `UPDATE payment_providers
             SET status='connected', is_enabled=true, account_ref=$2,
-                config = config || $3::jsonb, connected_at=now()
+                config='{}'::jsonb, connected_at=now()
           WHERE business_id = $1 AND provider = 'ath_movil'`,
-        [req.business.id, norm, JSON.stringify(config)]);
-      await audit(req, 'payment.connect', 'payment_provider', null, { provider, ath_mode: config.ath_mode });
-      return res.json({ ok: true, status: 'connected', ath_phone: norm, ath_mode: config.ath_mode });
+        [req.business.id, norm]);
+      await audit(req, 'payment.connect', 'payment_provider', null, { provider });
+      return res.json({ ok: true, status: 'connected', ath_phone: norm });
+    }
+
+    // ATH Móvil NEGOCIOS (automático, API REST): el negocio pega su Public Token de
+    // ATH Business. El backend crea el pago y ATH le manda push al cliente; el pago
+    // se VALIDA por API (no lo valida el negocio). El token vive solo en el servidor;
+    // NUNCA se expone al front ni se pide el privateToken (eso es solo para refunds).
+    if (provider === 'ath_movil_business') {
+      const rawToken = req.body?.ath_public_token;
+      if (!isStr(rawToken, 200) || !String(rawToken).trim())
+        return bad(res, 'Pega tu Public Token de ATH Móvil Business');
+      await db.query(
+        `UPDATE payment_providers
+            SET status='connected', is_enabled=true,
+                config = config || $2::jsonb, connected_at=now()
+          WHERE business_id = $1 AND provider = 'ath_movil_business'`,
+        [req.business.id, JSON.stringify({ ath_public_token: String(rawToken).trim() })]);
+      await audit(req, 'payment.connect', 'payment_provider', null, { provider });
+      return res.json({ ok: true, status: 'connected' });
     }
 
     // PayPal: self-serve. El negocio pone su handle de PayPal.me (o email).

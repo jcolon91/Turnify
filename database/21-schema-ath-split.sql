@@ -1,0 +1,11 @@
+-- ============================================================================
+--  Bukéame — Separar ATH Móvil en DOS métodos de pago (21).
+--    'ath_movil'          = MANUAL: el negocio valida el pago (como cash). Núm. tel.
+--    'ath_movil_business' = AUTOMÁTICO por API REST (token; ATH valida el pago).
+--  Correr como postgres:
+--    sudo -u postgres psql -d bukeame -f database/21-schema-ath-split.sql
+--  OJO: ALTER TYPE ... ADD VALUE NO puede ir dentro de una transacción (sin BEGIN).
+--  Idempotente: IF NOT EXISTS. Negocios que ya tenían ATH "auto" deben reconfigurar
+--  el método "ATH Móvil Negocios" en su panel de Pagos (poca/ninguna data existente).
+-- ============================================================================
+ALTER TYPE payment_provider ADD VALUE IF NOT EXISTS 'ath_movil_business';
