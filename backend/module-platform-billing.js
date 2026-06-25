@@ -42,7 +42,7 @@ function athPhone(raw) {
 
 function mount(app, ctx) {
   const { db, authRequired, businessScope, h } = ctx;
-  const { asyncH, bad, isStr, isUuid, audit, notify } = h;
+  const { asyncH, bad, isStr, isUuid, audit, notify, sendEmail, emailPlatformReceipt } = h;
 
   // ── Config desde el entorno (secretos sólo en process.env) ─────────────────
   const ATHM_ENV      = process.env.ATHM_ENV || 'production';
@@ -307,7 +307,7 @@ function mount(app, ctx) {
     pendingAth.set(created.ecommerceId, {
       businessId: req.business.id,
       authToken: created.authToken,
-      kind, refCode: exp.refCode, codesArr: exp.codesArr,
+      kind, refCode: exp.refCode, codesArr: exp.codesArr, title: exp.title,
       campaignId: kind === 'ad_budget' ? exp.refCode : null,
       weeksVal: exp.weeksVal, montoEsperadoCents: exp.montoEsperadoCents,
       createdAt: Date.now(),
@@ -368,6 +368,14 @@ function mount(app, ctx) {
       await notify(req.business.id, 'payment', 'Pago recibido',
         `Recibimos tu pago de $${(pend.montoEsperadoCents / 100).toFixed(2)} por ATH Móvil. ¡Gracias!`,
         { kind: pend.kind, code: pend.refCode });
+      // Recibo por email al dueño (marca Bukeame). Fire-and-forget; nunca rompe el pago.
+      try {
+        if (req.user && req.user.email && typeof emailPlatformReceipt === 'function' && typeof sendEmail === 'function') {
+          const e = emailPlatformReceipt({ title: pend.title || pend.kind, amountCents: pend.montoEsperadoCents,
+            method: 'ATH Móvil', reference: fin.referenceNumber });
+          sendEmail(req.user.email, e.subject, e.text, e.html).catch(err => console.error('platform receipt:', err.message));
+        }
+      } catch (_e) { /* el recibo nunca bloquea el cobro */ }
     }
     res.json({ status: 'completed', kind: pend.kind, activated: result.activated || null });
   }));

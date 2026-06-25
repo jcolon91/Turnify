@@ -815,6 +815,18 @@ app.patch('/api/businesses/me', authRequired, businessScope, asyncH(async (req, 
       .slice(0, 20);
     vals.push(JSON.stringify(policies)); sets.push(`policies = $${vals.length}::jsonb`);
   }
+  // invoice_settings: personalización de la factura/recibo del cliente (validado por campo).
+  if (req.body && req.body.invoice_settings && typeof req.body.invoice_settings === 'object') {
+    const s = req.body.invoice_settings;
+    const clean = {
+      brand_color:  /^#[0-9a-fA-F]{6}$/.test(s.brand_color || '') ? s.brand_color : null,
+      legal_name:   String(s.legal_name   || '').trim().slice(0, 120) || null,
+      address_line: String(s.address_line || '').trim().slice(0, 200) || null,
+      footer_note:  String(s.footer_note  || '').trim().slice(0, 300) || null,
+      show_logo:    !!s.show_logo,
+    };
+    vals.push(JSON.stringify(clean)); sets.push(`invoice_settings = $${vals.length}::jsonb`);
+  }
   if (Array.isArray(req.body?.category_ids)) {
     await db.query(`DELETE FROM business_categories WHERE business_id = $1`, [req.business.id]);
     for (const cid of req.body.category_ids.slice(0, 5))
@@ -2310,6 +2322,25 @@ app.post('/api/public/:slug/appointments/:code/ath/poll', codeLimiter, asyncH(as
   await db.query(`UPDATE appointments SET status='confirmed' WHERE id=$1 AND status='pending_deposit'`, [pend.appointmentId]);
   await notify(pend.businessId, 'payment', 'Pago ATH Móvil recibido',
     `Ref ${ref} · ${pend.serviceName}`, { appointment_id: pend.appointmentId });
+  // Recibo (factura del negocio) por email al cliente. Fire-and-forget; nunca rompe el pago.
+  try {
+    const rc = await db.query(
+      `SELECT c.email AS client_email, a.service_name, a.starts_at,
+              b.name AS biz_name, b.theme, b.logo_url, b.address_line, b.invoice_settings
+         FROM appointments a JOIN clients c ON c.id = a.client_id
+         JOIN businesses b ON b.id = a.business_id
+        WHERE a.id = $1`, [pend.appointmentId]);
+    const d = rc.rows[0];
+    if (d && d.client_email) {
+      const e = emailReceipt({
+        biz: { name: d.biz_name, theme: d.theme, logo_url: d.logo_url, address_line: d.address_line, invoice_settings: d.invoice_settings },
+        total: pend.expectedCents,
+        lines: [['Servicio', d.service_name], ['Fecha', d.starts_at ? fmtPR(d.starts_at) : ''],
+                ['Concepto', 'Depósito de cita'], ['Método', 'ATH Móvil'], ['Referencia', ref]],
+      });
+      sendEmail(d.client_email, e.subject, e.text, e.html).catch(err => console.error('deposit receipt:', err.message));
+    }
+  } catch (_e) { /* el recibo nunca bloquea la confirmación del pago */ }
   athDepositPending.delete(ecommerceId);
   res.json({ status: 'completed' });
 }));
@@ -2813,6 +2844,64 @@ function emailShell(innerHtml, opts = {}) {
   </table></body></html>`;
 }
 
+// Escape mínimo de HTML para los recibos.
+function emailEsc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+// Filas clave/valor del detalle de un recibo.
+function emailRows(pairs){
+  return pairs.filter(Boolean).map((kv, i) =>
+    `<tr><td style="padding:9px 0;font-size:12px;color:#7A7464;width:110px;vertical-align:top;${i?'border-top:1px solid #EFEADC':''}">${emailEsc(kv[0])}</td>`+
+    `<td style="padding:9px 0;font-size:14px;font-weight:600;color:#17150F;${i?'border-top:1px solid #EFEADC':''}">${emailEsc(kv[1])}</td></tr>`).join('');
+}
+
+// Recibo de compra de PLATAFORMA (el negocio paga a Bukeame: plan/add-on/promo/destacado).
+// Marca Bukeame (emailShell). ctx: { title, amountCents, method, reference }.
+function emailPlatformReceipt(ctx){
+  const dollars = '$' + ((ctx.amountCents||0)/100).toFixed(2);
+  const when = fmtPR(new Date().toISOString());
+  const rows = emailRows([
+    ['Concepto', ctx.title || 'Compra'],
+    ['Monto', dollars],
+    ['Método', ctx.method || 'ATH Móvil'],
+    ctx.reference ? ['Referencia', ctx.reference] : null,
+    ['Fecha', when],
+  ]);
+  const inner = `<tr><td style="padding:28px 30px 30px 30px">`+
+    `<h1 style="margin:0 0 4px 0;font-size:22px;font-weight:800;color:#17150F">Recibo de pago</h1>`+
+    `<p style="margin:0 0 18px 0;font-size:14px;color:#0A5B52;font-weight:600">¡Gracias por tu pago!</p>`+
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FBFAF5;border:1px solid #E1DCCD;border-radius:14px"><tr><td style="padding:6px 18px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table></td></tr></table></td></tr>`;
+  const text = `Recibo de pago — Bukeame\nConcepto: ${ctx.title||'Compra'}\nMonto: ${dollars}\nMétodo: ${ctx.method||'ATH Móvil'}\n`+(ctx.reference?`Referencia: ${ctx.reference}\n`:'')+`Fecha: ${when}`;
+  return { subject: 'Recibo de pago — Bukeame', text, html: emailShell(inner, { preheader: 'Tu recibo de pago', footerNote: 'Recibo de tu compra en bukeame.com' }) };
+}
+
+// Recibo/FACTURA para el CLIENTE de un negocio (depósito/orden). Marca del NEGOCIO:
+// color y nombre desde invoice_settings (con fallback a theme.accent y biz.name). Shell propia.
+// ctx: { biz, lines:[[k,v]...], total, method, reference }.
+function emailReceipt(ctx){
+  const biz = ctx.biz || {};
+  const inv = biz.invoice_settings || {};
+  let theme = {}; try { theme = (typeof biz.theme === 'string') ? JSON.parse(biz.theme) : (biz.theme || {}); } catch(e){}
+  const accent = /^#[0-9a-fA-F]{6}$/.test(inv.brand_color || '') ? inv.brand_color : (theme.accent || '#0E8074');
+  const brand  = emailEsc(inv.legal_name || biz.name || 'Tu negocio');
+  const addr   = emailEsc(inv.address_line || biz.address_line || '');
+  const footer = emailEsc(inv.footer_note || '');
+  const logo   = (inv.show_logo && biz.logo_url) ? `<img src="${emailEsc(biz.logo_url)}" alt="" style="height:42px;border-radius:8px;display:block;margin-bottom:10px">` : '';
+  const dollars = '$' + ((ctx.total||0)/100).toFixed(2);
+  const rows = emailRows(ctx.lines || []);
+  const inner = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;background:#fff;border:1px solid #E1DCCD;border-radius:18px;overflow:hidden">`+
+    `<tr><td style="height:5px;background:${accent};line-height:5px;font-size:5px">&nbsp;</td></tr>`+
+    `<tr><td style="padding:24px 30px 10px 30px">${logo}<div style="font-size:20px;font-weight:800;color:#17150F">${brand}</div>`+(addr?`<div style="font-size:12px;color:#7A7464;margin-top:2px">${addr}</div>`:'')+`</td></tr>`+
+    `<tr><td style="padding:0 30px 6px 30px"><h1 style="margin:0;font-size:18px;font-weight:800;color:#17150F">Recibo de pago</h1></td></tr>`+
+    `<tr><td style="padding:8px 30px 24px 30px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FBFAF5;border:1px solid #E1DCCD;border-radius:14px"><tr><td style="padding:6px 18px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}`+
+    `<tr><td style="padding:11px 0 4px 0;border-top:2px solid ${accent};font-size:13px;font-weight:700;color:#17150F">Total pagado</td><td style="padding:11px 0 4px 0;border-top:2px solid ${accent};font-size:16px;font-weight:800;color:${accent}">${dollars}</td></tr>`+
+    `</table></td></tr></table>`+(footer?`<p style="margin:14px 0 0;font-size:12px;color:#7A7464;line-height:1.6">${footer}</p>`:'')+
+    `<p style="margin:14px 0 0;font-size:11px;color:#A39C88">Procesado vía Bukeame · bukeame.com</p></td></tr></table>`;
+  const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"></head>`+
+    `<body style="margin:0;padding:0;background:#F1EFE5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">`+
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F1EFE5;padding:32px 16px"><tr><td align="center">${inner}</td></tr></table></body></html>`;
+  const text = `${inv.legal_name||biz.name||'Tu negocio'} — Recibo de pago\n`+(ctx.lines||[]).map(kv=>`${kv[0]}: ${kv[1]}`).join('\n')+`\nTotal pagado: ${dollars}`;
+  return { subject: `Recibo de pago — ${inv.legal_name||biz.name||'tu compra'}`, text, html };
+}
+
 function emailWelcome(name) {
   const first = (name || '').trim().split(' ')[0] || 'Hola';
   const subject = 'Bienvenido a Bukeame';
@@ -3026,6 +3115,7 @@ setInterval(() => { expireBilling().catch(e => console.error('expireBilling:', e
 const sharedHelpers = {
   asyncH, bad, isStr, isUuid, isEmail, isPhone, normPhone, isDate, audit, notify,
   confirmCode, bookingLimiter, codeLimiter, publicLimiter,
+  sendEmail, emailPlatformReceipt, emailReceipt,
 };
 // Referencia al módulo de ads (se asigna al montarlo más abajo). Los endpoints
 // públicos la usan en tiempo de request; queda null si el módulo falla al cargar.

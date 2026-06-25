@@ -683,6 +683,18 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
           <button class="btn btn-teal" id="saveBizBtn">Guardar cambios</button>
         </div>
         <div class="card">
+          <div class="seclabel">Factura / recibo a tus clientes</div>
+          <p style="font-size:12.5px;color:var(--ink2);margin:0 0 12px">Personaliza el recibo que le llega por email a tus clientes al pagar (depósitos/órdenes).</p>
+          <div class="row2">
+            <div class="field"><label>Nombre en la factura</label><input id="invName" placeholder="Tu Negocio LLC"></div>
+            <div class="field"><label>Color de marca</label><input id="invColor" type="color" value="#0E8074" style="height:42px;padding:4px"></div>
+          </div>
+          <div class="field"><label>Dirección en la factura</label><input id="invAddr" placeholder="Calle, pueblo, PR"></div>
+          <div class="field"><label>Nota al pie</label><textarea id="invFooter" rows="2" placeholder="Gracias por tu compra · términos, etc."></textarea></div>
+          <label style="display:flex;gap:9px;align-items:center;font-size:13px;cursor:pointer;margin:4px 0 14px"><input type="checkbox" id="invShowLogo"> Mostrar mi logo en la factura</label>
+          <button class="btn btn-teal" id="saveInvoiceBtn">Guardar factura</button>
+        </div>
+        <div class="card">
           <div class="seclabel">Políticas del negocio</div>
           <p style="font-size:12.5px;color:var(--ink2);margin-bottom:12px">Lo que tus clientes verán. Añade o quita lo que quieras.</p>
           <div class="alert" id="polAlert"></div>
@@ -1043,6 +1055,7 @@ const DAYS = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábad
 
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function money(cents){ return '$'+((cents||0)/100).toFixed(2); }
+function addonDate(iso){ try{ return new Date(iso).toLocaleDateString('es-PR',{day:'numeric',month:'long',year:'numeric'}); }catch(e){ return ''; } }
 function showAlert(id,msg,ok){ const e=document.getElementById(id); if(!e)return; e.textContent=msg; e.className='alert '+(ok?'ok':'err'); }
 function clearAlert(id){ const e=document.getElementById(id); if(e){ e.className='alert'; e.textContent=''; } }
 
@@ -1669,6 +1682,15 @@ function fillBusiness(data){
   document.getElementById('bizWa').value = b.whatsapp || '';
   document.getElementById('bizAddr').value = b.address_line || '';
   document.getElementById('bizAth').value = b.ath_phone || '';
+  // Factura/recibo personalizado del negocio (lo que le llega al cliente).
+  try {
+    var inv = (typeof b.invoice_settings === 'string') ? JSON.parse(b.invoice_settings) : (b.invoice_settings || {});
+    document.getElementById('invName').value = inv.legal_name || b.name || '';
+    document.getElementById('invColor').value = /^#[0-9a-fA-F]{6}$/.test(inv.brand_color||'') ? inv.brand_color : '#0E8074';
+    document.getElementById('invAddr').value = inv.address_line || b.address_line || '';
+    document.getElementById('invFooter').value = inv.footer_note || '';
+    document.getElementById('invShowLogo').checked = !!inv.show_logo;
+  } catch(e){}
   try { policiesInit(b.policies); } catch(e){ console.error('policiesInit', e); }
   // ── Logo del negocio (premium: Pro+) ──
   (function(){
@@ -2413,6 +2435,21 @@ document.getElementById('saveBizBtn').onclick = async function(){
   showAlert('bizAlert', r.ok ? '¡Guardado!' : (r.data.error||'No se pudo guardar.'), r.ok);
 };
 
+document.getElementById('saveInvoiceBtn').onclick = async function(){
+  clearAlert('bizAlert');
+  const body = { invoice_settings: {
+    legal_name:   document.getElementById('invName').value.trim() || null,
+    brand_color:  document.getElementById('invColor').value || null,
+    address_line: document.getElementById('invAddr').value.trim() || null,
+    footer_note:  document.getElementById('invFooter').value.trim() || null,
+    show_logo:    document.getElementById('invShowLogo').checked,
+  }};
+  const btn = this; btn.disabled=true; btn.textContent='Guardando…';
+  const r = await api('PATCH','/businesses/me', body);
+  btn.disabled=false; btn.textContent='Guardar factura';
+  showAlert('bizAlert', r.ok ? '¡Factura guardada!' : (r.data.error||'No se pudo guardar.'), r.ok);
+};
+
 // ── Políticas del negocio (array de strings) ───────────────────────────────
 var bizPolicies = [];
 function renderPolicies(){
@@ -3154,7 +3191,12 @@ async function loadAddons(){
     html += activeRows.map(function(a){
       return '<div class="addon-row"><div class="grow"><h4>'+esc(a.name||a.code)+'</h4>'+
         (a.description?'<p>'+esc(a.description)+'</p>':'')+
-        '<span class="addon-price">'+priceLabel(a)+'</span></div>'+
+        '<span class="addon-price">'+priceLabel(a)+'</span>'+
+        (a.current_period_end ? '<p style="font-size:12px;color:var(--ink2);margin-top:4px">'+
+          (a.cancel_at_period_end
+            ? 'Renovación cancelada — activo hasta '+esc(addonDate(a.current_period_end))
+            : 'Vigente hasta '+esc(addonDate(a.current_period_end)))+'</p>' : '')+
+        '</div>'+
         '<button class="btn btn-ghost btn-sm addon-cancel" type="button" data-code="'+esc(a.code)+'" style="flex:none">Cancelar</button></div>';
     }).join('');
   }
