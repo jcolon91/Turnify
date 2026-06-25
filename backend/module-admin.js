@@ -325,10 +325,12 @@ function mount(app, { db, authRequired, h }) {
         [req.params.id, code]));
     } else {
       ({ rows } = await db.query(
-        `INSERT INTO addons (business_id, code, price_cents)
-         VALUES ($1,$2,$3)
+        `INSERT INTO addons (business_id, code, price_cents, current_period_end)
+         VALUES ($1,$2,$3, now() + interval '30 days')
          ON CONFLICT (business_id, code)
-         DO UPDATE SET status = 'active', cancelled_at = NULL, price_cents = $3, activated_at = now()
+         DO UPDATE SET status = 'active', cancelled_at = NULL, cancel_at_period_end = false,
+                       price_cents = $3, activated_at = now(),
+                       current_period_end = GREATEST(addons.current_period_end, now()) + interval '30 days'
          RETURNING code, status, price_cents`,
         [req.params.id, code, cat.rows[0].price_cents]));
       await notify(req.params.id, 'system', 'Add-on activado',

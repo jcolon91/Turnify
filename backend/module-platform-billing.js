@@ -179,7 +179,8 @@ function mount(app, ctx) {
       const up = await client.query(
         `UPDATE subscriptions
             SET plan_code = $2::plan_code, status = 'active',
-                current_period_start = now(), current_period_end = now() + interval '1 month',
+                current_period_start = now(),
+                current_period_end = GREATEST(current_period_end, now()) + interval '1 month',
                 cancel_at_period_end = false, trial_ends_at = NULL
           WHERE business_id = $1
           RETURNING plan_code, status, current_period_end`,
@@ -189,9 +190,12 @@ function mount(app, ctx) {
     }
     if (kind === 'addon') {
       const up = await client.query(
-        `INSERT INTO addons (business_id, code, price_cents) VALUES ($1,$2,$3)
+        `INSERT INTO addons (business_id, code, price_cents, current_period_end)
+         VALUES ($1,$2,$3, now() + interval '30 days')
          ON CONFLICT (business_id, code)
-         DO UPDATE SET status = 'active', cancelled_at = NULL, price_cents = $3, activated_at = now()
+         DO UPDATE SET status = 'active', cancelled_at = NULL, cancel_at_period_end = false,
+                       price_cents = $3, activated_at = now(),
+                       current_period_end = GREATEST(addons.current_period_end, now()) + interval '30 days'
          RETURNING code, status, price_cents`,
         [business.id, refCode, montoEsperadoCents]);
       return up.rows[0];
@@ -202,9 +206,12 @@ function mount(app, ctx) {
         const pr = await client.query(`SELECT price_cents FROM addon_catalog WHERE code = $1`, [c]);
         const cents = pr.rows[0] ? pr.rows[0].price_cents : 0;
         const up = await client.query(
-          `INSERT INTO addons (business_id, code, price_cents) VALUES ($1,$2,$3)
+          `INSERT INTO addons (business_id, code, price_cents, current_period_end)
+           VALUES ($1,$2,$3, now() + interval '30 days')
            ON CONFLICT (business_id, code)
-           DO UPDATE SET status = 'active', cancelled_at = NULL, price_cents = $3, activated_at = now()
+           DO UPDATE SET status = 'active', cancelled_at = NULL, cancel_at_period_end = false,
+                         price_cents = $3, activated_at = now(),
+                         current_period_end = GREATEST(addons.current_period_end, now()) + interval '30 days'
            RETURNING code, status, price_cents`,
           [business.id, c, cents]);
         acts.push(up.rows[0]);

@@ -21,7 +21,8 @@ module.exports.mount = function (app, ctx) {
   async function hasLoyaltyAddon(businessId) {
     try {
       const { rows } = await db.query(
-        `SELECT 1 FROM addons WHERE business_id = $1 AND code = 'loyalty' AND status = 'active'`,
+        `SELECT 1 FROM addons WHERE business_id = $1 AND code = 'loyalty' AND status = 'active'
+           AND (current_period_end IS NULL OR now() <= current_period_end + interval '7 days')`,
         [businessId]);
       return !!rows[0];
     } catch (_e) {

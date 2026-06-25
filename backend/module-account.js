@@ -114,19 +114,21 @@ module.exports.mount = function (app, ctx) {
       `SELECT plan_code FROM subscriptions WHERE business_id = $1`, [req.business.id]);
     if (!subQ.rows[0]) return bad(res, 'El negocio no tiene suscripción registrada', 404);
 
-    // Bajar a 'free' (downgrade) NO requiere pago → aplica al instante.
+    // "Bajar a gratis" = cancelar la RENOVACIÓN, NO el beneficio. El plan de pago
+    // sigue activo hasta el fin del período pagado (+7 días de gracia); el worker
+    // lo baja a 'free' solo después. (Mismo principio que los add-ons.)
     if (planCode === 'free') {
       const { rows } = await db.query(
-        `UPDATE subscriptions
-            SET plan_code = 'free', status = 'active',
-                current_period_start = now(), current_period_end = NULL,
-                cancel_at_period_end = false, trial_ends_at = NULL
-          WHERE business_id = $1
-          RETURNING plan_code`,
+        `UPDATE subscriptions SET cancel_at_period_end = true
+          WHERE business_id = $1 AND plan_code <> 'free'
+          RETURNING plan_code, current_period_end`,
         [req.business.id]);
-      if (!rows[0]) return bad(res, 'El negocio no tiene suscripción registrada', 404);
-      await audit(req, 'plan.downgrade', 'business', req.business.id, { plan_code: 'free' });
-      return res.json({ ok: true, plan_code: rows[0].plan_code });
+      if (!rows[0])
+        return res.json({ ok: true, plan_code: 'free', note: 'Ya estás en el plan gratis.' });
+      await audit(req, 'plan.cancel_renewal', 'business', req.business.id, { plan_code: rows[0].plan_code });
+      return res.json({ ok: true, plan_code: rows[0].plan_code, cancel_at_period_end: true,
+        current_period_end: rows[0].current_period_end,
+        note: 'Cancelamos la renovación. Tu plan sigue activo hasta el fin del período pagado.' });
     }
 
     // Subir a un plan DE PAGO NUNCA se aplica solo: requiere pago confirmado. Registramos
@@ -172,6 +174,7 @@ module.exports.mount = function (app, ctx) {
                 ON a.code = c.code
                AND a.business_id = $1
                AND a.status = 'active'
+               AND (a.current_period_end IS NULL OR now() <= a.current_period_end + interval '7 days')
         ORDER BY c.price_cents`, [req.business.id]);
 
     const studioPlus = planAtLeast(req.business.plan_code, 'studio');

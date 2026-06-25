@@ -38,7 +38,8 @@ module.exports.mount = function (app, ctx) {
   // ¿el negocio tiene un add-on activo? (incluye trial premium para features de plan)
   async function hasAddon(businessId, code) {
     const { rows } = await db.query(
-      `SELECT 1 FROM addons WHERE business_id = $1 AND code = $2 AND status = 'active'`,
+      `SELECT 1 FROM addons WHERE business_id = $1 AND code = $2 AND status = 'active'
+         AND (current_period_end IS NULL OR now() <= current_period_end + interval '7 days')`,
       [businessId, code]);
     return !!rows[0];
   }
@@ -48,6 +49,7 @@ module.exports.mount = function (app, ctx) {
   async function productLimit(businessId) {
     const { rows } = await db.query(
       `SELECT code FROM addons WHERE business_id = $1 AND status = 'active'
+         AND (current_period_end IS NULL OR now() <= current_period_end + interval '7 days')
          AND code IN ('store_10','store_25')`, [businessId]);
     return (rows.some(r => r.code === 'store_10') ? 10 : 0)
          + (rows.some(r => r.code === 'store_25') ? 25 : 0);
@@ -84,7 +86,8 @@ module.exports.mount = function (app, ctx) {
 
   app.get('/api/addons', authRequired, businessScope, asyncH(async (req, res) => {
     const { rows } = await db.query(
-      `SELECT a.code, a.status, a.price_cents, a.activated_at, c.name, c.billing, c.description
+      `SELECT a.code, a.status, a.price_cents, a.activated_at, a.current_period_end,
+              a.cancel_at_period_end, c.name, c.billing, c.description
          FROM addons a JOIN addon_catalog c ON c.code = a.code
         WHERE a.business_id = $1 ORDER BY a.activated_at DESC`, [req.business.id]);
     // Catálogo completo (incluye 'payroll' y 'employee_accounting' de la migración 17).
@@ -136,14 +139,18 @@ module.exports.mount = function (app, ctx) {
     return bad(res, `Para activar "${cat.rows[0].name}" ($${(price / 100).toFixed(2)}) confirma el pago. Te lo activamos enseguida.`, 402);
   }));
 
+  // Desactivar = cancelar la RENOVACIÓN, NO el beneficio. El add-on sigue 'active'
+  // y el cliente lo conserva hasta el fin del período pagado (+7 días de gracia);
+  // el worker lo expira solo después. Esto arregla el bug de pérdida inmediata.
   app.post('/api/addons/:code/cancel', authRequired, businessScope, asyncH(async (req, res) => {
     const { rows } = await db.query(
-      `UPDATE addons SET status = 'cancelled', cancelled_at = now()
+      `UPDATE addons SET cancel_at_period_end = true
         WHERE business_id = $1 AND code = $2 AND status = 'active'
-        RETURNING code`, [req.business.id, req.params.code]);
+        RETURNING code, current_period_end`, [req.business.id, req.params.code]);
     if (!rows[0]) return bad(res, 'Add-on no activo', 404);
-    await audit(req, 'addon.cancel', 'addon', null, { code: req.params.code });
-    res.json({ ok: true, note: 'Activo hasta el fin del período pagado' });
+    await audit(req, 'addon.cancel_renewal', 'addon', null, { code: req.params.code });
+    res.json({ ok: true, cancel_at_period_end: true, current_period_end: rows[0].current_period_end,
+      note: 'Cancelamos la renovación. El beneficio sigue activo hasta el fin del período pagado.' });
   }));
 
   // ==========================================================================
@@ -456,6 +463,7 @@ module.exports.mount = function (app, ctx) {
     const b = await db.query(
       `SELECT b.id, b.slug FROM businesses b
          JOIN addons a ON a.business_id = b.id AND a.code = 'gift_cards' AND a.status = 'active'
+              AND (a.current_period_end IS NULL OR now() <= a.current_period_end + interval '7 days')
         WHERE b.slug = $1 AND b.deleted_at IS NULL`, [req.params.slug]);
     const biz = b.rows[0];
     if (!biz) return bad(res, 'Este negocio no vende gift cards', 404);

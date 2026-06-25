@@ -1795,6 +1795,7 @@ app.get('/api/public/:slug', publicLimiter, asyncH(async (req, res) => {
                WHERE p.business_id = $1 AND p.is_active = true
                  AND EXISTS (SELECT 1 FROM addons a
                               WHERE a.business_id = $1 AND a.status = 'active'
+                                AND (a.current_period_end IS NULL OR now() <= a.current_period_end + interval '7 days')
                                 AND a.code IN ('store_10','store_25'))
                ORDER BY p.name`, [biz.id])
       .catch(() =>
@@ -2992,6 +2993,24 @@ async function dispatchMessages() {
 
 setInterval(() => { queueReminders().catch(e => console.error('reminders:', e.message)); }, 60_000);
 setInterval(() => { dispatchMessages().catch(e => console.error('dispatch:', e.message)); }, 20_000);
+
+// ── Worker: ciclo de vida del cobro ────────────────────────────────────────
+// El beneficio (add-on / plan de pago) se mantiene durante el período pagado +
+// 7 días de gracia para renovar (ATH). Pasados esos 7 días sin pago → se quita.
+// Corre cada hora. UPDATEs idempotentes (seguros aunque corra de más).
+async function expireBilling() {
+  // Add-ons vencidos (+7 días de gracia) → 'expired' (dejan de contar en el gating).
+  await db.query(
+    `UPDATE addons SET status = 'expired'
+      WHERE status = 'active' AND current_period_end IS NOT NULL
+        AND now() > current_period_end + interval '7 days'`);
+  // Planes de pago vencidos (+7 días de gracia) → bajan a 'free'.
+  await db.query(
+    `UPDATE subscriptions SET plan_code = 'free', status = 'cancelled', current_period_end = NULL
+      WHERE plan_code <> 'free' AND current_period_end IS NOT NULL
+        AND now() > current_period_end + interval '7 days'`);
+}
+setInterval(() => { expireBilling().catch(e => console.error('expireBilling:', e.message)); }, 3600_000);
 
 // ============================================================================
 //  ESQUEMA v11 (config jsonb en payment_providers + auth_provider/google_sub/
