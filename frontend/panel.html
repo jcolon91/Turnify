@@ -357,6 +357,7 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
       <a data-v="contabilidad" class="navlink">Contabilidad</a>
       <a data-v="negocio" class="navlink">Mi negocio</a>
       <a data-v="pagos" class="navlink">Pagos</a>
+      <a data-v="promos" class="navlink">Promociones</a>
       <a href="referidos.html" class="navlink">Referidos</a>
       <a data-v="cuenta" class="navlink">Mi cuenta</a>
       <div class="planbox">
@@ -618,6 +619,16 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
         <div class="tophead"><div><h1>Órdenes</h1><p>Lo que compran tus clientes y su preparación.</p></div></div>
         <div id="ordersAlert" class="alert"></div>
         <div id="ordersList"></div>
+      </section>
+
+      <section class="view" id="view-promos">
+        <div class="tophead">
+          <div><h1>Promociones</h1><p>Promociona tu negocio: sal arriba en el buscador y el inicio.</p></div>
+          <button class="btn btn-teal btn-sm" id="promoCreateBtn" type="button">Crear campaña</button>
+        </div>
+        <div id="promoAlert" class="alert"></div>
+        <p style="font-size:13px;color:var(--ink2);margin:0 0 16px">Se cobra por vista (2¢) y por clic (25¢) de tu presupuesto. Las reservas/compras que vienen del anuncio se cuentan como conversiones.</p>
+        <div id="promoList"></div>
       </section>
 
       <section class="view" id="view-negocio">
@@ -2529,6 +2540,7 @@ function switchView(v){
   if(v==='horario'){ loadBlocks(); freeInit(); }
   if(v==='contabilidad') loadAccounting();
   if(v==='ordenes') loadOrders();
+  if(v==='promos') loadPromos();
   if(v==='pagos') loadPayments();
   if(v==='negocio'){ initLocMap(); loadPortfolio(); }
   if(v==='cuenta') loadAccount();
@@ -2539,7 +2551,7 @@ function openMenu(){ var d=document.getElementById('mobDrawer'),b=document.getEl
 function closeMenu(){ var d=document.getElementById('mobDrawer'),b=document.getElementById('mobBackdrop'),h=document.getElementById('hambBtn'); d.classList.remove('open'); b.classList.remove('open'); if(h) h.setAttribute('aria-expanded','false'); }
 function buildMobnav(){
   const nav = document.getElementById('mobDrawer');
-  const items = [['agenda','Agenda'],['servicios','Servicios'],['equipo','Equipo'],['clientes','Clientes'],['lealtad','Lealtad'],['#productos.html','Tienda'],['#espera.html','Lista de espera'],['ordenes','Órdenes'],['horario','Horario'],['contabilidad','Contabilidad'],['negocio','Mi negocio'],['pagos','Pagos'],['#referidos.html','Referidos'],['cuenta','Mi cuenta']];
+  const items = [['agenda','Agenda'],['servicios','Servicios'],['equipo','Equipo'],['clientes','Clientes'],['lealtad','Lealtad'],['#productos.html','Tienda'],['#espera.html','Lista de espera'],['ordenes','Órdenes'],['horario','Horario'],['contabilidad','Contabilidad'],['negocio','Mi negocio'],['pagos','Pagos'],['promos','Promociones'],['#referidos.html','Referidos'],['cuenta','Mi cuenta']];
   // Móvil: drawer off-canvas (hamburguesa) en vez de una barra de pestañas.
   nav.innerHTML = items.map(function(it){
     return '<a data-v="'+it[0]+'">'+it[1]+'</a>';
@@ -3413,6 +3425,75 @@ async function loadOrders(){
   });
 }
 
+// ════════════════════════ PROMOCIONES (anuncios) ════════════════════════
+const PROMO_ST_LABELS = { active:'Activa', paused:'Pausada', depleted:'Sin presupuesto', pending:'Pendiente' };
+const PROMO_BUDGET_OPTIONS = [1000, 2500, 5000];   // $10 / $25 / $50 en centavos
+
+document.getElementById('promoCreateBtn').onclick = async function(){
+  clearAlert('promoAlert');
+  this.disabled = true;
+  const r = await api('POST','/ads', {});
+  this.disabled = false;
+  if(r.ok){ loadPromos(); }
+  else { showAlert('promoAlert', (r.data && r.data.error) || 'No se pudo crear la campaña', false); }
+};
+
+async function loadPromos(){
+  clearAlert('promoAlert');
+  const list = document.getElementById('promoList');
+  list.innerHTML = '<div class="empty">Cargando…</div>';
+  const r = await api('GET','/ads');
+  if(!r.ok){ list.innerHTML = ''; showAlert('promoAlert', (r.data && r.data.error) || 'No se pudieron cargar las campañas', false); return; }
+  const camps = (r.data && r.data.campaigns) ? r.data.campaigns : [];
+  if(!camps.length){ list.innerHTML = '<div class="empty">Aún no tienes campañas. Crea una para promocionar tu negocio.</div>'; return; }
+  list.innerHTML = camps.map(function(c){
+    const st = c.status || 'active';
+    const stLabel = PROMO_ST_LABELS[st] || esc(st);
+    const remaining = Math.max(0, (c.budget_cents||0) - (c.spent_cents||0));
+    const ctr = (c.ctr != null) ? (Number(c.ctr)*100).toFixed(1)+'%' : ((c.impressions||0) ? (((c.clicks||0)/(c.impressions||1))*100).toFixed(1)+'%' : '0%');
+    const metric = function(label, val){
+      return '<div style="min-width:78px"><div style="font-size:11px;color:var(--ink2)">'+label+'</div><b style="font-size:15px">'+val+'</b></div>';
+    };
+    const budgetBtns = PROMO_BUDGET_OPTIONS.map(function(cents){
+      return '<button class="btn btn-sm btn-ghost" data-promo-fund="'+esc(c.id)+'" data-amount="'+cents+'">'+money(cents)+'</button>';
+    }).join('');
+    var toggleBtn = '';
+    if(st==='paused'){ toggleBtn = '<button class="btn btn-sm" data-promo-toggle="'+esc(c.id)+'" data-action="resume">Reanudar</button>'; }
+    else { toggleBtn = '<button class="btn btn-sm btn-ghost" data-promo-toggle="'+esc(c.id)+'" data-action="pause">Pausar</button>'; }
+    return '<div class="card" style="display:block">'+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">'+
+        '<div><div style="font-size:12px;color:var(--ink2)">Presupuesto restante</div><b style="font-size:18px">'+money(remaining)+'</b></div>'+
+        '<span class="pill">'+stLabel+'</span>'+
+      '</div>'+
+      '<div style="display:flex;gap:14px;flex-wrap:wrap;margin:12px 0;border-top:1px solid var(--line);padding-top:12px">'+
+        metric('Impresiones', esc(c.impressions||0))+
+        metric('Clics', esc(c.clicks||0))+
+        metric('CTR', ctr)+
+        metric('Conversiones', esc(c.conversions||0))+
+        metric('Gasto', money(c.spent_cents||0))+
+      '</div>'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'+
+        '<span style="font-size:12px;color:var(--ink2)">Cargar presupuesto:</span>'+budgetBtns+
+        '<span style="flex:1"></span>'+toggleBtn+
+      '</div>'+
+    '</div>';
+  }).join('');
+  list.querySelectorAll('[data-promo-fund]').forEach(function(b){
+    b.onclick = function(){
+      offerAthPay('promoAlert', { kind:'ad_budget', campaign_id:b.dataset.promoFund, amountCents:parseInt(b.dataset.amount,10), title:'Presupuesto de anuncio' });
+    };
+  });
+  list.querySelectorAll('[data-promo-toggle]').forEach(function(b){
+    b.onclick = async function(){
+      clearAlert('promoAlert');
+      b.disabled = true;
+      const rr = await api('POST','/ads/'+b.dataset.promoToggle+'/'+b.dataset.action, {});
+      if(rr.ok){ loadPromos(); }
+      else { b.disabled = false; showAlert('promoAlert', (rr.data && rr.data.error) || 'No se pudo actualizar la campaña', false); }
+    };
+  });
+}
+
 // Modal de gastos
 const expenseModal = document.getElementById('expenseModal');
 document.getElementById('addExpenseBtn').onclick = function(){
@@ -3507,6 +3588,8 @@ function openAthCheckout(opts){
   var meta2;
   if(opts.kind==='addons'){
     meta2 = 'addons:' + (opts.codes||[]).join(',');
+  } else if(opts.kind==='ad_budget'){
+    meta2 = 'ad_budget:' + opts.campaign_id;
   } else {
     meta2 = opts.kind + ':' + opts.code + (opts.kind==='featured' && opts.weeks ? ':'+opts.weeks : '');
   }
@@ -3593,6 +3676,7 @@ window.authorizationATHM = async function(){
       referenceNumber: data.referenceNumber
     };
     if(p.kind === 'addons'){ body.codes = p.codes || []; }
+    else if(p.kind === 'ad_budget'){ body.campaign_id = p.campaign_id; body.amount = p.amountCents; }
     else { body.code = p.code; }
     if(p.kind === 'featured' && p.weeks){ body.weeks = p.weeks; }
     var cr = await api('POST','/billing/ath/confirm', body);
@@ -3607,6 +3691,9 @@ window.authorizationATHM = async function(){
       } else if(p.kind === 'featured'){
         showAlert('featAlert','¡Pago recibido! Tu negocio está destacado.', true);
         loadFeatured();
+      } else if(p.kind === 'ad_budget'){
+        showAlert('promoAlert','¡Pago recibido! Presupuesto cargado a tu campaña.', true);
+        loadPromos();
       }
     } else {
       showAlert('athAlert', (cr.data && cr.data.error) || 'No se pudo confirmar el pago.', false);

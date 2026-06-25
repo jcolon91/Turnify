@@ -842,6 +842,20 @@ function getSlug(){
 }
 const SLUG = getSlug();
 
+// ── Atribución de ads: si el visitante llegó por una campaña a ESTE negocio (<24h),
+//    devuelve su campaign_id para adjuntarlo a la conversión (reserva/compra). Defensivo. ──
+function adCampaignId(){
+  try{
+    var raw = sessionStorage.getItem('bukeame_adref');
+    if(!raw) return null;
+    var ref = JSON.parse(raw);
+    if(ref && ref.slug === SLUG && ref.campaign_id != null && (Date.now() - Number(ref.ts) < 86400000)){
+      return ref.campaign_id;
+    }
+  }catch(e){}
+  return null;
+}
+
 const DOW = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
 const DOW_FULL = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
 const MON = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
@@ -1508,6 +1522,7 @@ document.getElementById('confirmBtn').onclick = async function(){
   if(state.staffId) body.staff_id = state.staffId;
   if(email) body.email = email;
   if(notes) body.client_notes = notes;
+  var _adcid = adCampaignId(); if(_adcid != null) body.ad_campaign_id = _adcid;
 
   var btn = document.getElementById('confirmBtn');
   btn.disabled = true; btn.textContent = 'Reservando…';
@@ -2068,6 +2083,7 @@ document.getElementById('orderBtn').onclick = async function(){
     buyer_name:name, buyer_phone:phone, fulfillment:state.fulfillment
   };
   if(email) body.buyer_email = email;
+  var _adcid = adCampaignId(); if(_adcid != null) body.ad_campaign_id = _adcid;
   var btn = document.getElementById('orderBtn');
   btn.disabled=true; btn.textContent='Procesando…';
   var res = await api('POST','/public/'+encodeURIComponent(SLUG)+'/orders', body);

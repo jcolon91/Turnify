@@ -114,6 +114,7 @@ nav .links{display:flex;gap:22px;font-size:14px;font-weight:600;color:var(--mute
 .bcard .cov{height:118px;background-size:cover;background-position:center;background-color:var(--card-soft);position:relative;display:grid;place-items:center}
 .bcard .cov .ini{font-family:var(--display);font-weight:800;font-size:40px;color:var(--green);background:var(--green-soft);width:100%;height:100%;display:grid;place-items:center}
 .bcard .cov .ft{position:absolute;top:10px;left:10px;background:var(--mango);color:#1a1305;font:800 10px var(--mono);letter-spacing:.06em;text-transform:uppercase;padding:4px 9px;border-radius:99px}
+.bcard .promo{position:absolute;top:10px;left:10px;background:var(--green);color:var(--green-ink);font:800 10px var(--mono);letter-spacing:.06em;text-transform:uppercase;padding:4px 9px;border-radius:99px;box-shadow:0 4px 12px -4px var(--green-glow)}
 .bcard .bd{padding:13px 14px 15px}
 .bcard h3{font:700 15.5px var(--display);color:var(--text)}
 .bcard .sub{font-size:12.5px;color:var(--muted);margin-top:3px}
@@ -412,6 +413,33 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
     });
   }
 
+  // ---- Ads: impresión / clic / atribución (no bloqueante, errores ignorados) ----
+  function adImpression(cid){
+    try{ fetch('/api/public/ads/'+encodeURIComponent(cid)+'/impression',{method:'POST'}).catch(function(){}); }catch(e){}
+  }
+  function adClick(cid, slug){
+    try{
+      try{ sessionStorage.setItem('bukeame_adref', JSON.stringify({campaign_id:cid, slug:slug, ts:Date.now()})); }catch(e){}
+      fetch('/api/public/ads/'+encodeURIComponent(cid)+'/click',{method:'POST'}).catch(function(){});
+    }catch(e){}
+  }
+
+  // ---- Tarjeta promocionada (mismo patrón que .bcard, con chip "Promocionado") ----
+  function promoCard(b){
+    var initial = (b.name||'?').charAt(0).toUpperCase();
+    var cov = b.logo_url
+      ? '<div class="cov" style="background-image:url(\''+attr(b.logo_url)+'\')">'
+      : '<div class="cov"><span class="ini">'+esc(initial)+'</span>';
+    var rt = (b.rating_count>0)
+      ? '★ '+Number(b.rating_avg||0).toFixed(1)+' · '+b.rating_count+' reseña'+(b.rating_count>1?'s':'')
+      : '<span class="new">Nuevo</span>';
+    return '<a class="bcard" href="negocio.html?slug='+encodeURIComponent(b.slug)+'" '+
+      'data-promo-cid="'+attr(b.campaign_id)+'" data-promo-slug="'+attr(b.slug)+'">'+
+      cov+'<span class="promo">Promocionado</span></div>'+
+      '<div class="bd"><h3>'+esc(b.name)+'</h3>'+
+      '<div class="rt">'+rt+'</div></div></a>';
+  }
+
   // ---- Negocios recomendados (usa el mismo endpoint público que buscar.html) ----
   function bizCard(b){
     var initial = (b.name||'?').charAt(0).toUpperCase();
@@ -435,16 +463,25 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
     if(!box) return;
     fetch('/api/public/discover').then(function(r){ return r.json(); }).then(function(d){
       d = d || {};
+      var promoted = Array.isArray(d.promoted) ? d.promoted.filter(function(b){ return b && b.slug && b.campaign_id; }) : [];
       var list = (d.featured||[]).concat(d.top_rated||[], d.recent||[], d.nearby||[]);
       // de-duplicar por slug, máximo 8
       var seen = {}, out = [];
       list.forEach(function(b){ if(b && b.slug && !seen[b.slug]){ seen[b.slug]=1; out.push(b); } });
       out = out.slice(0,8);
-      if(!out.length){
+      if(!promoted.length && !out.length){
         box.innerHTML = '<div class="disc-empty" style="grid-column:1/-1">Aún no hay negocios para mostrar. <a href="buscar.html">Explora el buscador →</a></div>';
         return;
       }
-      box.innerHTML = out.map(bizCard).join('');
+      // Tarjetas promocionadas ARRIBA, luego las recomendadas
+      box.innerHTML = promoted.map(promoCard).join('') + out.map(bizCard).join('');
+      // Impresiones + clics de las promocionadas
+      box.querySelectorAll('[data-promo-cid]').forEach(function(a){
+        var cid = a.getAttribute('data-promo-cid');
+        var pslug = a.getAttribute('data-promo-slug');
+        adImpression(cid);
+        a.addEventListener('click', function(){ adClick(cid, pslug); });
+      });
     }).catch(function(){
       box.innerHTML = '<div class="disc-empty" style="grid-column:1/-1">No se pudo cargar. <a href="buscar.html">Ir al buscador →</a></div>';
     });

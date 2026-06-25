@@ -1618,7 +1618,10 @@ app.get('/api/public/search', publicLimiter, publicCache, asyncH(async (req, res
       ORDER BY (EXISTS (SELECT 1 FROM featured_listings fl WHERE fl.business_id = b.id AND fl.ends_at > now())) DESC,
                ${rank} DESC NULLS LAST, b.rating_count DESC
       LIMIT 30`, vals);
-  res.json({ results: rows });
+  // Campañas patrocinadas (módulo ads). Resiliente: nunca tumba el buscador.
+  let promoted = [];
+  try { if (adsMod) promoted = await adsMod.getActivePromoted(db, 5); } catch (_e) { promoted = []; }
+  res.json({ results: rows, promoted });
 }));
 
 // ----------------------------------------------------------------------------
@@ -1699,7 +1702,10 @@ app.get('/api/public/discover', publicLimiter, publicCache, asyncH(async (req, r
   ).catch(() => []);
 
   const [featured, nearby, top_rated, recent] = await Promise.all([featuredP, nearbyP, topRatedP, recentP]);
-  res.json({ featured, nearby, top_rated, recent });
+  // Campañas patrocinadas (módulo ads). Resiliente: nunca tumba la portada.
+  let promoted = [];
+  try { if (adsMod) promoted = await adsMod.getActivePromoted(db, 5); } catch (_e) { promoted = []; }
+  res.json({ featured, nearby, top_rated, recent, promoted });
 }));
 
 // Perfil público (la página SEO bukeame.com/<slug>)
@@ -1949,7 +1955,7 @@ app.get('/api/public/:slug/availability', publicLimiter, asyncH(async (req, res)
 
 // CREAR CITA (público, sin cuenta)
 app.post('/api/public/:slug/appointments', bookingLimiter, asyncH(async (req, res) => {
-  const { service_id, staff_id, start_iso, full_name, phone, email, client_notes, payment_method } = req.body || {};
+  const { service_id, staff_id, start_iso, full_name, phone, email, client_notes, payment_method, ad_campaign_id } = req.body || {};
   // service_id puede ser uno (string) o varios (array). Normalizamos a lista.
   const serviceIds = (Array.isArray(service_id) ? service_id : String(service_id || '').split(','))
     .map(s => String(s).trim()).filter(isUuid);
@@ -2086,6 +2092,11 @@ app.post('/api/public/:slug/appointments', bookingLimiter, asyncH(async (req, re
     await notify(biz.id, 'new_appointment', '📅 Nueva cita',
       `${full_name.trim()} · ${service.name} · ${starts.toLocaleString('es-PR', { timeZone: 'America/Puerto_Rico', dateStyle: 'short', timeStyle: 'short' })}`,
       { appointment_id: appt.id });
+
+    // Conversión de campaña patrocinada (módulo ads). Resiliente: NUNCA rompe la reserva.
+    if (adsMod && isUuid(ad_campaign_id)) {
+      try { await adsMod.recordConversion(db, ad_campaign_id, appt.id); } catch (_e) {}
+    }
 
     res.status(201).json({
       appointment: {
@@ -2881,6 +2892,9 @@ const sharedHelpers = {
   asyncH, bad, isStr, isUuid, isEmail, isPhone, normPhone, isDate, audit, notify,
   confirmCode, bookingLimiter, codeLimiter, publicLimiter,
 };
+// Referencia al módulo de ads (se asigna al montarlo más abajo). Los endpoints
+// públicos la usan en tiempo de request; queda null si el módulo falla al cargar.
+let adsMod = null;
 try {
   require('./module-revenue').mount(app, { db, authRequired, businessScope, h: sharedHelpers });
   const loyalty = require('./module-loyalty');
@@ -2891,6 +2905,8 @@ try {
   require('./module-account').mount(app, { db, authRequired, businessScope, h: sharedHelpers });
   require('./module-payments').mount(app, { db, authRequired, businessScope, h: sharedHelpers });
   require('./module-platform-billing').mount(app, { db, authRequired, businessScope, h: sharedHelpers });
+  adsMod = require('./module-ads');
+  adsMod.mount(app, { db, authRequired, businessScope, h: sharedHelpers });
 } catch (e) {
   console.error('⚠ Error montando módulos v1.1:', e.message);
 }

@@ -310,7 +310,7 @@ module.exports.mount = function (app, ctx) {
   //  PEDIDOS de productos (público — el cliente compra en la página)
   // ==========================================================================
   app.post('/api/public/:slug/orders', bookingLimiter, asyncH(async (req, res) => {
-    const { items, buyer_name, buyer_phone, buyer_email, fulfillment, gift_code } = req.body || {};
+    const { items, buyer_name, buyer_phone, buyer_email, fulfillment, gift_code, ad_campaign_id } = req.body || {};
     if (!isStr(buyer_name, 120)) return bad(res, 'Tu nombre es requerido');
     if (!Array.isArray(items) || !items.length || items.length > 50) return bad(res, 'Carrito inválido');
 
@@ -398,6 +398,11 @@ module.exports.mount = function (app, ctx) {
 
       await notify(biz.id, 'order', 'Nueva venta de producto',
         `${buyer_name.trim()} · $${(total / 100).toFixed(2)}`, { order_id: rows[0].id });
+
+      // Atribución de conversión si la compra vino de un anuncio promocionado.
+      if (isUuid(ad_campaign_id)) {
+        try { await require('./module-ads').recordConversion(db, ad_campaign_id, rows[0].id); } catch (e) {}
+      }
 
       res.status(201).json({
         order_id: rows[0].id,
