@@ -1684,15 +1684,19 @@ function renderPayStep(appt, depCents){
     host.appendChild(cb);
   }
 
-  // ── Saltar el depósito (la cita ya quedó reservada) ──
-  var skip = document.createElement('div');
-  skip.className='pay-skip';
-  skip.textContent = hasAny ? 'Pagar el depósito más tarde' : 'Continuar';
-  skip.onclick = function(){ showOkStep(state.appt); };
-  host.appendChild(skip);
-
+  // Ya NO hay "Pagar el depósito más tarde": con métodos AUTOMÁTICOS (ATH auto /
+  // tarjeta) el cliente DEBE pagar para reservar — si no, la reserva expira y libera
+  // el turno. Con métodos MANUALES (efectivo / ATH al número) la cita ya queda
+  // pendiente al elegirlos y el negocio la valida. Solo si el negocio NO tiene ningún
+  // método de cobro configurado mostramos "Continuar": la cita queda PENDIENTE y se
+  // marca para que el negocio la valide (no se reserva confirmada sin depósito).
   if(!hasAny){
-    document.querySelector('#stepPay .seclabel').textContent = 'Reserva confirmada';
+    var cont = document.createElement('div');
+    cont.className='pay-skip';
+    cont.textContent = 'Continuar — el negocio confirmará tu depósito';
+    cont.onclick = function(){ submitCashDeposit(code, cont); };
+    host.appendChild(cont);
+    document.querySelector('#stepPay .seclabel').textContent = 'Reserva pendiente';
   }
 }
 

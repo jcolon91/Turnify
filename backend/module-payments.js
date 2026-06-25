@@ -362,6 +362,10 @@ module.exports.mount = function (app, ctx) {
     // Idempotencia suave: si el depósito ya está pagado, no recreamos la sesión.
     if (a.pay_status === 'paid' || a.status === 'confirmed')
       return bad(res, 'Esta cita ya está pagada.', 409);
+    // Si la reserva ya no está activa (p.ej. la expiró el worker por falta de pago),
+    // no creamos una sesión de pago para una cita muerta.
+    if (a.status !== 'pending_deposit')
+      return bad(res, 'Esta reserva ya no está activa. Vuelve a agendar.', 409);
 
     const acct = a.stripe_config && a.stripe_config.stripe_account_id;
     if (!acct) return bad(res, 'El negocio no tiene Stripe conectado para cobrar.', 409);
@@ -407,6 +411,12 @@ module.exports.mount = function (app, ctx) {
       console.error('stripe checkout fetch:', e.message);
       return bad(res, 'No se pudo iniciar el pago con tarjeta. Intenta de nuevo.', 502);
     }
+
+    // Marca el depósito como 'card': Stripe confirma de forma asíncrona por webhook
+    // (puede tardar), así que el worker de expiración NO debe cancelar esta reserva.
+    // Si el cliente abandona el checkout, el negocio la cancela manualmente.
+    if (a.payment_id)
+      await db.query(`UPDATE payments SET method = 'card' WHERE id = $1 AND status = 'pending'`, [a.payment_id]);
 
     return res.json({ url: session.url });
   }));

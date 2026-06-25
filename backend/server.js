@@ -167,12 +167,16 @@ app.post('/api/payments/stripe/webhook',
               `UPDATE payments SET status = 'paid', paid_at = now(), external_ref = $2
                 WHERE id = $1 AND status <> 'paid'`,
               [a.payment_id, extRef]);
-          await db.query(
+          const conf = await db.query(
             `UPDATE appointments SET status = 'confirmed'
               WHERE id = $1 AND status = 'pending_deposit'`, [a.id]);
           try {
-            await notify(a.business_id, 'payment', 'Pago con tarjeta recibido',
-              `${a.service_name} · ${extRef || code}`, { appointment_id: a.id });
+            await notify(a.business_id, 'payment',
+              conf.rowCount === 0 ? '⚠️ Pago de reserva expirada' : 'Pago con tarjeta recibido',
+              conf.rowCount === 0
+                ? `${a.service_name} · ${extRef || code} · el pago entró pero la cita ya no estaba activa; contacta al cliente`
+                : `${a.service_name} · ${extRef || code}`,
+              { appointment_id: a.id });
           } catch (e) { console.error('stripe webhook notify:', e.message); }
         }
       }
@@ -2198,7 +2202,7 @@ app.post('/api/public/appointments/:code/ath-reference', codeLimiter, asyncH(asy
   const { reference } = req.body || {};
   if (!isStr(reference, 60)) return bad(res, 'Referencia requerida');
   const { rows } = await db.query(
-    `UPDATE payments p SET external_ref = $1
+    `UPDATE payments p SET external_ref = $1, manual_validate = true
        FROM appointments a
       WHERE p.appointment_id = a.id AND p.business_id = a.business_id
         AND a.confirmation_code = $2
@@ -2254,9 +2258,13 @@ app.post('/api/public/:slug/appointments/:code/ath/confirm', codeLimiter, asyncH
   if (a.payment_id)
     await db.query(`UPDATE payments SET status = 'paid', paid_at = now(), external_ref = $2 WHERE id = $1`,
       [a.payment_id, reference.trim()]);
-  await db.query(`UPDATE appointments SET status = 'confirmed' WHERE id = $1 AND status = 'pending_deposit'`, [a.id]);
-  await notify(a.business_id, 'payment', 'Pago ATH Móvil recibido',
-    `Ref ${reference.trim()} · ${a.service_name}`, { appointment_id: a.id });
+  const conf = await db.query(`UPDATE appointments SET status = 'confirmed' WHERE id = $1 AND status = 'pending_deposit'`, [a.id]);
+  if (conf.rowCount === 0)
+    await notify(a.business_id, 'payment', '⚠️ Pago de reserva expirada',
+      `Ref ${reference.trim()} · ${a.service_name} · el depósito entró pero la cita ya no estaba activa; contacta al cliente`, { appointment_id: a.id });
+  else
+    await notify(a.business_id, 'payment', 'Pago ATH Móvil recibido',
+      `Ref ${reference.trim()} · ${a.service_name}`, { appointment_id: a.id });
   res.json({ ok: true, status: 'confirmed' });
 }));
 
@@ -2265,7 +2273,7 @@ app.post('/api/public/:slug/appointments/:code/ath/confirm', codeLimiter, asyncH
 // NO confirma: la cita queda 'pending_deposit' hasta que el negocio la valide.
 app.post('/api/public/:slug/appointments/:code/deposit-cash', codeLimiter, asyncH(async (req, res) => {
   const { rows } = await db.query(
-    `UPDATE payments p SET method = 'cash'
+    `UPDATE payments p SET method = 'cash', manual_validate = true
        FROM appointments a, businesses b
       WHERE p.appointment_id = a.id AND a.business_id = b.id
         AND b.slug = $1 AND b.deleted_at IS NULL
@@ -2353,9 +2361,15 @@ app.post('/api/public/:slug/appointments/:code/ath/poll', codeLimiter, asyncH(as
   if (pend.paymentId)
     await db.query(`UPDATE payments SET status='paid', paid_at=now(), external_ref=$2 WHERE id=$1 AND status<>'paid'`,
       [pend.paymentId, ref]);
-  await db.query(`UPDATE appointments SET status='confirmed' WHERE id=$1 AND status='pending_deposit'`, [pend.appointmentId]);
-  await notify(pend.businessId, 'payment', 'Pago ATH Móvil recibido',
-    `Ref ${ref} · ${pend.serviceName}`, { appointment_id: pend.appointmentId });
+  const conf = await db.query(`UPDATE appointments SET status='confirmed' WHERE id=$1 AND status='pending_deposit'`, [pend.appointmentId]);
+  if (conf.rowCount === 0)
+    // El pago entró pero la reserva ya no estaba activa (expiró/se canceló). No la
+    // re-activamos; avisamos al negocio para reubicar o reembolsar al cliente.
+    await notify(pend.businessId, 'payment', '⚠️ Pago de reserva expirada',
+      `Ref ${ref} · ${pend.serviceName} · el depósito entró pero la cita ya no estaba activa; contacta al cliente`, { appointment_id: pend.appointmentId });
+  else
+    await notify(pend.businessId, 'payment', 'Pago ATH Móvil recibido',
+      `Ref ${ref} · ${pend.serviceName}`, { appointment_id: pend.appointmentId });
   // Recibo (factura del negocio) por email al cliente. Fire-and-forget; nunca rompe el pago.
   try {
     const rc = await db.query(
@@ -2525,7 +2539,7 @@ app.get('/api/appointments', authRequired, businessScope, asyncH(async (req, res
   const { rows } = await db.query(
     `SELECT a.*, c.full_name AS client_name, c.phone AS client_phone, c.no_show_count,
             st.display_name AS staff_name, st.calendar_color,
-            (SELECT json_build_object('method', p.method, 'status', p.status, 'external_ref', p.external_ref, 'id', p.id)
+            (SELECT json_build_object('method', p.method, 'status', p.status, 'external_ref', p.external_ref, 'id', p.id, 'manual_validate', p.manual_validate)
                FROM payments p WHERE p.appointment_id = a.id AND p.kind = 'deposit' LIMIT 1) AS deposit
        FROM appointments a
        JOIN clients c ON c.id = a.client_id
@@ -3135,6 +3149,38 @@ async function expireBilling() {
         AND now() > current_period_end + interval '7 days'`);
 }
 setInterval(() => { expireBilling().catch(e => console.error('expireBilling:', e.message)); }, 3600_000);
+
+// ── Worker: expirar reservas AUTOMÁTICAS sin pagar (libera el turno) ─────────
+// Una cita 'pending_deposit' OCUPA el turno (constraint anti-doble-reserva, pues
+// pending_deposit está en ALIVE). Si el depósito es AUTOMÁTICO (ATH Móvil auto:
+// method='ath_movil' y manual_validate=false) y el cliente NO lo paga en 30 min,
+// se cancela para liberar el turno. NUNCA se tocan: los MANUALES (efectivo / ATH
+// al número → manual_validate=true, el negocio los valida cuando quiera) ni los de
+// TARJETA (method='card', Stripe confirma async). Cancelar a 'cancelled_business'
+// (fuera de ALIVE) libera el turno de inmediato. Idempotente; corre cada 5 min.
+async function expireAutoHolds() {
+  const { rows } = await db.query(
+    `UPDATE appointments a SET status = 'cancelled_business', cancelled_at = now(),
+            cancel_reason = 'Depósito no recibido a tiempo'
+      WHERE a.status = 'pending_deposit'
+        AND a.created_at < now() - interval '30 minutes'
+        AND EXISTS (SELECT 1 FROM payments p
+                     WHERE p.appointment_id = a.id AND p.business_id = a.business_id
+                       AND p.kind = 'deposit' AND p.status = 'pending'
+                       AND p.manual_validate = false AND p.method = 'ath_movil')
+      RETURNING a.id, a.business_id, a.service_name`);
+  for (const r of rows) {
+    // marca el depósito pendiente como fallido (reporte); la cita ya quedó cancelada
+    await db.query(
+      `UPDATE payments SET status = 'failed'
+        WHERE appointment_id = $1 AND kind = 'deposit' AND status = 'pending'`, [r.id]);
+    try {
+      await notify(r.business_id, 'cancellation', '⌛ Reserva expirada',
+        `${r.service_name} · depósito no recibido a tiempo`, { appointment_id: r.id });
+    } catch (e) { console.error('expireAutoHolds notify:', e.message); }
+  }
+}
+setInterval(() => { expireAutoHolds().catch(e => console.error('expireAutoHolds:', e.message)); }, 300_000);
 
 // ============================================================================
 //  ESQUEMA v11 (config jsonb en payment_providers + auth_provider/google_sub/
