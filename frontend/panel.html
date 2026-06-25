@@ -876,13 +876,10 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
     <h3 id="athTitle">Pagar con ATH Móvil</h3>
     <div class="alert" id="athAlert"></div>
     <div id="athSummary" style="font-size:13.5px;color:var(--ink);background:var(--paper);border-radius:11px;padding:12px 14px;margin-bottom:14px;line-height:1.6"></div>
-    <p style="font-size:12.5px;color:var(--ink2);margin-bottom:12px">Toca el botón de ATH Móvil, escribe tu número y te llegará una notificación a tu app de ATH Móvil para confirmar el pago. Al completarse, tu compra se activa automáticamente.</p>
-    <!-- Contenedor donde la librería de ATH Móvil inyecta su botón.
-         OJO: el id DEBE ser exactamente "ATHMovil_Checkout_Button_payment"
-         (con sufijo _payment). Es el id que busca athmovil_base.js para
-         renderizar su botón; sin él, la librería NO inyecta nada y el pago
-         nunca abre la app. -->
-    <div id="ATHMovil_Checkout_Button_payment" style="min-height:50px;margin-bottom:12px"></div>
+    <p style="font-size:12.5px;color:var(--ink2);margin-bottom:12px">Toca el botón de ATH Móvil para pagar. Se abrirá tu app de ATH Móvil para confirmar. Al completarse, tu compra se activa automáticamente.</p>
+    <!-- Contenedor del botón oficial de ATH Móvil V3 (lo renderiza athmovilV3.js
+         en este id, igual que negocio.html / cita.html). -->
+    <div id="ATHMovil_Checkout_Button" style="min-height:50px;margin-bottom:12px"></div>
     <div style="display:flex;gap:10px">
       <button type="button" class="btn btn-ghost btn-sm" id="athCancel" style="flex:1">Cancelar</button>
     </div>
@@ -3619,29 +3616,29 @@ async function loadAthConfig(){
       ATH_CFG.enabled = !!r.data.enabled;
       ATH_CFG.env = r.data.env || 'production';
       ATH_CFG.publicToken = r.data.publicToken || '';
-      // El script de ATH NO se carga aquí: se (re)inyecta en CADA compra
-      // (mountAthButton), porque la librería lee ATHM_Checkout AL CARGAR y el
-      // monto cambia por compra (no hay forma documentada de actualizarlo luego).
+      // El SDK de ATH lo carga renderAthButton (mismo patrón que negocio.html).
     }
   }catch(e){ /* sin ATH: se queda el flujo actual de "pago pendiente" */ }
 }
 
-// Monta (o re-monta) el botón OFICIAL de ATH Móvil con el checkout ACTUAL.
-// La librería athmovil_base.js lee el global ATHM_Checkout AL CARGAR y pinta su
-// botón en #ATHMovil_Checkout_Button_payment; su doc oficial NO expone forma de
-// actualizar el monto después. Por eso, para montos variables, re-inyectamos el
-// script en cada compra (tras fijar ATHM_Checkout) y la librería renderiza un
-// botón nuevo con el monto correcto. El usuario lo toca para pagar.
-function mountAthButton(){
-  var box = document.getElementById('ATHMovil_Checkout_Button_payment');
-  if(box) box.innerHTML = '';                         // limpia el botón anterior
-  var old = document.getElementById('athmovil-base-js');
-  if(old) old.remove();                               // quita el script anterior
+// Renderiza el botón OFICIAL de ATH Móvil V3 — EXACTAMENTE el mismo patrón que
+// negocio.html / cita.html (que SÍ abren la app de ATH). El SDK athmovilV3.js lee
+// window.ATHM_Checkout (ya fijado en openAthCheckout) y pinta el botón en
+// #ATHMovil_Checkout_Button. Para montos variables: si el SDK ya cargó, se
+// re-renderiza con window.loadButtonATHM(). El usuario toca el botón → ATH abre
+// su app para confirmar el pago (no se auto-dispara).
+var __athLoaded = false;
+function renderAthButton(){
+  if(__athLoaded){
+    if(typeof window.loadButtonATHM === 'function'){ try{ window.loadButtonATHM(); }catch(e){} }
+    return;
+  }
   var s = document.createElement('script');
-  s.id = 'athmovil-base-js';
-  s.src = 'https://payments.athmovil.com/api/modal/js/athmovil_base.js';
+  s.src = 'https://www.athmovil.com/api/js/v3/athmovilV3.js';
   s.async = true;
-  document.body.appendChild(s);                        // al cargar lee ATHM_Checkout y pinta el botón
+  s.onload = function(){ __athLoaded = true; };
+  s.onerror = function(){ showAlert('athAlert','No se pudo cargar ATH Móvil. Intenta de nuevo.', false); };
+  document.body.appendChild(s);
 }
 
 // ¿Mostrar botón "Pagar con ATH Móvil"? Solo si el backend dijo enabled.
@@ -3689,11 +3686,9 @@ function openAthCheckout(opts){
     }]
   };
   document.getElementById('athModal').classList.add('on');
-  // Re-inyecta el script de ATH para que renderice un botón NUEVO leyendo el
-  // ATHM_Checkout que acabamos de fijar (monto correcto de ESTA compra). NO se
-  // dispara por código: el usuario toca el botón; ATH abre su propio modal, pide
-  // su número de ATH Móvil y le manda una push a su app para confirmar el pago.
-  mountAthButton();
+  // Renderiza el botón oficial V3 con este checkout. El usuario lo toca y ATH
+  // abre su app para confirmar el pago (igual que en negocio.html/cita.html).
+  renderAthButton();
 }
 
 // Tras un 402: si ATH está disponible muestra el botón "Pagar con ATH Móvil"
@@ -3727,14 +3722,12 @@ document.getElementById('athCancel').onclick = closeAthCheckout;
 
 // ── Callbacks globales que invoca la librería de ATH Móvil ──
 // Pago COMPLETADO: confirma server-side y activa la compra.
-window.authorizationATHM = async function(){
+window.authorizationATHM = async function(response){
   try{
-    var r = await authorization();          // expuesta por la librería de ATH
-    var data = (r && r.data) ? r.data : {};
-    if(data.ecommerceStatus !== 'COMPLETED'){
-      showAlert('athAlert','El pago no se completó. Intenta de nuevo.', false);
-      return;
-    }
+    // V3 invoca authorizationATHM(response) SOLO cuando el pago se completó; el
+    // response trae ecommerceId/referenceNumber. El backend RE-VERIFICA con el
+    // token privado (findPayment) antes de activar nada, así que esto es seguro.
+    var data = response || {};
     var p = ATH_PENDING || {};
     var body = {
       kind: p.kind,
