@@ -264,7 +264,7 @@ regBtn.onclick = async ()=>{
 
   regBtn.disabled = true; regBtn.textContent = 'Creando…';
   try{
-    const body = { full_name, email, password: pass };
+    const body = { full_name, email, password: pass, accept_terms: terms };
     if(ref) body.referral_code = ref.toUpperCase();
     const data = await apiPost('/auth/register', body);
     showAlert('regAlert','¡Cuenta creada! Entrando…', true);

@@ -1189,11 +1189,12 @@ function renderReviews(){
     var ctx = ctxParts.length ? '<div class="ctx">'+esc(ctxParts.join(' · '))+'</div>' : '';
     var reply = r.business_reply ? '<div class="reply"><b>Respuesta del negocio:</b> '+esc(r.business_reply)+'</div>' : '';
     var txt = r.comment ? '<div class="txt">'+esc(r.comment)+'</div>' : '';
+    var rep = r.id ? '<div style="margin-top:6px"><button class="bk-rev-report" data-rid="'+esc(r.id)+'" style="background:none;border:0;color:var(--muted);font-size:11.5px;cursor:pointer;padding:2px 0;text-decoration:underline">Reportar</button></div>' : '';
     return '<div class="bk-review">'+
       '<div class="top"><div class="rav">'+ini+'</div>'+
         '<div style="flex:1;min-width:0"><div class="who">'+esc(nm)+'</div>'+
           '<div class="meta-row"><span class="stars">'+stars+'</span>'+confirmed+dateEl+'</div>'+ctx+'</div></div>'+
-      txt + reply + '</div>';
+      txt + reply + rep + '</div>';
   }).join('');
 
   var more = (revs.length > __reviewsShown)
@@ -1203,6 +1204,15 @@ function renderReviews(){
   document.getElementById('reviewList').innerHTML = summary + cards + more;
   var mb = document.getElementById('revMore');
   if(mb) mb.onclick = function(){ __reviewsShown += REVIEWS_PAGE; renderReviews(); };
+  // Reportar reseña objetable (UGC). Va al endpoint público; el negocio/plataforma modera.
+  document.querySelectorAll('#reviewList .bk-rev-report').forEach(function(b){
+    b.onclick = async function(){
+      if(!confirm('¿Reportar esta reseña por contenido objetable o inapropiado? El negocio la revisará.')) return;
+      b.disabled = true;
+      try{ await api('POST','/public/reviews/'+encodeURIComponent(b.dataset.rid)+'/report', {}); }catch(e){}
+      b.textContent = 'Reportada — gracias';
+    };
+  });
 }
 
 function fmtTime(t){

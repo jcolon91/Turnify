@@ -35,6 +35,9 @@
 --paper:var(--bg);--ink:var(--text);--ink2:var(--muted);--teal:var(--green);--teal-ink:var(--green);--teal-soft:var(--green-soft);--line:var(--border);
 --mango:#EFA12F;--r:18px;
 --display:"Bricolage Grotesque",sans-serif;--body:"Instrument Sans",sans-serif;--mono:"Spline Sans Mono",monospace}
+/* Opciones de los <select> legibles en ambos temas (en oscuro salían blancas sobre
+   fondo claro = ilegibles). Usa las variables del tema para fondo y texto. */
+select option, select optgroup{ background:var(--card); color:var(--text); }
 html[data-theme="dark"]{color-scheme:dark;
 --bg:#0B1A13;--bg2:#0E2218;--card:#12251B;--card-soft:rgba(255,255,255,.05);--border:rgba(255,255,255,.1);
 --text:#ECEAE0;--muted:#8AA197;--muted2:#5d6f66;--green:#36E27B;--green-ink:#08160F;
@@ -251,6 +254,8 @@ html[data-theme="dark"] .alert.err{background:rgba(225,75,60,.14);color:#FF9A8E;
 .mo-cell.is-today .mo-num{color:var(--green)}
 .mo-dots{display:flex;flex-wrap:wrap;gap:3px;margin-top:auto}
 .mo-dot{width:6px;height:6px;border-radius:99px;background:var(--green)}
+.mo-cnt{margin-top:auto;align-self:flex-start;display:inline-flex;align-items:baseline;gap:3px;background:var(--green-soft);color:var(--green);font-weight:800;font-size:13px;line-height:1;border-radius:8px;padding:3px 7px}
+.mo-cnt small{font-weight:600;font-size:9px;opacity:.85}
 .mo-count{font-size:10.5px;font-weight:700;color:var(--muted);margin-top:auto}
 @media(max-width:640px){
   .wk-grid{display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;padding-bottom:6px}
@@ -374,7 +379,7 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
           <div><h1 id="bizGreeting">Tu agenda</h1><p id="bizSubtitle"></p></div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <div class="theme-tg"><button type="button" data-theme-set="light">Claro</button><button type="button" data-theme-set="dark">Oscuro</button></div>
-            <button class="bell" id="bellBtn" title="Notificaciones">🔔<span id="bellCount" style="display:none"></span></button>
+            <button class="bell" id="bellBtn" title="Notificaciones" aria-label="Notificaciones"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span id="bellCount" style="display:none"></span></button>
             <button class="btn btn-teal btn-sm" id="addApptBtn">+ Cita manual</button>
           </div>
         </div>
@@ -429,6 +434,13 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
           <p style="font-size:13px;color:var(--ink2);margin-bottom:12px">Somete la paga de tu equipo (horas, retención y total), autorízala con tu contraseña y márcala pagada — queda en tu contabilidad y el empleado la ve en su cuenta.</p>
           <div id="payrollList"></div>
           <div class="alert" id="payrollAlert"></div>
+        </div>
+        <!-- Moderación de reseñas reportadas (UGC). Aparece solo si hay reportes. -->
+        <div id="modSection" style="display:none;margin-top:28px;padding-top:20px;border-top:1px solid var(--line)">
+          <div class="seclabel">Reseñas reportadas</div>
+          <p style="font-size:13px;color:var(--ink2);margin-bottom:12px">Alguien reportó estas reseñas por contenido inapropiado. Puedes ocultarlas (dejan de mostrarse) o bloquear al cliente.</p>
+          <div id="modList"></div>
+          <div class="alert" id="modAlert"></div>
         </div>
       </section>
 
@@ -1055,6 +1067,37 @@ const DAYS = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábad
 
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function money(cents){ return '$'+((cents||0)/100).toFixed(2); }
+// === Botón ATRÁS en el panel: cierra el modal abierto en vez de salir del panel. ===
+// Observa cuándo un modal gana la clase 'on' y empuja una entrada de historial (misma
+// URL); al dar atrás (popstate) cierra el de arriba. SEGURO: si no hay modal abierto el
+// atrás navega normal; tolerante a cierres por botón (peor caso: un toque de atrás sin
+// efecto, nunca salir con un modal abierto). Cubre TODOS los <div class="modal">.
+(function(){
+  function openModals(){ return document.querySelectorAll('.modal.on'); }
+  function closeTop(){
+    var open = openModals();
+    if(!open.length) return false;
+    open[open.length-1].classList.remove('on');
+    if(openModals().length===0) document.body.style.overflow='';
+    return true;
+  }
+  var pushed = 0;
+  function sync(){
+    var n = openModals().length;
+    while(pushed < n){ try{ history.pushState({pm:1}, ''); }catch(e){} pushed++; }
+    if(pushed > n) pushed = n;   // se cerró por botón → reajusta (no navega; misma URL)
+  }
+  window.addEventListener('popstate', function(){
+    if(pushed > 0){
+      pushed--; closeTop();
+      var n = openModals().length;
+      while(pushed < n){ try{ history.pushState({pm:1}, ''); }catch(e){} pushed++; }
+    }
+  });
+  function startObs(){ if('MutationObserver' in window) new MutationObserver(sync).observe(document.body, { attributes:true, subtree:true, attributeFilter:['class'] }); }
+  if(document.body) startObs(); else document.addEventListener('DOMContentLoaded', startObs);
+})();
+
 function addonDate(iso){ try{ return new Date(iso).toLocaleDateString('es-PR',{day:'numeric',month:'long',year:'numeric'}); }catch(e){ return ''; } }
 function showAlert(id,msg,ok){ const e=document.getElementById(id); if(!e)return; e.textContent=msg; e.className='alert '+(ok?'ok':'err'); }
 function clearAlert(id){ const e=document.getElementById(id); if(e){ e.className='alert'; e.textContent=''; } }
@@ -1391,6 +1434,45 @@ async function loadStaff(){
   });
   // Sección de Payroll (solo si el add-on 'payroll' está activo)
   loadPayroll(staff);
+  loadReportedReviews();
+}
+
+// Moderación de reseñas reportadas (UGC): ocultar/mostrar + bloquear cliente.
+async function loadReportedReviews(){
+  var section=document.getElementById('modSection'), list=document.getElementById('modList');
+  if(!section||!list) return;
+  var r=await api('GET','/reviews/reported');
+  var revs=(r.ok&&r.data&&r.data.reviews)?r.data.reviews:[];
+  if(!revs.length){ section.style.display='none'; return; }
+  section.style.display='block';
+  list.innerHTML=revs.map(function(v){
+    var rt=v.rating||0; var stars='★'.repeat(rt)+'☆'.repeat(5-rt);
+    return '<div class="svc" style="display:block" data-rid="'+esc(v.id)+'">'+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'+
+        '<div><b>'+esc(v.author||'Anónimo')+'</b> <span style="color:var(--gold,#E8A33D)">'+stars+'</span>'+
+          '<div style="font-size:12px;color:var(--ink2)">'+(v.kind==='product'?'Producto':'Cita')+' · '+(v.report_count||1)+' reporte(s)'+(v.report_reason?(' · '+esc(v.report_reason)):'')+'</div></div>'+
+        (v.hidden?'<span class="pill" style="background:#777;color:#fff">Oculta</span>':'<span class="pill" style="background:#EFA12F;color:#1a1205">Visible</span>')+
+      '</div>'+
+      (v.comment?'<div style="font-size:13px;margin-top:8px;color:var(--text)">'+esc(v.comment)+'</div>':'')+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">'+
+        (v.hidden?'<button class="btn btn-sm" data-act="unhide">Mostrar</button>':'<button class="btn btn-sm" data-act="hide">Ocultar</button>')+
+        (v.client_id?'<button class="btn btn-sm btn-ghost" data-act="block" data-cid="'+esc(v.client_id)+'">Bloquear cliente</button>':'')+
+      '</div></div>';
+  }).join('');
+  list.querySelectorAll('[data-act]').forEach(function(b){
+    b.onclick=async function(){
+      var card=b.closest('[data-rid]'); var rid=card&&card.getAttribute('data-rid');
+      if(b.dataset.act==='block'){
+        if(!confirm('¿Bloquear a este cliente? No podrá reservar contigo.')) return;
+        b.disabled=true; var rb=await api('PATCH','/clients/'+b.dataset.cid,{is_blocked:true});
+        if(rb.ok){ b.textContent='Bloqueado'; } else { b.disabled=false; showAlert('modAlert',(rb.data&&rb.data.error)||'No se pudo bloquear.',false); }
+        return;
+      }
+      b.disabled=true;
+      var rr=await api('POST','/reviews/'+rid+'/'+(b.dataset.act==='hide'?'hide':'unhide'),{});
+      if(rr.ok){ loadReportedReviews(); } else { b.disabled=false; showAlert('modAlert',(rr.data&&rr.data.error)||'No se pudo actualizar.',false); }
+    };
+  });
 }
 
 // ── Payroll: aparece cuando el add-on 'payroll' está activo ────────────────────
@@ -1609,10 +1691,17 @@ async function loadNotifCount(){
   window._notifs = r.data.notifications||[];
 }
 function notifIcon(type){
-  if(type==='new_appointment') return '📅';
-  if(type==='cancellation') return '❌';
-  if(type==='payment') return '💵';
-  return '🔔';
+  var P = {
+    new_appointment: '<path d="M8 2v3M16 2v3M3 9h18M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/>',
+    cancellation:    '<circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/>',
+    payment:         '<path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+    order:           '<path d="M6 2 4 6v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6l-2-4z"/><path d="M3 6h18M16 10a4 4 0 0 1-8 0"/>',
+    giftcard:        '<rect x="3" y="8" width="18" height="13" rx="2"/><path d="M3 12h18M12 8v13"/>',
+    payroll:         '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.4"/>',
+    system:          '<circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/>'
+  };
+  var d = P[type] || '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>';
+  return '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'+d+'</svg>';
 }
 document.getElementById('bellBtn').onclick = async function(){
   const panel = document.getElementById('notifPanel');
@@ -1625,7 +1714,8 @@ document.getElementById('bellBtn').onclick = async function(){
   else {
     html += notifs.map(function(n){
       const t = new Date(n.created_at).toLocaleString('es-PR',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'});
-      return '<div class="notif'+(n.read_at?'':' unread')+'"><div class="nico">'+notifIcon(n.type)+'</div><div class="ngrow"><h5>'+esc(n.title||'')+'</h5><p>'+esc(n.body||'')+'</p><time>'+t+'</time></div></div>';
+      var ttl = (n.title||'').replace(/^[^\p{L}\p{N}]+/u,'');   // quita emoji/símbolos iniciales
+      return '<div class="notif'+(n.read_at?'':' unread')+'"><div class="nico">'+notifIcon(n.type)+'</div><div class="ngrow"><h5>'+esc(ttl)+'</h5><p>'+esc(n.body||'')+'</p><time>'+t+'</time></div></div>';
     }).join('');
   }
   panel.innerHTML = html;
@@ -2415,14 +2505,12 @@ function renderMonth(list, items, range){
     const d = ymdToDate(day);
     const n = (byDay[day]||[]).length;
     const other = day.slice(0,7)!==curMonth;
-    let dots='';
+    let badge='';
     if(n>0){
-      const k=Math.min(n,4);
-      let ds=''; for(let j=0;j<k;j++){ ds+='<span class="mo-dot"></span>'; }
-      dots = '<div class="mo-dots">'+ds+'</div>'+(n>4?'<span class="mo-count">'+n+'</span>':'');
+      badge = '<div class="mo-cnt">'+n+'<small>'+(n===1?'cita':'citas')+'</small></div>';
     }
     h += '<div class="mo-cell'+(other?' is-other':'')+(day===today?' is-today':'')+'" data-day="'+esc(day)+'">'+
-      '<span class="mo-num">'+d.getDate()+'</span>'+dots+'</div>';
+      '<span class="mo-num">'+d.getDate()+'</span>'+badge+'</div>';
     day = addDays(day,1);
   }
   h += '</div>';
