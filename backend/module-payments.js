@@ -19,7 +19,7 @@ const crypto = require('crypto');
 
 module.exports.mount = function (app, ctx) {
   const { db, authRequired, businessScope, h } = ctx;
-  const { asyncH, bad, isStr, isPhone, normPhone, audit, codeLimiter } = h;
+  const { asyncH, bad, isStr, isUuid, isPhone, normPhone, audit, codeLimiter } = h;
 
   const JWT_SECRET = process.env.JWT_SECRET || '';
   const APP_URL    = (process.env.APP_URL || 'https://bukeame.com').replace(/\/+$/, '');
@@ -418,6 +418,72 @@ module.exports.mount = function (app, ctx) {
     if (a.payment_id)
       await db.query(`UPDATE payments SET method = 'card' WHERE id = $1 AND status = 'pending'`, [a.payment_id]);
 
+    return res.json({ url: session.url });
+  }));
+
+  // ── Checkout de Stripe (tarjeta) para una ORDEN de tienda (cargo DIRECTO al
+  //    negocio). El stock/gift NO se mueven aquí: el webhook llama confirmOrderPayment
+  //    al confirmarse el pago. Marca payment_method='card' para que el worker de
+  //    expiración no la cancele (Stripe confirma de forma asíncrona). ──
+  app.post('/api/public/:slug/orders/:id/stripe/checkout', codeLimiter, asyncH(async (req, res) => {
+    if (!process.env.STRIPE_SECRET_KEY) return bad(res, 'Pagos con tarjeta no disponibles ahora mismo.', 409);
+    if (!isUuid(req.params.id)) return bad(res, 'ID inválido');
+    const { rows } = await db.query(
+      `SELECT o.id, o.business_id, o.total_cents, o.gift_card_id, o.status, o.committed,
+              pp.config AS stripe_config
+         FROM product_orders o
+         JOIN businesses b ON b.id = o.business_id AND b.slug = $1 AND b.deleted_at IS NULL
+         LEFT JOIN payment_providers pp ON pp.business_id = o.business_id AND pp.provider = 'stripe'
+        WHERE o.id = $2`, [req.params.slug, req.params.id]);
+    const o = rows[0];
+    if (!o) return bad(res, 'Orden no encontrada', 404);
+    if (o.committed || o.status !== 'pending') return bad(res, 'Esta orden ya no acepta pago.', 409);
+    const acct = o.stripe_config && o.stripe_config.stripe_account_id;
+    if (!acct) return bad(res, 'El negocio no tiene Stripe conectado para cobrar.', 409);
+    // monto a cobrar = total - gift estimada (lectura)
+    let giftEstimate = 0;
+    if (o.gift_card_id) {
+      const gl = await db.query(`SELECT balance_cents FROM gift_cards WHERE id = $1 AND business_id = $2`, [o.gift_card_id, o.business_id]);
+      if (gl.rows[0]) giftEstimate = Math.min(gl.rows[0].balance_cents || 0, o.total_cents);
+    }
+    const amount = o.total_cents - giftEstimate;
+    if (!(amount > 0)) return bad(res, 'La gift card cubre el total; el negocio confirmará tu pedido.', 409);
+
+    const id = req.params.id;
+    const body = new URLSearchParams();
+    body.set('mode', 'payment');
+    body.set('line_items[0][price_data][currency]', 'usd');
+    body.set('line_items[0][price_data][unit_amount]', String(amount));
+    body.set('line_items[0][price_data][product_data][name]', 'Compra en la tienda');
+    body.set('line_items[0][quantity]', '1');
+    body.set('success_url', `${APP_URL}/negocio.html?slug=${encodeURIComponent(req.params.slug)}&pedido=ok`);
+    body.set('cancel_url', `${APP_URL}/negocio.html?slug=${encodeURIComponent(req.params.slug)}`);
+    body.set('metadata[order_id]', id);
+    body.set('metadata[kind]', 'order');
+    body.set('payment_intent_data[metadata][order_id]', id);
+    body.set('payment_intent_data[metadata][kind]', 'order');
+
+    let session;
+    try {
+      const r = await fetch('https://api.stripe.com/v1/checkout/sessions', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + process.env.STRIPE_SECRET_KEY,
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Stripe-Account': acct,
+        },
+        body: body.toString(),
+      });
+      session = await r.json();
+      if (!r.ok || !session || !session.url) {
+        console.error('stripe order checkout:', session && session.error ? session.error.message : r.status);
+        return bad(res, 'No se pudo iniciar el pago con tarjeta. Intenta de nuevo.', 502);
+      }
+    } catch (e) {
+      console.error('stripe order checkout fetch:', e.message);
+      return bad(res, 'No se pudo iniciar el pago con tarjeta. Intenta de nuevo.', 502);
+    }
+    await db.query(`UPDATE product_orders SET payment_method = 'card' WHERE id = $1 AND status = 'pending'`, [id]);
     return res.json({ url: session.url });
   }));
 

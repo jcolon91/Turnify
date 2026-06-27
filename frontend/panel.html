@@ -3488,6 +3488,11 @@ async function loadOrders(){
     const isPickup = o.fulfillment === 'pickup';
     const stKey = (st==='fulfilled') ? ('fulfilled_'+(isPickup?'pickup':'shipping')) : st;
     const stLabel = ORDER_ST_LABELS[stKey] || esc(st);
+    // Pago: 'committed'/'paid_at' = el negocio ya recibió el dinero (stock descontado).
+    const paid = !!(o.committed || o.paid_at);
+    const payPill = paid
+      ? '<span class="pill" style="background:#0E8074;color:#fff">Pagada</span>'
+      : '<span class="pill" style="background:#EFA12F;color:#1a1205">Por cobrar</span>';
     const items = Array.isArray(o.items) ? o.items : [];
     const phone = (o.buyer_phone||'').replace(/[^0-9]/g,'');
     const buyer = '<b>'+esc(o.buyer_name||'Cliente')+'</b>' + (phone ? (' · <a href="https://wa.me/'+phone+'" target="_blank" rel="noopener" style="color:var(--ink2)">'+esc(o.buyer_phone)+'</a>') : '');
@@ -3496,14 +3501,21 @@ async function loadOrders(){
     }).join('') : '<div style="font-size:13px;color:var(--ink2)">Sin detalle de productos.</div>';
     const metodo = isPickup ? 'Recogida' : 'Entregada';
     var btns = '';
-    if(st==='pending' || st==='paid') btns += '<button class="btn btn-sm" data-ord="'+esc(o.id)+'" data-next="preparing">Marcar preparando</button>';
-    if(st==='preparing') btns += '<button class="btn btn-sm" data-ord="'+esc(o.id)+'" data-next="ready">Marcar lista</button>';
-    if(st==='ready') btns += '<button class="btn btn-sm" data-ord="'+esc(o.id)+'" data-next="fulfilled">Marcar '+(isPickup?'recogida':'entregada')+'</button>';
+    if(!paid){
+      // MANUAL (efectivo / ATH al número): el negocio valida el pago → descuenta stock
+      // y la orden pasa a pagada. Las AUTO sin pagar solo se pueden cancelar.
+      if(o.manual_validate) btns += '<button class="btn btn-sm" data-ord="'+esc(o.id)+'" data-validate="1">Validar pago</button>';
+    } else {
+      if(st==='paid') btns += '<button class="btn btn-sm" data-ord="'+esc(o.id)+'" data-next="preparing">Marcar preparando</button>';
+      if(st==='preparing') btns += '<button class="btn btn-sm" data-ord="'+esc(o.id)+'" data-next="ready">Marcar lista</button>';
+      if(st==='ready') btns += '<button class="btn btn-sm" data-ord="'+esc(o.id)+'" data-next="fulfilled">Marcar '+(isPickup?'recogida':'entregada')+'</button>';
+    }
     if(st!=='fulfilled' && st!=='cancelled') btns += '<button class="btn btn-sm btn-ghost" data-ord="'+esc(o.id)+'" data-next="cancelled">Cancelar</button>';
     return '<div class="card" style="display:block">'+
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">'+
         '<div style="min-width:0">'+buyer+'</div>'+
-        '<span class="pill">'+stLabel+'</span>'+
+        '<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">'+payPill+
+          ((paid && (st==='preparing'||st==='ready'||st==='fulfilled')) ? '<span class="pill">'+stLabel+'</span>' : '')+'</div>'+
       '</div>'+
       '<div style="margin:10px 0">'+itemsHtml+'</div>'+
       '<div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding-top:8px">'+
@@ -3514,6 +3526,14 @@ async function loadOrders(){
   }).join('');
   list.querySelectorAll('[data-ord]').forEach(function(b){
     b.onclick = async function(){
+      if(b.dataset.validate){
+        if(!confirm('¿Confirmas que RECIBISTE el pago? Se descontará el inventario y la orden quedará pagada.')) return;
+        b.disabled = true;
+        const rr = await api('POST','/orders/'+b.dataset.ord+'/confirm-payment', {});
+        if(rr.ok){ loadOrders(); }
+        else { b.disabled = false; showAlert('ordersAlert', (rr.data && rr.data.error) || 'No se pudo validar el pago', false); }
+        return;
+      }
       if(b.dataset.next==='cancelled' && !confirm('¿Cancelar esta orden?')) return;
       b.disabled = true;
       const rr = await api('PATCH','/orders/'+b.dataset.ord, { status: b.dataset.next });

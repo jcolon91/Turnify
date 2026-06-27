@@ -763,15 +763,17 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
       <div class="field"><label>Tu nombre *</label><input id="oName" placeholder="Tu nombre completo"></div>
       <div class="field"><label>WhatsApp / Teléfono *</label><input id="oPhone" type="tel" placeholder="787-555-1234"></div>
       <div class="field"><label>Email (opcional)</label><input id="oEmail" type="email" placeholder="tu@correo.com"></div>
+      <div id="orderPay"></div>
+      <div id="orderAutoMsg" style="display:none;text-align:center;font-size:13px;color:var(--text);padding:6px 0;line-height:1.5"></div>
       <button class="btn btn-teal" id="orderBtn">Confirmar pedido →</button>
     </div>
     <section class="view" id="orderOk" style="display:none">
       <div class="success">
         <div class="check"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-        <h2>¡Pedido confirmado!</h2>
+        <h2 id="orderOkTitle">¡Pedido confirmado!</h2>
         <p id="orderOkDetail"></p>
         <div class="code" id="orderOkCode"></div>
-        <p style="font-size:13px">Guarda este número. El negocio te contactará.</p>
+        <p id="orderOkNote" style="font-size:13px">Guarda este número. El negocio te contactará.</p>
         <button class="btn btn-teal" id="orderOkClose" style="margin-top:18px">Listo</button>
       </div>
     </section>
@@ -2099,6 +2101,7 @@ function renderCart(){
   document.getElementById('cartSummary').innerHTML =
     state.cart.map(function(l){ var p=findProduct(l.product_id); return p?('<div class="row"><span>'+esc(p.name)+' × '+l.qty+'</span><b>'+money(p.price_cents*l.qty)+'</b></div>'):''; }).join('')+
     '<div class="row tot"><span>Total</span><b>'+money(cartTotal())+'</b></div>';
+  renderOrderPay();
 }
 
 function openSheet(id){ document.getElementById(id).classList.add('on'); document.body.style.overflow='hidden'; }
@@ -2122,25 +2125,100 @@ document.getElementById('orderBtn').onclick = async function(){
     buyer_name:name, buyer_phone:phone, fulfillment:state.fulfillment
   };
   if(email) body.buyer_email = email;
+  if(state.orderPay) body.payment_method = state.orderPay;
   var _adcid = adCampaignId(); if(_adcid != null) body.ad_campaign_id = _adcid;
   var btn = document.getElementById('orderBtn');
   btn.disabled=true; btn.textContent='Procesando…';
   var res = await api('POST','/public/'+encodeURIComponent(SLUG)+'/orders', body);
-  btn.disabled=false; btn.textContent='Confirmar pedido →';
   if(!res.ok){
+    btn.disabled=false; btn.textContent='Confirmar pedido →';
     if(res.status===404){ showAlert('cartAlert','Este negocio no está aceptando pedidos en línea por ahora.'); return; }
     showAlert('cartAlert', res.data.error || 'No se pudo procesar el pedido. Intenta de nuevo.');
     return;
   }
-  var orderId = res.data.order_id || (res.data.order && res.data.order.id) || '—';
-  document.getElementById('orderOkDetail').textContent = cartCount()+' artículo'+(cartCount()>1?'s':'')+' · '+money(cartTotal());
-  document.getElementById('orderOkCode').textContent = orderId;
-  document.getElementById('cartItems').innerHTML='';
-  document.getElementById('cartCheckout').style.display='none';
-  document.getElementById('orderOk').style.display='block';
-  state.cart = []; updateCartFab();
+  var d = res.data || {};
+  state.lastOrder = { id: d.order_id || '—', count: cartCount(), total: cartTotal() };
+  // AUTO: el cliente paga ANTES de que la orden quede confirmada (si no paga, expira).
+  if(!d.manual_validate && d.balance_due_cents > 0){
+    if(state.orderPay==='card'){ startCardOrder(state.lastOrder.id, btn); return; }
+    if(state.orderPay==='ath_business'){ startAthOrder(state.lastOrder.id, btn); return; }
+  }
+  // MANUAL (efectivo / ATH al número) o gift que cubre todo → pendiente; el negocio valida.
+  btn.disabled=false; btn.textContent='Confirmar pedido →';
+  showOrderOk(true);
 };
 document.getElementById('orderOkClose').onclick = function(){ closeSheet('cartSheet'); document.getElementById('orderOk').style.display='none'; };
+
+// Muestra el panel de éxito. pending=true → orden por validar (manual / gift / sin método AUTO pagado).
+function showOrderOk(pending){
+  var o = state.lastOrder || { id:'—', count:cartCount(), total:cartTotal() };
+  document.getElementById('orderOkTitle').textContent = pending ? 'Pedido pendiente de pago' : '¡Pedido confirmado!';
+  document.getElementById('orderOkDetail').textContent = o.count+' artículo'+(o.count>1?'s':'')+' · '+money(o.total);
+  document.getElementById('orderOkCode').textContent = o.id;
+  document.getElementById('orderOkNote').textContent = pending
+    ? 'Tu pedido quedó PENDIENTE. El negocio lo confirmará al recibir el pago.'
+    : 'Guarda este número. El negocio te contactará.';
+  document.getElementById('cartItems').innerHTML='';
+  document.getElementById('cartCheckout').style.display='none';
+  document.getElementById('orderAutoMsg').style.display='none';
+  document.getElementById('orderOk').style.display='block';
+  state.cart = []; updateCartFab();
+}
+
+// Selector de método de pago de la orden (según lo que el negocio tenga activo).
+function renderOrderPay(){
+  var host = document.getElementById('orderPay'); if(!host) return;
+  var cfg = state.payment_config || {};
+  var opts = [];
+  if(cfg.ath_business && cfg.ath_business.enabled) opts.push({v:'ath_business', t:'ATH Móvil — pago automático'});
+  var stripe = cfg.stripe || {};
+  if(stripe.connected || stripe.stripe_can_charge) opts.push({v:'card', t:'Tarjeta · Apple Pay · Google Pay'});
+  if(cfg.ath_manual && cfg.ath_manual.phone) opts.push({v:'ath_manual', t:'ATH Móvil al '+cfg.ath_manual.phone+' — el negocio valida'});
+  if(cfg.cash && cfg.cash.enabled) opts.push({v:'cash', t:'Efectivo / en persona — el negocio valida'});
+  if(!opts.length){ host.innerHTML=''; state.orderPay=null; return; }
+  if(!state.orderPay || !opts.some(function(o){ return o.v===state.orderPay; })) state.orderPay = opts[0].v;
+  host.innerHTML = '<div class="seclabel" style="text-align:left">Pago</div>' +
+    opts.map(function(o){
+      return '<label style="display:flex;align-items:center;gap:9px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;margin-bottom:6px;cursor:pointer">'+
+        '<input type="radio" name="orderPayM" value="'+o.v+'"'+(o.v===state.orderPay?' checked':'')+'>'+
+        '<span style="font-size:14px;color:var(--text)">'+esc(o.t)+'</span></label>';
+    }).join('');
+  host.querySelectorAll('input[name=orderPayM]').forEach(function(r){ r.onchange=function(){ state.orderPay=r.value; }; });
+}
+
+// Pago con tarjeta (Stripe) de la orden → redirige al checkout del negocio.
+async function startCardOrder(orderId, btnEl){
+  var res = await api('POST','/public/'+encodeURIComponent(SLUG)+'/orders/'+encodeURIComponent(orderId)+'/stripe/checkout', {});
+  if(res.ok && res.data && res.data.url){ window.location.href = res.data.url; return; }
+  if(btnEl){ btnEl.disabled=false; btnEl.textContent='Confirmar pedido →'; }
+  showAlert('cartAlert', (res.data && res.data.error) || 'No pudimos iniciar el pago con tarjeta. Escoge otro método.');
+}
+
+// Pago AUTO por ATH Móvil de la orden: push al cliente + polling. El dinero va directo al negocio.
+async function startAthOrder(orderId, btnEl){
+  if(btnEl){ btnEl.textContent='Conectando con ATH Móvil…'; }
+  var r = await api('POST','/public/'+encodeURIComponent(SLUG)+'/orders/'+encodeURIComponent(orderId)+'/ath/start', {});
+  if(!r.ok || !r.data || !r.data.ecommerceId){
+    if(btnEl){ btnEl.disabled=false; btnEl.textContent='Confirmar pedido →'; }
+    showAlert('cartAlert', (r.data && r.data.error) || 'No se pudo iniciar el pago.'); return;
+  }
+  if(btnEl) btnEl.style.display='none';
+  var msg = document.getElementById('orderAutoMsg');
+  if(msg){ msg.style.display='block'; msg.textContent='Abre tu app de ATH Móvil y confirma el pago…'; }
+  pollAthOrder(orderId, r.data.ecommerceId, msg, btnEl);
+}
+function pollAthOrder(orderId, ecommerceId, msg, btnEl){
+  var tries=0, max=60;   // 60 × 3s = 3 min
+  var t=setInterval(async function(){
+    tries++;
+    if(tries>max){ clearInterval(t); if(msg) msg.textContent='El pago expiró. Intenta de nuevo.'; if(btnEl){ btnEl.style.display=''; btnEl.disabled=false; btnEl.textContent='Confirmar pedido →'; } return; }
+    var r = await api('POST','/public/'+encodeURIComponent(SLUG)+'/orders/'+encodeURIComponent(orderId)+'/ath/poll', { ecommerceId: ecommerceId });
+    if(!r.ok) return;
+    var st = r.data && r.data.status;
+    if(st==='completed'){ clearInterval(t); if(msg) msg.textContent='¡Pago confirmado!'; setTimeout(function(){ showOrderOk(false); }, 900); }
+    else if(st==='cancelled'){ clearInterval(t); if(msg) msg.textContent='Pago cancelado. Intenta de nuevo.'; if(btnEl){ btnEl.style.display=''; btnEl.disabled=false; btnEl.textContent='Confirmar pedido →'; } }
+  }, 3000);
+}
 
 // ═══════════ GIFT CARD ═══════════
 document.getElementById('openGift').onclick = function(){ clearAlert('giftAlert'); document.getElementById('giftForm').style.display='block'; document.getElementById('giftOk').style.display='none'; openSheet('giftSheet'); };

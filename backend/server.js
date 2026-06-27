@@ -180,6 +180,32 @@ app.post('/api/payments/stripe/webhook',
           } catch (e) { console.error('stripe webhook notify:', e.message); }
         }
       }
+
+      // ── Órdenes de tienda pagadas con tarjeta (metadata kind='order') ──────
+      const orderId = (md.order_id || '').toString().trim();
+      if (md.kind === 'order' && isUuid(orderId)) {
+        // Multi-tenant: el business_id sale de la FILA, nunca de metadata.
+        const { rows: orows } = await db.query(
+          `SELECT id, business_id, status, committed FROM product_orders WHERE id = $1 LIMIT 1`, [orderId]);
+        const o = orows[0];
+        if (o && !o.committed && o.status === 'pending' && revenueMod && revenueMod.confirmOrderPayment) {
+          const r = await revenueMod.confirmOrderPayment(orderId, o.business_id);
+          try {
+            await notify(o.business_id, 'order',
+              (r && r.oversell) ? '⚠️ Pago de orden sin inventario' : 'Pago de orden con tarjeta recibido',
+              (r && r.oversell)
+                ? `Se cobró con tarjeta pero faltó ${r.item} · contacta al cliente para reembolsar`
+                : `${extRef || orderId}`,
+              { order_id: orderId });
+          } catch (e) { console.error('stripe order notify:', e.message); }
+        } else if (o && o.status !== 'pending' && !o.committed) {
+          // El pago entró pero la orden ya no estaba activa (cancelada) → avisar.
+          try {
+            await notify(o.business_id, 'order', '⚠️ Pago de orden cancelada',
+              `${extRef || orderId} · el pago entró pero la orden ya no estaba activa; contacta al cliente`, { order_id: orderId });
+          } catch (e) {}
+        }
+      }
     }
     // Firma válida ⇒ 200 siempre (aplique o no el evento).
     return res.json({ received: true });
@@ -3182,6 +3208,27 @@ async function expireAutoHolds() {
 }
 setInterval(() => { expireAutoHolds().catch(e => console.error('expireAutoHolds:', e.message)); }, 300_000);
 
+// ── Worker: expirar órdenes de tienda AUTO sin pagar ────────────────────────
+// Una orden AUTO por ATH (payment_method='ath_movil' y manual_validate=false) sin
+// pagar en 30 min se cancela. El inventario/gift NUNCA se movieron al crearla
+// (committed=false), así que NO hay nada que restaurar. NO toca: manuales
+// (manual_validate=true), pagadas/legacy (committed=true), ni tarjeta (Stripe es
+// asíncrono). Idempotente; corre cada 5 min.
+async function expireUnpaidOrders() {
+  const { rows } = await db.query(
+    `UPDATE product_orders SET status = 'cancelled'
+      WHERE status = 'pending' AND committed = false AND manual_validate = false
+        AND payment_method = 'ath_movil' AND created_at < now() - interval '30 minutes'
+      RETURNING id, business_id, buyer_name`);
+  for (const r of rows) {
+    try {
+      await notify(r.business_id, 'order', '⌛ Orden expirada',
+        `${r.buyer_name} · pago no recibido a tiempo`, { order_id: r.id });
+    } catch (e) { console.error('expireUnpaidOrders notify:', e.message); }
+  }
+}
+setInterval(() => { expireUnpaidOrders().catch(e => console.error('expireUnpaidOrders:', e.message)); }, 300_000);
+
 // ============================================================================
 //  ESQUEMA v11 (config jsonb en payment_providers + auth_provider/google_sub/
 //  apple_sub en users) → se aplica con `database/11-schema-pagos-login-social.sql`
@@ -3201,8 +3248,9 @@ const sharedHelpers = {
 // Referencia al módulo de ads (se asigna al montarlo más abajo). Los endpoints
 // públicos la usan en tiempo de request; queda null si el módulo falla al cargar.
 let adsMod = null;
+let revenueMod = null;   // capturado al montar: expone confirmOrderPayment para el webhook
 try {
-  require('./module-revenue').mount(app, { db, authRequired, businessScope, h: sharedHelpers });
+  revenueMod = require('./module-revenue').mount(app, { db, authRequired, businessScope, h: sharedHelpers });
   const loyalty = require('./module-loyalty');
   loyalty.mount(app, { db, authRequired, businessScope, h: sharedHelpers });
   loyalty.startWorkers({ db, h: sharedHelpers });
