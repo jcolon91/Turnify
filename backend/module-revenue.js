@@ -255,13 +255,13 @@ module.exports.mount = function (app, ctx) {
                             ORDER BY ph.sort_order)
               FROM product_photos ph WHERE ph.product_id = p.id), '[]') AS photos,
            (SELECT round(avg(r.rating)::numeric, 1) FROM product_reviews r
-              WHERE r.product_id = p.id) AS rating_avg,
+              WHERE r.product_id = p.id AND r.hidden_at IS NULL) AS rating_avg,
            COALESCE((SELECT count(*)::int FROM product_reviews r
-              WHERE r.product_id = p.id), 0) AS rating_count,
+              WHERE r.product_id = p.id AND r.hidden_at IS NULL), 0) AS rating_count,
            COALESCE(
              (SELECT json_agg(rv ORDER BY rv.created_at DESC)
-                FROM (SELECT reviewer_name, rating, comment, verified, created_at
-                        FROM product_reviews r WHERE r.product_id = p.id
+                FROM (SELECT id, reviewer_name, rating, comment, verified, created_at
+                        FROM product_reviews r WHERE r.product_id = p.id AND r.hidden_at IS NULL
                        ORDER BY created_at DESC LIMIT 20) rv), '[]') AS reviews
          FROM products p
         WHERE p.business_id = $1 AND p.is_active

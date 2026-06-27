@@ -426,9 +426,10 @@ app.post('/api/auth/register', authLimiter, asyncH(async (req, res) => {
   let user;
   try {
     const { rows } = await db.query(
-      `INSERT INTO users (full_name, email, phone, password_hash)
-       VALUES ($1,$2,$3,$4) RETURNING id, full_name, email, is_platform_admin`,
-      [full_name.trim(), email.toLowerCase(), phone ? normPhone(phone) : null, hash]);
+      `INSERT INTO users (full_name, email, phone, password_hash, terms_accepted_at)
+       VALUES ($1,$2,$3,$4, CASE WHEN $5 THEN now() ELSE NULL END)
+       RETURNING id, full_name, email, is_platform_admin`,
+      [full_name.trim(), email.toLowerCase(), phone ? normPhone(phone) : null, hash, !!(req.body && req.body.accept_terms)]);
     user = rows[0];
   } catch (e) {
     // Mensaje neutral: no confirmamos si fue el email o el teléfono (anti-enumeración).
@@ -1822,7 +1823,7 @@ app.get('/api/public/:slug', publicLimiter, asyncH(async (req, res) => {
     db.query(`SELECT id, display_name, bio, avatar_url, specialties, rating_avg, rating_count
               FROM staff WHERE business_id = $1 AND is_active AND deleted_at IS NULL ORDER BY sort_order`, [biz.id]),
     db.query(`SELECT day_of_week, opens, closes FROM business_hours WHERE business_id = $1 ORDER BY day_of_week, opens`, [biz.id]),
-    db.query(`SELECT r.rating, r.comment, r.business_reply, r.created_at, c.full_name
+    db.query(`SELECT r.id, r.rating, r.comment, r.business_reply, r.created_at, c.full_name
               FROM reviews r JOIN clients c ON c.id = r.client_id
               WHERE r.business_id = $1 AND r.is_published ORDER BY r.created_at DESC LIMIT 10`, [biz.id]),
     // Métodos de pago que el negocio activó (resiliente si la migración 07/11 aún no corre).
@@ -1846,9 +1847,9 @@ app.get('/api/public/:slug', publicLimiter, asyncH(async (req, res) => {
                         WHERE pp.product_id = p.id
                         ORDER BY pp.sort_order, pp.id LIMIT 1) AS first_photo,
                      COALESCE((SELECT count(*)::int FROM product_reviews r
-                        WHERE r.product_id = p.id), 0) AS rating_count,
+                        WHERE r.product_id = p.id AND r.hidden_at IS NULL), 0) AS rating_count,
                      (SELECT round(avg(r.rating)::numeric, 1) FROM product_reviews r
-                        WHERE r.product_id = p.id) AS rating_avg
+                        WHERE r.product_id = p.id AND r.hidden_at IS NULL) AS rating_avg
                 FROM products p
                WHERE p.business_id = $1 AND p.is_active = true
                  AND EXISTS (SELECT 1 FROM addons a
@@ -1937,12 +1938,12 @@ app.get('/api/public/:slug/products/:id', publicLimiter, asyncH(async (req, res)
   const [photos, reviews, summary] = await Promise.all([
     db.query(`SELECT url FROM product_photos WHERE product_id = $1
               ORDER BY sort_order, id LIMIT 3`, [req.params.id]),
-    db.query(`SELECT reviewer_name, rating, comment, verified, created_at
-                FROM product_reviews WHERE product_id = $1
+    db.query(`SELECT id, reviewer_name, rating, comment, verified, created_at
+                FROM product_reviews WHERE product_id = $1 AND hidden_at IS NULL
                ORDER BY created_at DESC LIMIT 50`, [req.params.id]),
     db.query(`SELECT count(*)::int AS rating_count,
                      round(avg(rating)::numeric, 1) AS rating_avg
-                FROM product_reviews WHERE product_id = $1`, [req.params.id]),
+                FROM product_reviews WHERE product_id = $1 AND hidden_at IS NULL`, [req.params.id]),
   ]);
   const sum = summary.rows[0] || { rating_count: 0, rating_avg: null };
   res.json({
@@ -2555,6 +2556,79 @@ app.post('/api/appointments/:code/review', authRequired, asyncH(async (req, res)
 }));
 
 // ============================================================================
+//  MODERACIÓN DE RESEÑAS (UGC) — Apple 1.2 / Google UGC. Reportar (público),
+//  ocultar/mostrar (negocio), lista de reportadas. Bloquear cliente reusa is_blocked.
+// ============================================================================
+
+// Público: reportar una reseña objetable (cita o producto). No revela existencia/tabla.
+app.post('/api/public/reviews/:id/report', publicLimiter, asyncH(async (req, res) => {
+  if (!isUuid(req.params.id)) return bad(res, 'ID inválido');
+  const reason = isStr(req.body && req.body.reason, 300) ? req.body.reason.trim() : null;
+  const r = await db.query(
+    `UPDATE reviews SET reported_at = COALESCE(reported_at, now()),
+            report_count = report_count + 1, report_reason = COALESCE($2, report_reason)
+      WHERE id = $1 AND is_published RETURNING id`, [req.params.id, reason]);
+  if (!r.rows[0])
+    await db.query(
+      `UPDATE product_reviews SET reported_at = COALESCE(reported_at, now()),
+              report_count = report_count + 1, report_reason = COALESCE($2, report_reason)
+        WHERE id = $1 AND hidden_at IS NULL`, [req.params.id, reason]).catch(() => {});
+  res.json({ ok: true, message: 'Gracias, revisaremos esta reseña.' });
+}));
+
+// Negocio: ocultar una reseña (cita → is_published=false, el trigger baja el rating;
+// producto → hidden_at). Scope estricto por business_id.
+app.post('/api/reviews/:id/hide', authRequired, businessScope, asyncH(async (req, res) => {
+  if (!isUuid(req.params.id)) return bad(res, 'ID inválido');
+  let r = await db.query(
+    `UPDATE reviews SET is_published = false, hidden_at = now()
+      WHERE id = $1 AND business_id = $2 RETURNING id`, [req.params.id, req.business.id]);
+  if (!r.rows[0])
+    r = await db.query(
+      `UPDATE product_reviews SET hidden_at = now()
+        WHERE id = $1 AND business_id = $2 RETURNING id`, [req.params.id, req.business.id]);
+  if (!r.rows[0]) return bad(res, 'Reseña no encontrada', 404);
+  await audit(req, 'review.hide', 'review', req.params.id);
+  res.json({ ok: true });
+}));
+
+// Negocio: volver a mostrar una reseña oculta.
+app.post('/api/reviews/:id/unhide', authRequired, businessScope, asyncH(async (req, res) => {
+  if (!isUuid(req.params.id)) return bad(res, 'ID inválido');
+  let r = await db.query(
+    `UPDATE reviews SET is_published = true, hidden_at = NULL
+      WHERE id = $1 AND business_id = $2 RETURNING id`, [req.params.id, req.business.id]);
+  if (!r.rows[0])
+    r = await db.query(
+      `UPDATE product_reviews SET hidden_at = NULL
+        WHERE id = $1 AND business_id = $2 RETURNING id`, [req.params.id, req.business.id]);
+  if (!r.rows[0]) return bad(res, 'Reseña no encontrada', 404);
+  await audit(req, 'review.unhide', 'review', req.params.id);
+  res.json({ ok: true });
+}));
+
+// Negocio: lista de reseñas REPORTADAS (cita + producto) para moderar.
+app.get('/api/reviews/reported', authRequired, businessScope, asyncH(async (req, res) => {
+  const appt = await db.query(
+    `SELECT r.id, 'appointment' AS kind, r.rating, r.comment, r.created_at, r.reported_at,
+            r.report_count, r.report_reason, (r.is_published = false) AS hidden,
+            r.client_id, c.full_name AS author
+       FROM reviews r JOIN clients c ON c.id = r.client_id
+      WHERE r.business_id = $1 AND r.reported_at IS NOT NULL
+      ORDER BY r.reported_at DESC LIMIT 100`, [req.business.id]);
+  const prod = await db.query(
+    `SELECT id, 'product' AS kind, rating, comment, created_at, reported_at,
+            report_count, report_reason, (hidden_at IS NOT NULL) AS hidden,
+            NULL::uuid AS client_id, reviewer_name AS author
+       FROM product_reviews
+      WHERE business_id = $1 AND reported_at IS NOT NULL
+      ORDER BY reported_at DESC LIMIT 100`, [req.business.id]);
+  const all = appt.rows.concat(prod.rows)
+    .sort((a, b) => new Date(b.reported_at).getTime() - new Date(a.reported_at).getTime());
+  res.json({ reviews: all });
+}));
+
+// ============================================================================
 //  NÓMINA (payroll) — el negocio SOMETE pagos al equipo; el empleado los ve.
 //  Requiere el add-on 'payroll' activo y la contraseña del dueño para autorizar.
 // ============================================================================
@@ -2656,6 +2730,51 @@ app.get('/api/me/payroll', authRequired, asyncH(async (req, res) => {
        JOIN businesses b ON b.id = pe.business_id AND b.deleted_at IS NULL
       ORDER BY pe.created_at DESC LIMIT 200`, [req.user.id]);
   res.json({ entries: rows });
+}));
+
+// ============================================================================
+//  WEB PUSH (scaffolding). 'web-push' es OPCIONAL: si no está instalado o faltan las
+//  llaves VAPID, todo queda INERTE sin romper la app (hasta `npm i web-push` + .env).
+// ============================================================================
+let webpush = null;
+try {
+  webpush = require('web-push');
+  if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY)
+    webpush.setVapidDetails(process.env.VAPID_SUBJECT || 'mailto:soporte@bukeame.com',
+      process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
+} catch (e) { /* 'web-push' aún no instalado → push inerte */ }
+
+// Envía push a TODAS las suscripciones de un usuario. Best-effort; limpia las muertas.
+// No-op si push no está configurado. Listo para llamar desde cualquier evento.
+async function sendPush(userId, title, body, url) {
+  if (!webpush || !process.env.VAPID_PUBLIC_KEY) return;
+  let subs;
+  try { subs = (await db.query(`SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = $1`, [userId])).rows; }
+  catch (e) { return; }
+  const payload = JSON.stringify({ title: title || 'Bukéame', body: body || '', url: url || '/' });
+  for (const s of subs) {
+    try {
+      await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload);
+    } catch (e) {
+      if (e && (e.statusCode === 404 || e.statusCode === 410))
+        await db.query(`DELETE FROM push_subscriptions WHERE id = $1`, [s.id]).catch(() => {});
+    }
+  }
+}
+
+// Llave pública VAPID para que el frontend se suscriba (null = push no configurado).
+app.get('/api/push/key', (_req, res) => res.json({ key: process.env.VAPID_PUBLIC_KEY || null }));
+
+// Guarda/actualiza la suscripción push del usuario autenticado.
+app.post('/api/push/subscribe', authRequired, asyncH(async (req, res) => {
+  const s = req.body && req.body.subscription;
+  if (!s || !s.endpoint || !s.keys || !s.keys.p256dh || !s.keys.auth) return bad(res, 'Suscripción inválida');
+  await db.query(
+    `INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
+     VALUES ($1,$2,$3,$4)
+     ON CONFLICT (endpoint) DO UPDATE SET user_id = EXCLUDED.user_id, p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth`,
+    [req.user.id, s.endpoint, s.keys.p256dh, s.keys.auth]);
+  res.json({ ok: true });
 }));
 
 // ============================================================================
