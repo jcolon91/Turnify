@@ -47,13 +47,17 @@ async function getActivePromoted(db, limit) {
   return rows;
 }
 
-// recordConversion(db, campaignId, refId): registra una conversión (p.ej. una
-// cita atribuida a la campaña). No gasta presupuesto (las conversiones no cobran).
-async function recordConversion(db, campaignId, refId) {
+// recordConversion(db, campaignId, refId, businessId): registra una conversión
+// (p.ej. una cita atribuida a la campaña). No gasta presupuesto (no cobran).
+// SEGURIDAD: solo cuenta si la campaña PERTENECE al negocio que generó la conversión
+// (los UUID de campaña son públicos; sin esto un atacante atribuye conversiones falsas
+// a la campaña de un competidor para envenenar sus métricas).
+async function recordConversion(db, campaignId, refId, businessId) {
   const { rows } = await db.query(
     `INSERT INTO ad_events (campaign_id, type, ref_id)
-     VALUES ($1, 'conversion', $2)
-     RETURNING id`, [campaignId, refId || null]);
+     SELECT $1, 'conversion', $2
+      WHERE EXISTS (SELECT 1 FROM ad_campaigns WHERE id = $1 AND business_id = $3)
+     RETURNING id`, [campaignId, refId || null, businessId || null]);
   return rows[0];
 }
 

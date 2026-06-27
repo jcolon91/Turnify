@@ -389,8 +389,10 @@ const authRequired = asyncH(async (req, res, next) => {
   try { payload = jwt.verify(h.slice(7), JWT_SECRET); }
   catch { return bad(res, 'Sesión expirada', 401); }
   const { rows } = await db.query(
-    `SELECT id, email, phone, full_name, is_platform_admin FROM users
-     WHERE id = $1 AND deleted_at IS NULL`, [payload.sub]);
+    `SELECT id, email, phone, full_name, is_platform_admin,
+            email_verified_at IS NOT NULL AS email_verified,
+            phone_verified_at IS NOT NULL AS phone_verified
+       FROM users WHERE id = $1 AND deleted_at IS NULL`, [payload.sub]);
   if (!rows[0]) return bad(res, 'Sesión expirada', 401);
   req.user = rows[0];
   next();
@@ -591,10 +593,12 @@ async function socialLoginUpsert(req, res, { provider, sub, email, name }) {
       ORDER BY (${subCol} = $1) DESC LIMIT 1`, [sub, emailLc]);
   let user;
   if (found.rows[0]) {
-    // Anti account-takeover: fusión SOLO por email exige cuenta local verificada o sin contraseña.
-    // Si la cuenta tiene password y NO está verificada, no enlazamos automáticamente.
-    if (!found.rows[0].sub_match && found.rows[0].has_password && !found.rows[0].is_verified)
-      return bad(res, 'Ya existe una cuenta con ese correo. Inicia sesión con tu correo y contraseña.', 409);
+    // Es SEGURO enlazar el login social a una cuenta local existente (incluso si esa
+    // cuenta no estaba verificada): al llegar aquí el PROVEEDOR ya probó que el usuario
+    // controla este email (/auth/google exige email_verified; los emails de Apple son
+    // verificados). Antes esto devolvía 409 cuando la cuenta local tenía contraseña y no
+    // estaba verificada, lo que permitía a un atacante BLOQUEAR el login social de una
+    // víctima pre-registrando su email — eso ya no aplica.
     // Enlaza el sub + provider y marca el email como verificado (el proveedor ya lo hizo).
     const upd = await db.query(
       `UPDATE users
@@ -2127,6 +2131,18 @@ app.post('/api/public/:slug/appointments', bookingLimiter, asyncH(async (req, re
   const method = payment_method === 'card' ? 'card' : 'ath_movil';
   const phoneN = normPhone(phone);
 
+  // ABUSE: tope de reservas SIN PAGAR por cliente en este negocio. Una cita
+  // 'pending_deposit' OCUPA el turno; sin tope, alguien podría inundar todos los
+  // turnos con holds y nunca pagar. Si ya tiene varias pendientes, no deja crear otra
+  // hasta que pague o expiren (el worker las libera a los ~30 min).
+  if (deposit > 0) {
+    const held = await db.query(
+      `SELECT count(*)::int n FROM appointments a JOIN clients c ON c.id = a.client_id
+        WHERE a.business_id = $1 AND a.status = 'pending_deposit' AND c.phone = $2`, [biz.id, phoneN]);
+    if (held.rows[0].n >= 5)
+      return bad(res, 'Tienes varias reservas pendientes de depósito. Págalas o espera a que expiren antes de hacer otra.', 429);
+  }
+
   const client = await db.connect();
   try {
     await client.query('BEGIN');
@@ -2187,7 +2203,7 @@ app.post('/api/public/:slug/appointments', bookingLimiter, asyncH(async (req, re
 
     // Conversión de campaña patrocinada (módulo ads). Resiliente: NUNCA rompe la reserva.
     if (adsMod && isUuid(ad_campaign_id)) {
-      try { await adsMod.recordConversion(db, ad_campaign_id, appt.id); } catch (_e) {}
+      try { await adsMod.recordConversion(db, ad_campaign_id, appt.id, appt.business_id); } catch (_e) {}
     }
 
     res.status(201).json({
@@ -2262,36 +2278,32 @@ app.post('/api/public/appointments/:code/cancel', codeLimiter, asyncH(async (req
   res.json({ ok: true });
 }));
 
-// Confirmación ATH Móvil AUTO (botón client-side con el publicToken del negocio): el cobro ya
-// ocurrió DIRECTO hacia la cuenta ATH del negocio. Aquí registramos la referencia, marcamos el
-// depósito 'paid' y la cita 'confirmed'. Idempotente. Bukéame no toca el dinero.
+// El cliente REPORTA una referencia de ATH Móvil manual (endpoint legacy del botón
+// client-side). SEGURIDAD: NUNCA se marca el depósito 'paid' ni la cita 'confirmed' con
+// una referencia de texto del cliente — eso permitía reservas gratis garantizadas
+// (cualquiera con un código podía auto-confirmar sin pagar). Solo se registra la
+// referencia y se marca para VALIDACIÓN del negocio; la cita queda 'pending_deposit'
+// hasta que el negocio la confirme (PATCH /api/payments/:id/confirm). El pago AUTO real
+// va por /ath/start → /ath/poll (verifica el monto contra ATH). Mismo modelo que
+// /ath-reference y /deposit-cash. Multi-tenant por slug; idempotente; no filtra existencia.
 app.post('/api/public/:slug/appointments/:code/ath/confirm', codeLimiter, asyncH(async (req, res) => {
   const { reference } = req.body || {};
   if (!isStr(reference, 60)) return bad(res, 'Referencia requerida');
-  // La cita debe pertenecer al negocio del slug (aislamiento multi-tenant).
   const { rows } = await db.query(
-    `SELECT a.id, a.business_id, a.service_name, a.status,
-            p.id AS payment_id, p.status AS pay_status
-       FROM appointments a
-       JOIN businesses b ON b.id = a.business_id AND b.slug = $1 AND b.deleted_at IS NULL
-       LEFT JOIN payments p ON p.appointment_id = a.id AND p.kind = 'deposit' AND p.method = 'ath_movil'
-      WHERE a.confirmation_code = $2`, [req.params.slug, req.params.code.toUpperCase()]);
-  const a = rows[0];
-  if (!a) return bad(res, 'Cita no encontrada', 404);
-  // Idempotencia: si ya está pagada/confirmada, responder ok sin re-procesar.
-  if (a.pay_status === 'paid' || a.status === 'confirmed')
-    return res.json({ ok: true, status: 'confirmed', already: true });
-  if (a.payment_id)
-    await db.query(`UPDATE payments SET status = 'paid', paid_at = now(), external_ref = $2 WHERE id = $1`,
-      [a.payment_id, reference.trim()]);
-  const conf = await db.query(`UPDATE appointments SET status = 'confirmed' WHERE id = $1 AND status = 'pending_deposit'`, [a.id]);
-  if (conf.rowCount === 0)
-    await notify(a.business_id, 'payment', '⚠️ Pago de reserva expirada',
-      `Ref ${reference.trim()} · ${a.service_name} · el depósito entró pero la cita ya no estaba activa; contacta al cliente`, { appointment_id: a.id });
-  else
-    await notify(a.business_id, 'payment', 'Pago ATH Móvil recibido',
-      `Ref ${reference.trim()} · ${a.service_name}`, { appointment_id: a.id });
-  res.json({ ok: true, status: 'confirmed' });
+    `UPDATE payments p SET external_ref = $1, manual_validate = true
+       FROM appointments a, businesses b
+      WHERE p.appointment_id = a.id AND a.business_id = b.id
+        AND b.slug = $2 AND b.deleted_at IS NULL
+        AND a.confirmation_code = $3
+        AND p.kind = 'deposit' AND p.status = 'pending'
+      RETURNING a.business_id, a.id, a.service_name`,
+    [reference.trim(), req.params.slug, req.params.code.toUpperCase()]);
+  // Idempotente / sin enumeración: si no hay depósito pendiente (ya validado o inexistente)
+  // respondemos ok sin revelar nada.
+  if (!rows[0]) return res.json({ ok: true, status: 'pending' });
+  await notify(rows[0].business_id, 'payment', '💸 Verifica un ATH Móvil',
+    `Referencia ${reference.trim()} · ${rows[0].service_name}`, { appointment_id: rows[0].id });
+  res.json({ ok: true, status: 'pending', message: 'El negocio validará tu pago y confirmará la cita' });
 }));
 
 // Cliente elige pagar el depósito EN EFECTIVO (en persona). Marca el método del
@@ -2428,11 +2440,14 @@ app.post('/api/public/:slug/appointments/:code/ath/poll', codeLimiter, asyncH(as
 // sus citas en cualquier negocio. Todo parametrizado.
 // ============================================================================
 
-// Cláusula de cruce reutilizable: la cita es del usuario si el cliente del
-// negocio comparte user_id, email o teléfono con el usuario autenticado.
-// $1 = req.user.id (uuid), $2 = req.user.email, $3 = req.user.phone (puede ser null).
+// Cláusula de cruce reutilizable: la cita es del usuario si el cliente del negocio
+// comparte user_id, o un canal de contacto VERIFICADO (email/teléfono). SEGURIDAD:
+// el registro NO prueba que controlas el email/teléfono que pusiste, así que solo
+// cruzamos por email/teléfono cuando ESE canal está verificado (si no, un atacante
+// se registraría con el contacto de un walk-in ajeno y leería su historial cross-tenant).
+// $1=user.id, $2=email, $3=phone (nullable), $4=email_verified (bool), $5=phone_verified (bool).
 const CLIENT_MATCH =
-  `(c.user_id = $1 OR c.email = $2 OR ($3::text IS NOT NULL AND c.phone = $3::text))`;
+  `(c.user_id = $1 OR ($4 AND c.email = $2) OR ($5 AND $3::text IS NOT NULL AND c.phone = $3::text))`;
 
 // Las citas del usuario en TODOS los negocios.
 app.get('/api/me/appointments', authRequired, asyncH(async (req, res) => {
@@ -2449,7 +2464,7 @@ app.get('/api/me/appointments', authRequired, asyncH(async (req, res) => {
       WHERE ${CLIENT_MATCH}
       ORDER BY a.starts_at DESC
       LIMIT 200`,
-    [req.user.id, req.user.email, req.user.phone || null]);
+    [req.user.id, req.user.email, req.user.phone || null, !!req.user.email_verified, !!req.user.phone_verified]);
 
   const now = Date.now();
   const upcoming = [], past = [];
@@ -2474,12 +2489,12 @@ app.get('/api/me/orders', authRequired, asyncH(async (req, res) => {
             b.name AS business_name, b.slug AS business_slug
        FROM product_orders o
        JOIN businesses b ON b.id = o.business_id AND b.deleted_at IS NULL
-      WHERE o.buyer_email = $1
-         OR ($2::text IS NOT NULL AND o.buyer_phone = $2::text)
-         OR o.client_id IN (SELECT id FROM clients WHERE user_id = $3)
+      WHERE o.client_id IN (SELECT id FROM clients WHERE user_id = $3)
+         OR ($4 AND o.buyer_email = $1)
+         OR ($5 AND $2::text IS NOT NULL AND o.buyer_phone = $2::text)
       ORDER BY o.created_at DESC
       LIMIT 200`,
-    [req.user.email, req.user.phone || null, req.user.id]);
+    [req.user.email, req.user.phone || null, req.user.id, !!req.user.email_verified, !!req.user.phone_verified]);
 
   const orders = rows.map(o => ({
     id: o.id,
@@ -2518,8 +2533,8 @@ app.post('/api/appointments/:code/review', authRequired, asyncH(async (req, res)
             a.starts_at, a.status
        FROM appointments a
        JOIN clients c ON c.id = a.client_id
-      WHERE a.confirmation_code = $4 AND ${CLIENT_MATCH}`,
-    [req.user.id, req.user.email, req.user.phone || null, req.params.code.toUpperCase()]);
+      WHERE a.confirmation_code = $6 AND ${CLIENT_MATCH}`,
+    [req.user.id, req.user.email, req.user.phone || null, !!req.user.email_verified, !!req.user.phone_verified, req.params.code.toUpperCase()]);
   const a = rows[0];
   if (!a) return bad(res, 'Cita no encontrada', 404);
 
@@ -3028,9 +3043,12 @@ function emailVerify(name, link) {
 function emailAppt(template, ctx) {
   const { biz, appt } = ctx;
   const when = appt?.starts_at ? fmtPR(appt.starts_at) : '';
-  const svc  = appt?.service_name || 'tu servicio';
+  // Valores controlados por el NEGOCIO → escapados para el HTML (anti inyección de
+  // HTML/links de phishing en el correo bajo la marca Bukeame). emailEsc neutraliza & < > ".
+  const svc  = emailEsc(appt?.service_name || 'tu servicio');
   const code = appt?.confirmation_code || '';
-  const addr = biz?.address_line || '';
+  const addr = emailEsc(biz?.address_line || '');
+  const bizName = emailEsc(biz?.name || '');
   const mapUrl = (biz?.lat != null && biz?.lng != null)
     ? `https://www.google.com/maps/search/?api=1&query=${biz.lat},${biz.lng}` : '';
   let title, intro, extra = '';
@@ -3041,7 +3059,7 @@ function emailAppt(template, ctx) {
         ? 'Tu cita quedó reservada, pendiente de depósito.'
         : 'Tu cita quedó confirmada. Te esperamos.';
       if (appt.status === 'pending_deposit' && biz.ath_phone)
-        extra = `Para confirmar, envía el depósito de $${(appt.deposit_cents / 100).toFixed(2)} por ATH Móvil a ${biz.ath_phone} y responde con tu referencia.`;
+        extra = `Para confirmar, envía el depósito de $${(appt.deposit_cents / 100).toFixed(2)} por ATH Móvil a ${emailEsc(biz.ath_phone)} y responde con tu referencia.`;
       break;
     case 'reminder_48h':
       title = 'Tu cita es en 2 días';
@@ -3082,15 +3100,15 @@ function emailAppt(template, ctx) {
   const html = emailShell(`
     <tr><td style="padding:28px 30px 30px 30px">
       <h1 style="margin:0 0 4px 0;font-size:22px;font-weight:800;color:#17150F;line-height:1.3;letter-spacing:-.01em">${title}</h1>
-      <p style="margin:0 0 20px 0;font-size:14px;color:#0A5B52;font-weight:600">${biz.name}</p>
+      <p style="margin:0 0 20px 0;font-size:14px;color:#0A5B52;font-weight:600">${bizName}</p>
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FBFAF5;border:1px solid #E1DCCD;border-radius:14px;margin-bottom:18px">
         <tr><td style="padding:6px 18px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rowsHtml}</table></td></tr>
       </table>
       ${intro ? `<p style="margin:0;font-size:14px;color:#5E594B;line-height:1.6">${intro}</p>` : ''}
       ${extra ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;background:#FCF3E3;border:1px solid #F0D9AE;border-radius:12px"><tr><td style="padding:14px 16px;border-left:3px solid #EFA12F"><p style="margin:0;font-size:14px;color:#17150F;line-height:1.6;font-weight:600">${extra}</p></td></tr></table>` : ''}
     </td></tr>`, {
-      preheader: `${title} — ${biz.name}${when ? ' · ' + when : ''}`,
-      footerNote: `Recibiste este correo de ${biz.name} a través de Bukeame. Si no esperabas esta cita, puedes ignorarlo.`,
+      preheader: `${title} — ${bizName}${when ? ' · ' + when : ''}`,
+      footerNote: `Recibiste este correo de ${bizName} a través de Bukeame. Si no esperabas esta cita, puedes ignorarlo.`,
     });
   const text = buildMessage(template, ctx).replace(/\*/g, '');
   return { subject, text, html };

@@ -29,6 +29,16 @@ module.exports.mount = function (app, ctx) {
     for (const [k, v] of athOrderPending) if (v.createdAt < cutoff) athOrderPending.delete(k);
   }, 60_000);
 
+  // Worker: anula las gift cards 'pending' nunca confirmadas tras 7 días, para que no se
+  // acumulen pendientes basura en el panel/notificaciones. 'void' = no gastable.
+  // Idempotente (solo toca 'pending'); corre cada 6 horas.
+  setInterval(async () => {
+    try {
+      await db.query(`UPDATE gift_cards SET status = 'void', balance_cents = 0
+        WHERE status = 'pending' AND created_at < now() - interval '7 days'`);
+    } catch (e) { console.error('giftcard cleanup:', e.message); }
+  }, 6 * 3600_000);
+
   // EL ÚNICO lugar donde el inventario se descuenta y la gift card se redime: SOLO al
   // CONFIRMAR el pago (AUTO verificado o MANUAL validado por el negocio). Atómico +
   // idempotente (guard 'committed'; cubre órdenes legacy ya descontadas). FOR UPDATE
@@ -457,9 +467,11 @@ module.exports.mount = function (app, ctx) {
       if (gl.rows[0]) giftEstimate = Math.min(gl.rows[0].balance_cents || 0, total);
     }
     const balanceDue = total - giftEstimate;
-    // Si la gift card cubre todo (nada que cobrar en línea) → forzar MANUAL: el negocio
-    // confirma (redime la gift + descuenta stock); así el worker de expiración no la toca.
-    if (balanceDue <= 0) { pmManual = true; }
+    // Si hay gift card aplicada → SIEMPRE MANUAL: el negocio confirma (redime la gift +
+    // descuenta stock con el saldo REAL bajo lock). Esto elimina la carrera del estimado
+    // (cobrar AUTO con un estimado viejo si la gift se gasta en otra orden entremedio) y
+    // el caso de gift que cubre todo (cobro $0). Sin gift, AUTO/MANUAL según el método.
+    if (giftId || balanceDue <= 0) { pmManual = true; }
 
     const { rows } = await db.query(
       `INSERT INTO product_orders (business_id, buyer_name, buyer_phone, buyer_email,
@@ -477,7 +489,7 @@ module.exports.mount = function (app, ctx) {
 
     // Atribución de conversión si la compra vino de un anuncio promocionado.
     if (isUuid(ad_campaign_id)) {
-      try { await require('./module-ads').recordConversion(db, ad_campaign_id, orderId); } catch (e) {}
+      try { await require('./module-ads').recordConversion(db, ad_campaign_id, orderId, biz.id); } catch (e) {}
     }
 
     res.status(201).json({
@@ -507,6 +519,9 @@ module.exports.mount = function (app, ctx) {
     if (!o) return bad(res, 'Orden no encontrada', 404);
     if (o.committed || o.status !== 'pending') return bad(res, 'Esta orden ya no acepta pago', 409);
     if (!o.public_token) return bad(res, 'Este negocio no tiene ATH Móvil automático', 400);
+    // Pedidos con gift card → solo validación manual del negocio (evita la carrera del
+    // estimado de gift). El frontend ya los crea manual_validate=true; esto blinda la API.
+    if (o.gift_card_id) return bad(res, 'Los pedidos con gift card los confirma el negocio; no se pagan en línea', 400);
     // monto a cobrar = total - gift estimada (lectura)
     let giftEstimate = 0;
     if (o.gift_card_id) {
@@ -639,6 +654,15 @@ module.exports.mount = function (app, ctx) {
         WHERE b.slug = $1 AND b.deleted_at IS NULL`, [req.params.slug]);
     const biz = b.rows[0];
     if (!biz) return bad(res, 'Este negocio no vende gift cards', 404);
+
+    // ABUSE: tope de gift cards PENDIENTES por comprador/día en este negocio (evita
+    // que alguien acumule pendientes basura con emails bien formados pero falsos).
+    const cap = await db.query(
+      `SELECT count(*)::int n FROM gift_cards
+        WHERE business_id = $1 AND status = 'pending' AND purchaser_email = $2
+          AND created_at > now() - interval '1 day'`, [biz.id, purchaser_email.toLowerCase()]);
+    if (cap.rows[0].n >= 5)
+      return bad(res, 'Ya tienes gift cards pendientes de confirmación. Espera a que el negocio las active.', 429);
 
     // código único (reintenta ante colisión)
     let code;

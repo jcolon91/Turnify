@@ -438,6 +438,9 @@ module.exports.mount = function (app, ctx) {
     const o = rows[0];
     if (!o) return bad(res, 'Orden no encontrada', 404);
     if (o.committed || o.status !== 'pending') return bad(res, 'Esta orden ya no acepta pago.', 409);
+    // Pedidos con gift card → solo validación manual del negocio (evita la carrera del
+    // estimado de gift). Blindaje de API; el frontend ya los crea manual_validate=true.
+    if (o.gift_card_id) return bad(res, 'Los pedidos con gift card los confirma el negocio; no se pagan en línea.', 400);
     const acct = o.stripe_config && o.stripe_config.stripe_account_id;
     if (!acct) return bad(res, 'El negocio no tiene Stripe conectado para cobrar.', 409);
     // monto a cobrar = total - gift estimada (lectura)
