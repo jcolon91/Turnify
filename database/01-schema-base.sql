@@ -618,7 +618,8 @@ INSERT INTO categories (name_es, name_en, slug, icon, sort_order) VALUES
 ('Maquillaje',        'Makeup',          'maquillaje',    'brush',      7),
 ('Tatuajes',          'Tattoo',          'tattoo',        'pen',        8),
 ('Pet grooming',      'Pet grooming',    'pet-grooming',  'paw',        9),
-('Bienestar y fitness','Wellness & fitness','bienestar',  'heart',      10);
+('Bienestar y fitness','Wellness & fitness','bienestar',  'heart',      10),
+('Waxing',            'Waxing',          'waxing',        'sparkles',   11);
 
 INSERT INTO pr_municipalities (name, slug) VALUES
 ('Adjuntas','adjuntas'),('Aguada','aguada'),('Aguadilla','aguadilla'),
