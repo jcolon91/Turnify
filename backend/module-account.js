@@ -319,4 +319,55 @@ module.exports.mount = function (app, ctx) {
     await audit(req, 'account.delete', 'business', bizId, { anonymized: true });
     res.json({ ok: true, message: 'Cuenta eliminada. Datos personales borrados; registros financieros anonimizados por requisito fiscal.' });
   }));
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // DELETE /api/me — borrado seguro de la cuenta de un CLIENTE (usuario sin negocio)
+  //   Body: { confirm: "BORRAR MI CUENTA" }
+  //   Anonimiza sus fichas de cliente (las deja para que cuadren las stats del
+  //   negocio, pero sin datos identificables) y hace soft-delete del usuario.
+  //   Requisito de App Store 5.1.1(v) / Google Play: borrado de cuenta in-app.
+  // ──────────────────────────────────────────────────────────────────────────
+  app.delete('/api/me', authRequired, asyncH(async (req, res) => {
+    const confirm = (req.body && req.body.confirm) || '';
+    if (confirm !== 'BORRAR MI CUENTA')
+      return bad(res, 'Debes escribir exactamente: BORRAR MI CUENTA', 400);
+    const userId = req.user.id;
+
+    // Si el usuario es DUEÑO de un negocio, el borrado va por el flujo del negocio
+    // (DELETE /api/account, que además anonimiza la contabilidad). Aquí solo clientes.
+    const biz = await db.query(
+      `SELECT 1 FROM businesses WHERE owner_user_id = $1 AND deleted_at IS NULL`, [userId]);
+    if (biz.rows[0])
+      return bad(res, 'Tu cuenta tiene un negocio. Bórralo desde Mi cuenta en el panel del negocio.', 409);
+
+    const client = await db.connect();
+    try {
+      await client.query('BEGIN');
+      // Anonimizar las fichas de cliente vinculadas a este usuario en cualquier negocio
+      // (se conservan para integridad de stats/pagos; se borra lo identificable).
+      await client.query(
+        `UPDATE clients
+            SET full_name = 'Cliente eliminado',
+                phone     = 'deleted-' || left(md5(random()::text), 12),
+                email     = NULL, notes = NULL, user_id = NULL
+          WHERE user_id = $1`, [userId]);
+      // Soft-delete + anonimización del usuario.
+      await client.query(
+        `UPDATE users
+            SET full_name = 'Usuario eliminado', email = NULL, phone = NULL,
+                password_hash = NULL, avatar_url = NULL, deleted_at = now()
+          WHERE id = $1`, [userId]);
+      // Revocar todas las sesiones.
+      await client.query(`DELETE FROM refresh_tokens WHERE user_id = $1`, [userId]).catch(() => {});
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+
+    await audit(req, 'account.delete', 'user', userId, { client: true });
+    res.json({ ok: true, message: 'Cuenta eliminada. Tus datos personales fueron borrados de forma permanente.' });
+  }));
 };

@@ -2555,6 +2555,110 @@ app.post('/api/appointments/:code/review', authRequired, asyncH(async (req, res)
 }));
 
 // ============================================================================
+//  NÓMINA (payroll) — el negocio SOMETE pagos al equipo; el empleado los ve.
+//  Requiere el add-on 'payroll' activo y la contraseña del dueño para autorizar.
+// ============================================================================
+async function hasPayrollAddon(bizId) {
+  const { rows } = await db.query(
+    `SELECT 1 FROM addons WHERE business_id = $1 AND code = 'payroll' AND status = 'active'
+        AND (current_period_end IS NULL OR now() <= current_period_end + interval '7 days') LIMIT 1`, [bizId]);
+  return !!rows[0];
+}
+
+// POST /api/payroll — somete una nómina (queda 'pending'). Pide la CONTRASEÑA de la
+// cuenta para validar el pago. El servidor recalcula retención y total (no confía en
+// el cliente). Mismo patrón de re-autenticación que una acción sensible.
+app.post('/api/payroll', authRequired, businessScope, asyncH(async (req, res) => {
+  if (!(await hasPayrollAddon(req.business.id)))
+    return bad(res, 'Activa el add-on de Nómina para someter pagos.', 403);
+  const b = req.body || {};
+  if (!isUuid(b.staff_id)) return bad(res, 'Selecciona un empleado');
+  const gross = b.gross_cents;
+  if (!Number.isInteger(gross) || gross <= 0 || gross > 100000000) return bad(res, 'Monto de paga inválido');
+  let pct = Number(b.withhold_pct);
+  if (!Number.isFinite(pct) || pct < 0 || pct > 100) pct = 0;
+  let hours = null;
+  if (b.hours_worked != null && b.hours_worked !== '') {
+    hours = Number(b.hours_worked);
+    if (!Number.isFinite(hours) || hours < 0 || hours > 1000) return bad(res, 'Horas trabajadas inválidas');
+  }
+  if (!isDate(b.period_start) || !isDate(b.period_end)) return bad(res, 'Indica el período de pago (inicio y fin)');
+  if (b.period_end < b.period_start) return bad(res, 'El fin del período no puede ser antes del inicio');
+
+  // Validar la contraseña del dueño (autoriza el pago). Cuentas sociales sin contraseña
+  // ya están autenticadas por su token → no se les exige (no tienen password_hash).
+  const u = await db.query(`SELECT password_hash FROM users WHERE id = $1`, [req.user.id]);
+  const hash = u.rows[0] && u.rows[0].password_hash;
+  if (hash && !(isStr(b.password, 200) && await bcrypt.compare(b.password, hash)))
+    return bad(res, 'Contraseña incorrecta. Escribe tu contraseña para autorizar el pago.', 401);
+
+  // El empleado debe ser staff de ESTE negocio.
+  const st = await db.query(
+    `SELECT display_name, user_id FROM staff WHERE id = $1 AND business_id = $2 AND deleted_at IS NULL`,
+    [b.staff_id, req.business.id]);
+  if (!st.rows[0]) return bad(res, 'Empleado no encontrado', 404);
+
+  const withhold = Math.round(gross * pct / 100);
+  const net = gross - withhold;
+  const { rows } = await db.query(
+    `INSERT INTO payroll_entries (business_id, staff_id, staff_name, period_start, period_end,
+        hours_worked, gross_cents, withhold_pct, withhold_cents, net_cents, status, notes)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'pending',$11)
+     RETURNING id, period_start, period_end, hours_worked, gross_cents, withhold_pct,
+               withhold_cents, net_cents, status, submitted_at`,
+    [req.business.id, b.staff_id, st.rows[0].display_name, b.period_start, b.period_end,
+     hours, gross, pct, withhold, net, isStr(b.notes, 300) ? b.notes.trim() : null]);
+  await audit(req, 'payroll.submit', 'staff', b.staff_id, { net_cents: net });
+  res.status(201).json({ entry: rows[0] });
+}));
+
+// GET /api/payroll — el negocio lista sus nóminas (pendientes + pagadas).
+app.get('/api/payroll', authRequired, businessScope, asyncH(async (req, res) => {
+  const { rows } = await db.query(
+    `SELECT pe.id, pe.staff_id, pe.staff_name, pe.period_start, pe.period_end, pe.hours_worked,
+            pe.gross_cents, pe.withhold_pct, pe.withhold_cents, pe.net_cents, pe.status,
+            pe.submitted_at, pe.paid_at, st.display_name AS current_name, (st.user_id IS NOT NULL) AS has_account
+       FROM payroll_entries pe
+       LEFT JOIN staff st ON st.id = pe.staff_id
+      WHERE pe.business_id = $1
+      ORDER BY pe.created_at DESC LIMIT 200`, [req.business.id]);
+  res.json({ entries: rows });
+}));
+
+// POST /api/payroll/:id/pay — el negocio marca una nómina PAGADA → registra el gasto
+// (categoría 'empleados') para que se vea en contabilidad. Idempotente (solo 'pending').
+app.post('/api/payroll/:id/pay', authRequired, businessScope, asyncH(async (req, res) => {
+  if (!isUuid(req.params.id)) return bad(res, 'ID inválido');
+  const { rows } = await db.query(
+    `UPDATE payroll_entries SET status = 'paid', paid_at = now()
+      WHERE id = $1 AND business_id = $2 AND status = 'pending'
+      RETURNING id, staff_id, staff_name, net_cents, period_start, period_end`,
+    [req.params.id, req.business.id]);
+  if (!rows[0]) return bad(res, 'Nómina no encontrada o ya pagada', 404);
+  const e = rows[0];
+  await db.query(
+    `INSERT INTO expenses (business_id, category, label, amount_cents, spent_on, notes)
+     VALUES ($1, 'empleados'::expense_category, $2, $3, CURRENT_DATE, $4)`,
+    [req.business.id, `Nómina · ${(e.staff_name || 'Empleado').slice(0, 100)}`, e.net_cents,
+     `Período ${e.period_start} a ${e.period_end}`]).catch(() => {});
+  await audit(req, 'payroll.pay', 'staff', e.staff_id, { net_cents: e.net_cents });
+  res.json({ ok: true });
+}));
+
+// GET /api/me/payroll — el EMPLEADO ve sus nóminas (por staff.user_id = él).
+app.get('/api/me/payroll', authRequired, asyncH(async (req, res) => {
+  const { rows } = await db.query(
+    `SELECT pe.id, pe.period_start, pe.period_end, pe.hours_worked, pe.gross_cents,
+            pe.withhold_pct, pe.withhold_cents, pe.net_cents, pe.status, pe.submitted_at, pe.paid_at,
+            b.name AS business_name
+       FROM payroll_entries pe
+       JOIN staff st ON st.id = pe.staff_id AND st.user_id = $1
+       JOIN businesses b ON b.id = pe.business_id AND b.deleted_at IS NULL
+      ORDER BY pe.created_at DESC LIMIT 200`, [req.user.id]);
+  res.json({ entries: rows });
+}));
+
+// ============================================================================
 //  RUTAS — AGENDA, KPIs, CLIENTES, PAGOS, NOTIFICACIONES, SUSCRIPCIÓN
 // ============================================================================
 app.get('/api/appointments', authRequired, businessScope, asyncH(async (req, res) => {

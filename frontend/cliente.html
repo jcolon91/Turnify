@@ -153,6 +153,25 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
     </div>
     <div id="joinMsg" style="font-size:12.5px;margin-top:8px"></div>
   </div>
+  <div id="myPayrollCard" style="display:none;margin-top:14px;background:var(--card-soft);border:1px solid var(--border);border-radius:16px;padding:16px 18px">
+    <b style="font-family:var(--display);font-size:15px;color:var(--text);display:block;margin-bottom:2px">Mi nómina</b>
+    <span style="font-size:12.5px;color:var(--muted);line-height:1.5;display:block;margin-bottom:10px">Tus pagos sometidos por los negocios donde trabajas. Cuando el negocio los marca pagados quedan en tu contabilidad.</span>
+    <div id="myPayrollList"></div>
+  </div>
+  <div style="margin-top:14px;background:var(--card-soft);border:1px solid var(--border);border-radius:16px;padding:16px 18px">
+    <b style="font-family:var(--display);font-size:15px;color:var(--text);display:block;margin-bottom:2px">Mi cuenta</b>
+    <span style="font-size:12.5px;color:var(--muted);line-height:1.5;display:block;margin-bottom:12px">Borrar tu cuenta elimina tus datos personales de Bukéame de forma <b style="color:var(--text)">permanente</b> y no se puede deshacer. Tus citas y compras dejan de estar asociadas a ti. (Los registros de transacciones se conservan anonimizados por requisito fiscal.)</span>
+    <button type="button" id="delAcctBtn" style="background:transparent;color:#c0392b;border:1.5px solid #c0392b;font-weight:700;border-radius:12px;padding:10px 16px;cursor:pointer">Borrar mi cuenta</button>
+    <div id="delAcctBox" style="display:none;margin-top:12px">
+      <label style="font-size:12.5px;font-weight:700;color:var(--text);display:block;margin-bottom:6px">Para confirmar, escribe <b>BORRAR MI CUENTA</b></label>
+      <input id="delAcctConfirm" type="text" autocomplete="off" placeholder="BORRAR MI CUENTA" style="width:100%;padding:11px 13px;border:1.5px solid var(--border);border-radius:12px;background:var(--card);color:var(--text);margin-bottom:10px;box-sizing:border-box">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button type="button" id="delAcctConfirmBtn" disabled style="background:#c0392b;color:#fff;border:0;border-radius:12px;padding:11px 18px;cursor:pointer;font-weight:700;opacity:.5">Borrar permanentemente</button>
+        <button type="button" id="delAcctCancel" style="background:var(--card);color:var(--text);border:1.5px solid var(--border);border-radius:12px;padding:11px 18px;cursor:pointer">Cancelar</button>
+      </div>
+      <div id="delAcctMsg" style="font-size:12.5px;margin-top:8px"></div>
+    </div>
+  </div>
 </div>
 </div>
 <div class="foot">Hecho con Bukéame · bukeame.com</div>
@@ -421,6 +440,52 @@ document.getElementById('tabOrders').onclick=function(){
   }
 };
 document.getElementById('logoutBtn').onclick=function(){ localStorage.removeItem('bukeame_token'); location.href='acceso.html'; };
+
+// Borrar mi cuenta (cliente): confirmación escribiendo "BORRAR MI CUENTA" + permanente.
+(function(){
+  var btn=document.getElementById('delAcctBtn'), box=document.getElementById('delAcctBox'),
+      inp=document.getElementById('delAcctConfirm'), ok=document.getElementById('delAcctConfirmBtn'),
+      cancel=document.getElementById('delAcctCancel'), msg=document.getElementById('delAcctMsg');
+  if(!btn) return;
+  btn.onclick=function(){ box.style.display='block'; btn.style.display='none'; inp.focus(); };
+  cancel.onclick=function(){ box.style.display='none'; btn.style.display=''; inp.value=''; ok.disabled=true; ok.style.opacity='.5'; msg.textContent=''; };
+  inp.oninput=function(){ var m=inp.value.trim()==='BORRAR MI CUENTA'; ok.disabled=!m; ok.style.opacity=m?'1':'.5'; };
+  ok.onclick=async function(){
+    if(inp.value.trim()!=='BORRAR MI CUENTA') return;
+    ok.disabled=true; ok.textContent='Borrando…';
+    var r;
+    try{ r=await api('DELETE','/me',{confirm:inp.value.trim()}); }catch(e){ return; }
+    if(r&&r.ok){
+      msg.style.color='var(--green)'; msg.textContent='Cuenta eliminada. Saliendo…';
+      localStorage.clear(); setTimeout(function(){ location.href='acceso.html'; },1500);
+    } else {
+      ok.disabled=false; ok.textContent='Borrar permanentemente';
+      msg.style.color='#c0392b'; msg.textContent=(r&&r.data&&r.data.error)||'No se pudo borrar la cuenta. Intenta de nuevo.';
+    }
+  };
+})();
+
+// Mi nómina (empleados): solo se muestra si el usuario tiene pagos sometidos.
+async function loadMyPayroll(){
+  var r;
+  try{ r=await api('GET','/me/payroll'); }catch(e){ return; }
+  var entries=(r&&r.ok&&r.data&&r.data.entries)?r.data.entries:[];
+  if(!entries.length) return;
+  var card=document.getElementById('myPayrollCard'), list=document.getElementById('myPayrollList');
+  if(!card||!list) return;
+  list.innerHTML=entries.map(function(e){
+    var paid=e.status==='paid';
+    return '<div style="border:1px solid var(--border);border-radius:12px;padding:11px 13px;margin-bottom:8px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b style="font-size:13.5px;color:var(--text)">'+esc(e.business_name||'Negocio')+'</b>'+
+        '<span style="font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;background:'+(paid?'#0E8074':'#EFA12F')+';color:'+(paid?'#fff':'#1a1205')+'">'+(paid?'Pagada':'Pendiente')+'</span></div>'+
+      '<div style="font-size:12px;color:var(--muted);margin-top:3px">'+esc(e.period_start)+' → '+esc(e.period_end)+(e.hours_worked?(' · '+esc(e.hours_worked)+'h'):'')+'</div>'+
+      '<div style="font-size:12.5px;color:var(--muted);margin-top:6px">Bruto '+money(e.gross_cents)+(e.withhold_cents>0?(' · Retención '+money(e.withhold_cents)+' ('+esc(e.withhold_pct)+'%)'):'')+'</div>'+
+      '<div style="font-weight:800;color:var(--green);margin-top:4px">Total: '+money(e.net_cents)+'</div>'+
+    '</div>';
+  }).join('');
+  card.style.display='block';
+}
+loadMyPayroll();
 
 // saludo con el nombre del usuario
 (async function greet(){

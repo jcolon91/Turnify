@@ -426,7 +426,7 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
         <!-- Payroll: visible solo cuando el add-on 'payroll' está activo -->
         <div id="payrollSection" style="display:none;margin-top:28px;padding-top:20px;border-top:1px solid var(--line)">
           <div class="seclabel">Pagos al equipo (Payroll)</div>
-          <p style="font-size:13px;color:var(--ink2);margin-bottom:12px">Informa cuánto le pagas a cada persona del equipo.</p>
+          <p style="font-size:13px;color:var(--ink2);margin-bottom:12px">Somete la paga de tu equipo (horas, retención y total), autorízala con tu contraseña y márcala pagada — queda en tu contabilidad y el empleado la ve en su cuenta.</p>
           <div id="payrollList"></div>
           <div class="alert" id="payrollAlert"></div>
         </div>
@@ -1407,23 +1407,107 @@ async function loadPayroll(staff){
   } catch(e){ payrollActive = false; }
   if(!payrollActive){ section.style.display = 'none'; return; }
   section.style.display = 'block';
-  if(!staff || staff.length === 0){
-    list.innerHTML = '<div class="empty">Añade profesionales para informar sus pagos.</div>';
-    return;
+  var staffArr = staff || [];
+  var IST='width:100%;padding:10px;border:1.5px solid var(--line);border-radius:10px;background:var(--card);color:var(--text);box-sizing:border-box;margin-bottom:8px;font-size:14px';
+  var LST='font-size:12px;font-weight:700;color:var(--ink2);display:block;margin-bottom:4px';
+  var today = new Date().toISOString().slice(0,10);
+  var form = staffArr.length
+    ? '<div style="background:var(--card-soft);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:16px">'+
+        '<div style="font-family:var(--display);font-size:14px;margin-bottom:10px">Someter una nómina</div>'+
+        '<label style="'+LST+'">Empleado</label>'+
+        '<select id="pyStaff" style="'+IST+'">'+staffArr.map(function(s){return '<option value="'+esc(s.id)+'">'+esc(s.display_name)+'</option>';}).join('')+'</select>'+
+        '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+          '<div style="flex:1;min-width:130px"><label style="'+LST+'">Período: inicio</label><input type="date" id="pyStart" value="'+today+'" style="'+IST+'"></div>'+
+          '<div style="flex:1;min-width:130px"><label style="'+LST+'">Período: fin</label><input type="date" id="pyEnd" value="'+today+'" style="'+IST+'"></div>'+
+        '</div>'+
+        '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+          '<div style="flex:1;min-width:130px"><label style="'+LST+'">Horas trabajadas</label><input type="number" id="pyHours" min="0" step="0.25" inputmode="decimal" placeholder="Ej. 80" style="'+IST+'"></div>'+
+          '<div style="flex:1;min-width:130px"><label style="'+LST+'">Paga (bruto $)</label><input type="number" id="pyGross" min="0" step="0.01" inputmode="decimal" placeholder="0.00" style="'+IST+'"></div>'+
+        '</div>'+
+        '<label style="display:flex;align-items:center;gap:8px;margin:4px 0 10px;font-size:13px;cursor:pointer"><input type="checkbox" id="pyHold"> Retener 10%</label>'+
+        '<div style="background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:10px">'+
+          '<div style="display:flex;justify-content:space-between"><span style="color:var(--ink2)">Cantidad a retener</span><b id="pyHoldAmt">$0.00</b></div>'+
+          '<div style="display:flex;justify-content:space-between;margin-top:4px"><span style="color:var(--ink2)">Total a pagar</span><b id="pyNet" style="color:var(--green)">$0.00</b></div>'+
+        '</div>'+
+        '<label style="'+LST+'">Notas (opcional)</label>'+
+        '<input type="text" id="pyNotes" maxlength="300" placeholder="Bono, propinas, etc." style="'+IST+'">'+
+        '<div id="pyConfirm" style="display:none">'+
+          '<label style="'+LST+'">Escribe tu contraseña para autorizar el pago</label>'+
+          '<input type="password" id="pyPass" placeholder="Tu contraseña" autocomplete="current-password" style="'+IST+'">'+
+        '</div>'+
+        '<button type="button" id="pySubmit" style="width:100%;background:var(--green);color:#fff;font-weight:700;border:0;border-radius:12px;padding:12px;cursor:pointer;font-size:14px">Someter nómina</button>'+
+        '<div class="alert" id="pyAlert" style="margin-top:8px"></div>'+
+      '</div>'
+    : '<div class="empty">Añade profesionales para someter sus pagos.</div>';
+  list.innerHTML = form + '<div id="payrollHistory"></div>';
+  if(staffArr.length){
+    function recalc(){
+      var gross = Math.round((parseFloat(document.getElementById('pyGross').value)||0)*100);
+      var hold = document.getElementById('pyHold').checked ? Math.round(gross*0.10) : 0;
+      document.getElementById('pyHoldAmt').textContent = '$'+(hold/100).toFixed(2);
+      document.getElementById('pyNet').textContent = '$'+((gross-hold)/100).toFixed(2);
+    }
+    document.getElementById('pyGross').oninput = recalc;
+    document.getElementById('pyHold').onchange = recalc;
+    var sub = document.getElementById('pySubmit');
+    sub.onclick = async function(){
+      clearAlert('pyAlert');
+      var conf = document.getElementById('pyConfirm');
+      var gross = Math.round((parseFloat(document.getElementById('pyGross').value)||0)*100);
+      if(gross<=0){ showAlert('pyAlert','Escribe la paga (bruto).',false); return; }
+      if(!document.getElementById('pyStart').value || !document.getElementById('pyEnd').value){ showAlert('pyAlert','Indica el período de pago.',false); return; }
+      if(conf.style.display==='none'){ conf.style.display='block'; document.getElementById('pyPass').focus(); sub.textContent='Confirmar y someter'; return; }
+      var pass = document.getElementById('pyPass').value;
+      if(!pass){ showAlert('pyAlert','Escribe tu contraseña para autorizar.',false); return; }
+      var body = {
+        staff_id: document.getElementById('pyStaff').value,
+        period_start: document.getElementById('pyStart').value,
+        period_end: document.getElementById('pyEnd').value,
+        hours_worked: document.getElementById('pyHours').value||null,
+        gross_cents: gross,
+        withhold_pct: document.getElementById('pyHold').checked?10:0,
+        notes: document.getElementById('pyNotes').value||undefined,
+        password: pass
+      };
+      sub.disabled=true; sub.textContent='Sometiendo…';
+      var r = await api('POST','/payroll',body);
+      sub.disabled=false; sub.textContent='Confirmar y someter';
+      if(r.ok){ loadPayroll(staffArr); }
+      else { showAlert('pyAlert',(r.data&&r.data.error)||'No se pudo someter.',false); }
+    };
   }
-  list.innerHTML = staff.map(function(s){
-    return '<div class="svc"><div class="grow"><h4>'+esc(s.display_name)+'</h4>'+
-      '<p>'+(s.bio?esc(s.bio):'Profesional')+'</p></div>'+
-      '<div style="display:flex;align-items:center;gap:6px;flex:none">'+
-        '<span style="font-family:var(--mono);color:var(--ink2)">$</span>'+
-        '<input type="number" min="0" step="0.01" inputmode="decimal" class="pay-amount" data-id="'+esc(s.id)+'" placeholder="0.00" '+
-        'style="width:110px;padding:9px;border:1.5px solid var(--line);border-radius:9px;font-family:var(--mono)">'+
-      '</div></div>';
-  }).join('');
-  // Aviso: aún no hay endpoint para guardar los pagos.
-  list.innerHTML += '<div style="margin-top:12px;background:var(--warn-bg);border:1px solid var(--warn-border);border-radius:10px;padding:12px 14px;font-size:13px;color:var(--warn-ink)">'+
-    'Próximamente podrás guardar los pagos del equipo.'+
-    '</div>';
+  loadPayrollHistory();
+}
+
+async function loadPayrollHistory(){
+  var host = document.getElementById('payrollHistory'); if(!host) return;
+  var r = await api('GET','/payroll');
+  var entries = (r.ok && r.data && r.data.entries) ? r.data.entries : [];
+  if(!entries.length){ host.innerHTML = '<div class="empty" style="margin-top:6px">Aún no has sometido nóminas.</div>'; return; }
+  host.innerHTML = '<div style="font-family:var(--display);font-size:14px;margin:6px 0 10px">Nóminas sometidas</div>'+
+    entries.map(function(e){
+      var paid = e.status==='paid';
+      var name = e.staff_name || e.current_name || 'Empleado';
+      return '<div class="svc" style="display:block">'+
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'+
+          '<div><b>'+esc(name)+'</b><div style="font-size:12px;color:var(--ink2)">'+esc(e.period_start)+' → '+esc(e.period_end)+(e.hours_worked?(' · '+esc(e.hours_worked)+'h'):'')+(e.has_account===false?' · sin cuenta':'')+'</div></div>'+
+          '<span class="pill" style="background:'+(paid?'#0E8074':'#EFA12F')+';color:'+(paid?'#fff':'#1a1205')+'">'+(paid?'Pagada':'Pendiente')+'</span>'+
+        '</div>'+
+        '<div style="font-size:13px;color:var(--ink2);margin-top:8px">Bruto '+money(e.gross_cents)+(e.withhold_cents>0?(' · Retención '+money(e.withhold_cents)+' ('+e.withhold_pct+'%)'):'')+'</div>'+
+        '<div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);margin-top:8px;padding-top:8px">'+
+          '<b style="color:var(--green)">Total: '+money(e.net_cents)+'</b>'+
+          (paid?'<small style="color:var(--ink2)">Pagada</small>':'<button type="button" class="btn btn-sm" data-pay="'+esc(e.id)+'">Marcar pagada</button>')+
+        '</div></div>';
+    }).join('');
+  host.querySelectorAll('[data-pay]').forEach(function(b){
+    b.onclick = async function(){
+      if(!confirm('¿Marcar esta nómina como PAGADA? Se registra como gasto (empleados) en tu contabilidad.')) return;
+      b.disabled=true;
+      var rr = await api('POST','/payroll/'+b.dataset.pay+'/pay',{});
+      if(rr.ok){ loadPayrollHistory(); }
+      else { b.disabled=false; alert((rr.data&&rr.data.error)||'No se pudo marcar pagada.'); }
+    };
+  });
 }
 // Código de invitación a nivel del NEGOCIO (un solo botón para todo el equipo).
 (function(){

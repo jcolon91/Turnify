@@ -1366,6 +1366,15 @@ function fmtDuration(min){
 
 // ───────── Modal de reserva: abrir/cerrar ─────────
 var bookModal = document.getElementById('bookModal');
+// === Botón ATRÁS (físico/navegador) cierra overlays/pasos en vez de salir de la página ===
+// Cada overlay que se abre empuja UNA entrada al historial; al dar atrás (popstate) se
+// cierra el overlay de arriba. SEGURO para la web: si no hay ningún overlay abierto, la
+// navegación del navegador es totalmente normal.
+var __ovStack = [];
+function ovPush(closeFn){ __ovStack.push(closeFn); try{ history.pushState({ov:1}, ''); }catch(e){} }
+function ovBack(){ if(__ovStack.length){ try{ history.back(); }catch(e){ var f=__ovStack.pop(); if(f) f(); } } }
+window.addEventListener('popstate', function(){ var f=__ovStack.pop(); if(f){ try{ f(); }catch(e){} } });
+
 function openBook(preselectServiceId){
   // resetear selección
   state.selectedServices = [];
@@ -1374,13 +1383,35 @@ function openBook(preselectServiceId){
   goStep(1);
   bookModal.classList.add('on');
   document.body.style.overflow='hidden';
+  ovPush(closeBookUI);                 // integra el botón atrás (cierra el modal, no sale)
   if(preselectServiceId){
     toggleService(preselectServiceId);  // marca ese servicio de entrada
   } else {
     updateSvcTotal();
   }
 }
-function closeBook(){ bookModal.classList.remove('on'); document.body.style.overflow=''; }
+function closeBookUI(){ bookModal.classList.remove('on'); document.body.style.overflow=''; }
+function closeBook(){ ovBack(); }       // cerrar vía historial (mantiene el botón atrás en sync)
+
+// Atrás contextual del modal de reserva: retrocede UN paso; si está en el primero, cierra.
+function bookGoBack(){
+  var pay = document.getElementById('stepPay');
+  if(pay && pay.classList.contains('on')){ goStep(3); return; }
+  if(document.getElementById('step3').classList.contains('on')){ goStep(2); return; }
+  if(document.getElementById('step2').classList.contains('on')){ goStep(1); return; }
+  ovBack();   // paso 1 → cerrar
+}
+// Glifo del botón de la cabecera: ← en pasos internos, × en el primero; oculto en el éxito.
+function updateBookNav(){
+  var b = document.getElementById('closeBook'); if(!b) return;
+  var pay = document.getElementById('stepPay'), ok = document.getElementById('stepOk');
+  var inner = document.getElementById('step2').classList.contains('on') ||
+              document.getElementById('step3').classList.contains('on') ||
+              (pay && pay.classList.contains('on'));
+  b.innerHTML = inner ? '&#8592;' : '&times;';
+  b.setAttribute('aria-label', inner ? 'Atrás' : 'Cerrar');
+  b.style.visibility = (ok && ok.classList.contains('on')) ? 'hidden' : 'visible';
+}
 
 // Botón "Continuar" del paso 1 → pasa a elegir profesional/fecha/hora
 document.getElementById('svcContinue').onclick = function(){
@@ -1394,8 +1425,8 @@ document.getElementById('svcContinue').onclick = function(){
   var el = document.getElementById(id);
   if(el) el.onclick = function(){ openBook(); };
 });
-document.getElementById('closeBook').onclick = closeBook;
-document.getElementById('okClose') && (document.getElementById('okClose').onclick = function(){ closeBook(); location.reload(); });
+document.getElementById('closeBook').onclick = bookGoBack;
+document.getElementById('okClose') && (document.getElementById('okClose').onclick = function(){ closeBookUI(); location.reload(); });
 
 // ───────── Drawer ─────────
 var drawer = document.getElementById('drawer'), drawerBg = document.getElementById('drawerBg');
@@ -1427,6 +1458,7 @@ function goStep(n){
   if(n===2) document.getElementById('step2').classList.add('on');
   if(n===3) document.getElementById('step3').classList.add('on');
   document.querySelector('.bookmodal-body').scrollTop = 0;
+  updateBookNav();
 }
 
 function renderStaff(){
@@ -1562,6 +1594,7 @@ document.getElementById('confirmBtn').onclick = async function(){
       document.getElementById('stepPay').classList.add('on');
       document.querySelectorAll('.step-dot').forEach(function(d){ d.classList.add('on'); });
       document.querySelector('.bookmodal-body').scrollTop = 0;
+      updateBookNav();
     } else {
       showOkStep(appt);
     }
@@ -1590,6 +1623,7 @@ function showOkStep(appt){
   document.getElementById('stepOk').classList.add('on');
   document.querySelectorAll('.step-dot').forEach(function(d){ d.classList.add('on'); });
   document.querySelector('.bookmodal-body').scrollTop = 0;
+  updateBookNav();
 }
 
 function renderPayStep(appt, depCents){
@@ -2104,8 +2138,8 @@ function renderCart(){
   renderOrderPay();
 }
 
-function openSheet(id){ document.getElementById(id).classList.add('on'); document.body.style.overflow='hidden'; }
-function closeSheet(id){ document.getElementById(id).classList.remove('on'); document.body.style.overflow=''; }
+function openSheet(id){ var el=document.getElementById(id); if(!el||el.classList.contains('on')) return; el.classList.add('on'); document.body.style.overflow='hidden'; ovPush(function(){ el.classList.remove('on'); document.body.style.overflow=''; }); }
+function closeSheet(id){ var el=document.getElementById(id); if(el && el.classList.contains('on')) ovBack(); }
 
 document.getElementById('cartFab').onclick = function(){ clearAlert('cartAlert'); document.getElementById('orderOk').style.display='none'; renderCart(); openSheet('cartSheet'); };
 document.getElementById('closeCart').onclick = function(){ closeSheet('cartSheet'); };
