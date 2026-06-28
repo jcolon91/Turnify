@@ -421,6 +421,7 @@ app.post('/api/auth/register', authLimiter, asyncH(async (req, res) => {
   if (!isEmail(email))        return bad(res, 'Email válido requerido');
   if (!isStr(password, 100) || password.length < 8) return bad(res, 'Contraseña mínima de 8 caracteres');
   if (phone && !isPhone(phone)) return bad(res, 'Teléfono inválido (usa un número de PR/US de 10 dígitos)');
+  if (!(req.body && req.body.accept_terms)) return bad(res, 'Debes aceptar los Términos y la Política de Privacidad');
 
   const hash = await bcrypt.hash(password, 12);
   let user;
@@ -2558,17 +2559,18 @@ app.post('/api/appointments/:code/review', authRequired, asyncH(async (req, res)
 // ============================================================================
 
 // Público: reportar una reseña objetable (cita o producto). No revela existencia/tabla.
-app.post('/api/public/reviews/:id/report', publicLimiter, asyncH(async (req, res) => {
+app.post('/api/public/reviews/:id/report', codeLimiter, asyncH(async (req, res) => {
   if (!isUuid(req.params.id)) return bad(res, 'ID inválido');
   const reason = isStr(req.body && req.body.reason, 300) ? req.body.reason.trim() : null;
+  // report_count topado (LEAST .. 99) para que un solo actor no infle la cola de moderación.
   const r = await db.query(
     `UPDATE reviews SET reported_at = COALESCE(reported_at, now()),
-            report_count = report_count + 1, report_reason = COALESCE($2, report_reason)
+            report_count = LEAST(report_count + 1, 99), report_reason = COALESCE($2, report_reason)
       WHERE id = $1 AND is_published RETURNING id`, [req.params.id, reason]);
   if (!r.rows[0])
     await db.query(
       `UPDATE product_reviews SET reported_at = COALESCE(reported_at, now()),
-              report_count = report_count + 1, report_reason = COALESCE($2, report_reason)
+              report_count = LEAST(report_count + 1, 99), report_reason = COALESCE($2, report_reason)
         WHERE id = $1 AND hidden_at IS NULL`, [req.params.id, reason]).catch(() => {});
   res.json({ ok: true, message: 'Gracias, revisaremos esta reseña.' });
 }));
@@ -2679,7 +2681,7 @@ app.post('/api/payroll', authRequired, businessScope, asyncH(async (req, res) =>
                withhold_cents, net_cents, status, submitted_at`,
     [req.business.id, b.staff_id, st.rows[0].display_name, b.period_start, b.period_end,
      hours, gross, pct, withhold, net, isStr(b.notes, 300) ? b.notes.trim() : null]);
-  await audit(req, 'payroll.submit', 'staff', b.staff_id, { net_cents: net });
+  await audit(req, 'payroll.submit', 'staff', b.staff_id, { net_cents: net, reauth: !!hash });
   res.status(201).json({ entry: rows[0] });
 }));
 
@@ -2707,11 +2709,15 @@ app.post('/api/payroll/:id/pay', authRequired, businessScope, asyncH(async (req,
     [req.params.id, req.business.id]);
   if (!rows[0]) return bad(res, 'Nómina no encontrada o ya pagada', 404);
   const e = rows[0];
-  await db.query(
-    `INSERT INTO expenses (business_id, category, label, amount_cents, spent_on, notes)
-     VALUES ($1, 'empleados'::expense_category, $2, $3, CURRENT_DATE, $4)`,
-    [req.business.id, `Nómina · ${(e.staff_name || 'Empleado').slice(0, 100)}`, e.net_cents,
-     `Período ${e.period_start} a ${e.period_end}`]).catch(() => {});
+  // expenses tiene CHECK(amount_cents > 0): solo registramos el gasto si el neto > 0
+  // (retención 100% → neto 0 → no hay gasto). Logueamos cualquier fallo del insert.
+  if (e.net_cents > 0) {
+    await db.query(
+      `INSERT INTO expenses (business_id, category, label, amount_cents, spent_on, notes)
+       VALUES ($1, 'empleados'::expense_category, $2, $3, CURRENT_DATE, $4)`,
+      [req.business.id, `Nómina · ${(e.staff_name || 'Empleado').slice(0, 100)}`, e.net_cents,
+       `Período ${e.period_start} a ${e.period_end}`]).catch(err => console.error('payroll expense insert:', err.message));
+  }
   await audit(req, 'payroll.pay', 'staff', e.staff_id, { net_cents: e.net_cents });
   res.json({ ok: true });
 }));
@@ -3454,7 +3460,7 @@ async function remindRenewals() {
          FROM businesses b, users u
         WHERE s.business_id = b.id AND u.id = b.owner_user_id AND b.deleted_at IS NULL
           AND s.plan_code <> 'free' AND s.current_period_end IS NOT NULL
-          AND s.current_period_end::date = CURRENT_DATE + $1::int
+          AND (s.current_period_end AT TIME ZONE 'America/Puerto_Rico')::date = (now() AT TIME ZONE 'America/Puerto_Rico')::date + $1::int
           AND (s.renew_reminded_on IS NULL OR s.renew_reminded_on < CURRENT_DATE)
         RETURNING b.id AS business_id, b.whatsapp, u.email AS owner_email, s.plan_code, s.current_period_end`, [stage.d]);
     for (const r of subs.rows) await sendRenewReminder(r, 'plan', r.plan_code, stage);
@@ -3463,13 +3469,17 @@ async function remindRenewals() {
          FROM businesses b, users u
         WHERE a.business_id = b.id AND u.id = b.owner_user_id AND b.deleted_at IS NULL
           AND a.status = 'active' AND a.current_period_end IS NOT NULL
-          AND a.current_period_end::date = CURRENT_DATE + $1::int
+          AND (a.current_period_end AT TIME ZONE 'America/Puerto_Rico')::date = (now() AT TIME ZONE 'America/Puerto_Rico')::date + $1::int
           AND (a.renew_reminded_on IS NULL OR a.renew_reminded_on < CURRENT_DATE)
         RETURNING b.id AS business_id, b.whatsapp, u.email AS owner_email, a.code, a.current_period_end`, [stage.d]);
     for (const r of ad.rows) await sendRenewReminder(r, 'addon', r.code, stage);
   }
 }
 setInterval(() => { remindRenewals().catch(e => console.error('remindRenewals:', e.message)); }, 3600_000);
+// Corrida al arranque: si el proceso reinició, revisa de inmediato (no esperar 1h ni
+// perder el día). El guard renew_reminded_on evita duplicados dentro del mismo día.
+remindRenewals().catch(e => console.error('remindRenewals(boot):', e.message));
+expireBilling().catch(e => console.error('expireBilling(boot):', e.message));
 
 // ── Worker: expirar reservas AUTOMÁTICAS sin pagar (libera el turno) ─────────
 // Una cita 'pending_deposit' OCUPA el turno (constraint anti-doble-reserva, pues

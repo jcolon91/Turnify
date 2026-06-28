@@ -1081,13 +1081,17 @@ function money(cents){ return '$'+((cents||0)/100).toFixed(2); }
     if(openModals().length===0) document.body.style.overflow='';
     return true;
   }
-  var pushed = 0;
+  var pushed = 0, suppress = 0;
   function sync(){
     var n = openModals().length;
     while(pushed < n){ try{ history.pushState({pm:1}, ''); }catch(e){} pushed++; }
-    if(pushed > n) pushed = n;   // se cerró por botón → reajusta (no navega; misma URL)
+    // Cierre por código (Guardar/Cancelar quitan .on): consumimos la entrada de historial
+    // sobrante con history.back() (marcada con 'suppress' para que el popstate no cierre
+    // otra cosa). Todas nuestras entradas son misma-URL → nunca sacan al usuario del panel.
+    while(pushed > n){ pushed--; suppress++; try{ history.back(); }catch(e){ suppress--; } }
   }
   window.addEventListener('popstate', function(){
+    if(suppress > 0){ suppress--; return; }   // nuestro propio history.back() tras un cierre por código
     if(pushed > 0){
       pushed--; closeTop();
       var n = openModals().length;
