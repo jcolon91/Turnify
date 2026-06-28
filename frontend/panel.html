@@ -1396,14 +1396,17 @@ async function loadStaff(){
     list.innerHTML = '<div class="empty">Aún no tienes profesionales.<br>Toca "+ Añadir" para crear el primero.</div>';
     return;
   }
+  _staffCache = staff;
   list.innerHTML = staff.map(function(s){
     var av = s.avatar_url
       ? '<img src="'+esc(s.avatar_url)+'" alt="" style="width:46px;height:46px;border-radius:50%;object-fit:cover;flex:none">'
       : '<div style="width:46px;height:46px;border-radius:50%;background:var(--green-soft);color:var(--green);display:grid;place-items:center;font-family:var(--display);font-weight:800;flex:none">'+esc((s.display_name||'?').charAt(0).toUpperCase())+'</div>';
     return '<div class="svc">'+av+'<div class="grow"><h4>'+esc(s.display_name)+'</h4><p>'+(s.bio?esc(s.bio):'Profesional')+'</p></div>'+
+      '<button class="btn btn-ghost btn-sm" data-stedit="'+esc(s.id)+'" style="flex:none">Editar</button>'+
       '<button class="btn btn-ghost btn-sm st-photo" data-id="'+esc(s.id)+'">Foto</button>'+
       '<button class="del" data-id="'+esc(s.id)+'">Quitar</button></div>';
   }).join('');
+  list.querySelectorAll('[data-stedit]').forEach(function(b){ b.onclick=function(){ editStaff(b.dataset.stedit); }; });
   // Subir/cambiar foto del profesional (FormData, sin forzar Content-Type JSON)
   list.querySelectorAll('.st-photo').forEach(function(b){
     b.onclick = function(){
@@ -1612,17 +1615,29 @@ async function loadPayrollHistory(){
   };
 })();
 const staffModal = document.getElementById('staffModal');
-document.getElementById('addStaffBtn').onclick = function(){ clearAlert('staffAlert'); document.getElementById('stName').value=''; document.getElementById('stBio').value=''; staffModal.classList.add('on'); };
-document.getElementById('stCancel').onclick = function(){ staffModal.classList.remove('on'); };
+var _staffCache = [], editingStaffId = null;
+function editStaff(id){
+  var s = _staffCache.find(function(x){ return String(x.id)===String(id); });
+  if(!s) return;
+  editingStaffId = id;
+  document.getElementById('stName').value = s.display_name||'';
+  document.getElementById('stBio').value = s.bio||'';
+  document.getElementById('staffModalTitle').textContent = 'Editar profesional';
+  clearAlert('staffAlert'); staffModal.classList.add('on');
+}
+document.getElementById('addStaffBtn').onclick = function(){ editingStaffId=null; clearAlert('staffAlert'); document.getElementById('stName').value=''; document.getElementById('stBio').value=''; document.getElementById('staffModalTitle').textContent='Añadir profesional'; staffModal.classList.add('on'); };
+document.getElementById('stCancel').onclick = function(){ staffModal.classList.remove('on'); editingStaffId=null; };
 document.getElementById('stSave').onclick = async function(){
   clearAlert('staffAlert');
   const name = document.getElementById('stName').value.trim();
   const bio = document.getElementById('stBio').value.trim();
   if(!name){ showAlert('staffAlert','Escribe el nombre.',false); return; }
   const btn = document.getElementById('stSave'); btn.disabled=true; btn.textContent='…';
-  const r = await api('POST','/staff',{ display_name:name, bio:bio||undefined });
+  const r = editingStaffId
+    ? await api('PATCH','/staff/'+editingStaffId,{ display_name:name, bio:bio })
+    : await api('POST','/staff',{ display_name:name, bio:bio||undefined });
   btn.disabled=false; btn.textContent='Guardar';
-  if(r.ok){ staffModal.classList.remove('on'); loadStaff(); }
+  if(r.ok){ staffModal.classList.remove('on'); editingStaffId=null; loadStaff(); }
   else showAlert('staffAlert', r.data.error||'No se pudo guardar.', false);
 };
 

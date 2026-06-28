@@ -2252,8 +2252,7 @@ app.post('/api/public/appointments/:code/ath-reference', codeLimiter, asyncH(asy
         AND p.kind = 'deposit' AND p.method = 'ath_movil' AND p.status = 'pending'
       RETURNING a.business_id, a.id, a.service_name`, [reference.trim(), req.params.code.toUpperCase()]);
   if (!rows[0]) return bad(res, 'Cita o depósito no encontrado', 404);
-  await notify(rows[0].business_id, 'payment', '💸 Verifica un ATH Móvil',
-    `Referencia ${reference.trim()} · ${rows[0].service_name}`, { appointment_id: rows[0].id });
+  await alertDepositToValidate(rows[0].business_id, rows[0].id, `ATH Móvil (ref ${reference.trim()}) · ${rows[0].service_name}`);
   res.json({ ok: true, message: 'El negocio verificará tu pago y la cita quedará confirmada' });
 }));
 
@@ -2302,8 +2301,7 @@ app.post('/api/public/:slug/appointments/:code/ath/confirm', codeLimiter, asyncH
   // Idempotente / sin enumeración: si no hay depósito pendiente (ya validado o inexistente)
   // respondemos ok sin revelar nada.
   if (!rows[0]) return res.json({ ok: true, status: 'pending' });
-  await notify(rows[0].business_id, 'payment', '💸 Verifica un ATH Móvil',
-    `Referencia ${reference.trim()} · ${rows[0].service_name}`, { appointment_id: rows[0].id });
+  await alertDepositToValidate(rows[0].business_id, rows[0].id, `ATH Móvil (ref ${reference.trim()}) · ${rows[0].service_name}`);
   res.json({ ok: true, status: 'pending', message: 'El negocio validará tu pago y confirmará la cita' });
 }));
 
@@ -2319,8 +2317,7 @@ app.post('/api/public/:slug/appointments/:code/deposit-cash', codeLimiter, async
         AND a.confirmation_code = $2 AND p.kind = 'deposit' AND p.status = 'pending'
       RETURNING a.business_id, a.id, a.service_name`, [req.params.slug, req.params.code.toUpperCase()]);
   if (!rows[0]) return bad(res, 'Cita o depósito no encontrado', 404);
-  await notify(rows[0].business_id, 'payment', '💵 Depósito en efectivo por validar',
-    `${rows[0].service_name} · valida y acepta la cita`, { appointment_id: rows[0].id });
+  await alertDepositToValidate(rows[0].business_id, rows[0].id, `Efectivo · ${rows[0].service_name}`);
   res.json({ ok: true, message: 'El negocio confirmará tu cita al recibir el depósito' });
 }));
 
@@ -3416,6 +3413,63 @@ async function expireBilling() {
         AND now() > current_period_end + interval '7 days'`);
 }
 setInterval(() => { expireBilling().catch(e => console.error('expireBilling:', e.message)); }, 3600_000);
+
+// ── Aviso al NEGOCIO: tiene un depósito por validar (in-app + WhatsApp + email) ──
+// El WhatsApp dice que se valida EN LA PLATAFORMA (panel), NUNCA "aquí" por el chat.
+async function alertDepositToValidate(businessId, appointmentId, detail) {
+  const body = `Depósito por validar: ${detail}. Valídalo en tu panel: Agenda → la cita → "Validar depósito y aceptar".`;
+  try { await notify(businessId, 'payment', 'Depósito por validar', body, { appointment_id: appointmentId }); } catch (e) {}
+  try {
+    const b = await db.query(
+      `SELECT b.whatsapp, u.email FROM businesses b JOIN users u ON u.id = b.owner_user_id WHERE b.id = $1`, [businessId]);
+    const row = b.rows[0]; if (!row) return;
+    if (row.whatsapp) {
+      const wa = `*Bukéame* — Depósito por validar\n\n${detail}\n\nValídalo en tu panel de Bukéame: Agenda → la cita → "Validar depósito y aceptar". (No se valida por este chat.)`;
+      try { await sendWhatsApp(row.whatsapp, wa); } catch (e) {}
+    }
+    if (row.email) { try { await sendEmail(row.email, 'Depósito por validar — Bukéame', body); } catch (e) {} }
+  } catch (e) {}
+}
+
+// ── Recordatorio de renovación: 3 días y 1 día antes de vencer plan/add-on ──
+// Una vez al día por fila (guard renew_reminded_on). Si el negocio renueva,
+// current_period_end se mueve → el recordatorio de 1 día ya no aplica.
+const ADDON_NAMES = { payroll:'Nómina', employee_accounting:'Contabilidad de empleado', gift_cards:'Gift Cards', loyalty:'Lealtad', store_10:'Tienda', store_25:'Tienda', sms:'Recordatorios SMS', custom_domain:'Dominio propio', advanced_reports:'Reportes avanzados', featured:'Destacado' };
+async function sendRenewReminder(r, kind, code, stage) {
+  const what = kind === 'plan' ? `tu plan ${code}` : `tu add-on ${ADDON_NAMES[code] || code}`;
+  const cap = what.charAt(0).toUpperCase() + what.slice(1);
+  const fecha = new Date(r.current_period_end).toLocaleDateString('es-PR', { day: 'numeric', month: 'long' });
+  const body = `${cap} vence en ${stage.lbl} (el ${fecha}). Renuévalo desde tu panel en bukeame.com para no perder el servicio.`;
+  try { await notify(r.business_id, 'system', 'Renovación próxima', body, {}); } catch (e) {}
+  if (r.whatsapp) {
+    const wa = `*Bukéame* — Renovación próxima\n\n${cap} vence en ${stage.lbl} (el ${fecha}).\nRenuévalo desde tu panel en bukeame.com para no perder el servicio.`;
+    try { await sendWhatsApp(r.whatsapp, wa); } catch (e) {}
+  }
+  if (r.owner_email) { try { await sendEmail(r.owner_email, 'Tu renovación está próxima — Bukéame', body); } catch (e) {} }
+}
+async function remindRenewals() {
+  for (const stage of [{ d: 3, lbl: '3 días' }, { d: 1, lbl: '1 día' }]) {
+    const subs = await db.query(
+      `UPDATE subscriptions s SET renew_reminded_on = CURRENT_DATE
+         FROM businesses b, users u
+        WHERE s.business_id = b.id AND u.id = b.owner_user_id AND b.deleted_at IS NULL
+          AND s.plan_code <> 'free' AND s.current_period_end IS NOT NULL
+          AND s.current_period_end::date = CURRENT_DATE + $1::int
+          AND (s.renew_reminded_on IS NULL OR s.renew_reminded_on < CURRENT_DATE)
+        RETURNING b.id AS business_id, b.whatsapp, u.email AS owner_email, s.plan_code, s.current_period_end`, [stage.d]);
+    for (const r of subs.rows) await sendRenewReminder(r, 'plan', r.plan_code, stage);
+    const ad = await db.query(
+      `UPDATE addons a SET renew_reminded_on = CURRENT_DATE
+         FROM businesses b, users u
+        WHERE a.business_id = b.id AND u.id = b.owner_user_id AND b.deleted_at IS NULL
+          AND a.status = 'active' AND a.current_period_end IS NOT NULL
+          AND a.current_period_end::date = CURRENT_DATE + $1::int
+          AND (a.renew_reminded_on IS NULL OR a.renew_reminded_on < CURRENT_DATE)
+        RETURNING b.id AS business_id, b.whatsapp, u.email AS owner_email, a.code, a.current_period_end`, [stage.d]);
+    for (const r of ad.rows) await sendRenewReminder(r, 'addon', r.code, stage);
+  }
+}
+setInterval(() => { remindRenewals().catch(e => console.error('remindRenewals:', e.message)); }, 3600_000);
 
 // ── Worker: expirar reservas AUTOMÁTICAS sin pagar (libera el turno) ─────────
 // Una cita 'pending_deposit' OCUPA el turno (constraint anti-doble-reserva, pues
