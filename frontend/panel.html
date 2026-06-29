@@ -364,6 +364,7 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
       <a data-v="pagos" class="navlink">Pagos</a>
       <a data-v="promos" class="navlink">Promociones</a>
       <a href="referidos.html" class="navlink">Referidos</a>
+      <a href="kit-marca.html" class="navlink" id="kitLink">Kit de marca</a>
       <a data-v="cuenta" class="navlink">Mi cuenta</a>
       <div class="planbox">
         <small>Tu plan</small>
@@ -1898,6 +1899,8 @@ function fillBusiness(data){
   document.getElementById('bizName').value = b.name || '';
   document.getElementById('bizPhone').value = b.phone || '';
   document.getElementById('bizWa').value = b.whatsapp || '';
+  var kitLink = document.getElementById('kitLink');
+  if (kitLink) kitLink.href = 'kit-marca.html?nombre=' + encodeURIComponent(b.name || '') + '&slug=' + encodeURIComponent(b.slug || '') + '&url=' + encodeURIComponent('bukeame.com/' + (b.slug || '')) + '&tel=' + encodeURIComponent(b.whatsapp || b.phone || '');
   document.getElementById('bizAddr').value = b.address_line || '';
   document.getElementById('bizAth').value = b.ath_phone || '';
   // Factura/recibo personalizado del negocio (lo que le llega al cliente).
