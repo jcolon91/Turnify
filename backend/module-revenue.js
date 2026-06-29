@@ -14,7 +14,7 @@ const crypto = require('crypto');
 
 module.exports.mount = function (app, ctx) {
   const { db, authRequired, businessScope, h } = ctx;
-  const { asyncH, bad, isStr, isUuid, isEmail, isPhone, normPhone, audit, notify, bookingLimiter, publicLimiter, codeLimiter } = h;
+  const { asyncH, bad, isStr, isUuid, isEmail, isPhone, normPhone, audit, notify, bookingLimiter, publicLimiter, codeLimiter, sendEmail, emailGiftCard, emailReceipt } = h;
 
   // ---- helpers locales ----
   const cents = v => Number.isInteger(v) && v >= 0 && v <= 100000000; // ≤ $1M
@@ -49,7 +49,7 @@ module.exports.mount = function (app, ctx) {
     try {
       await client.query('BEGIN');
       const o = await client.query(
-        `SELECT id, items, total_cents, gift_card_id, status, committed
+        `SELECT id, items, total_cents, gift_card_id, status, committed, buyer_email, buyer_name
            FROM product_orders WHERE id = $1 AND business_id = $2 FOR UPDATE`, [orderId, businessId]);
       const ord = o.rows[0];
       if (!ord) { await client.query('ROLLBACK'); return { missing: true }; }
@@ -103,6 +103,24 @@ module.exports.mount = function (app, ctx) {
             `La gift card cubrió distinto de lo estimado · diferencia $${diff} · ajusta el cobro`, { order_id: orderId });
         } catch (e) {}
       }
+      // Recibo por email al COMPRADOR (falla suave; espeja el recibo de depósito de cita).
+      // Este es el único punto de commit de órdenes → cubre tarjeta, ATH auto, efectivo y ATH manual.
+      try {
+        if (ord.buyer_email && isEmail(ord.buyer_email) && sendEmail && emailReceipt) {
+          const bz = await db.query(
+            `SELECT name, invoice_settings, theme, logo_url, address_line FROM businesses WHERE id = $1`, [businessId]);
+          const biz = bz.rows[0] || {};
+          const lines = items.map(it => {
+            const qty = it.qty || 1;
+            const cents = (it.price_cents != null ? it.price_cents : (it.unit_price_cents != null ? it.unit_price_cents : null));
+            return [`${qty}× ${it.name || 'Producto'}`, cents != null ? '$' + ((cents * qty) / 100).toFixed(2) : ''];
+          });
+          const e = emailReceipt({ biz, total: ord.total_cents, lines });
+          sendEmail(ord.buyer_email.toLowerCase(), e.subject, e.text, e.html)
+            .catch(err => console.error('order receipt email:', err.message));
+        }
+      } catch (e) { console.error('order receipt email:', e.message); }
+
       return { applied: true, giftApplied };
     } catch (e) { await client.query('ROLLBACK'); throw e; }
     finally { client.release(); }
@@ -648,7 +666,7 @@ module.exports.mount = function (app, ctx) {
     if (!isEmail(purchaser_email)) return bad(res, 'Tu email es requerido para el recibo');
 
     const b = await db.query(
-      `SELECT b.id, b.slug FROM businesses b
+      `SELECT b.id, b.slug, b.name FROM businesses b
          JOIN addons a ON a.business_id = b.id AND a.code = 'gift_cards' AND a.status = 'active'
               AND (a.current_period_end IS NULL OR now() <= a.current_period_end + interval '7 days')
         WHERE b.slug = $1 AND b.deleted_at IS NULL`, [req.params.slug]);
@@ -691,9 +709,23 @@ module.exports.mount = function (app, ctx) {
     await notify(biz.id, 'giftcard', 'Gift card por confirmar',
       `$${(amount_cents / 100).toFixed(2)} · ${purchaser_name.trim()} · confirma el pago para activarla`, { code });
 
+    // Email al comprador con el código (pendiente de activación). Falla suave: no rompe la compra.
+    try {
+      if (sendEmail && emailGiftCard) {
+        const eg = emailGiftCard({
+          status: 'pending', bizName: biz.name, code, amount_cents,
+          purchaser_name: purchaser_name.trim(),
+          recipient_name: isStr(recipient_name, 120) ? recipient_name.trim() : null,
+          message: isStr(message, 300) ? message.trim() : null, expires_at: expires,
+        });
+        sendEmail(purchaser_email.toLowerCase(), eg.subject, eg.text, eg.html)
+          .catch(e => console.error('giftcard email(pending):', e.message));
+      }
+    } catch (e) { console.error('giftcard email(pending):', e.message); }
+
     res.status(201).json({
       gift_card: rows[0],
-      note: 'Te enviamos el código. El negocio lo activará al confirmar tu pago.',
+      note: 'Te enviamos el código a tu email. El negocio lo activará al confirmar tu pago.',
     });
   }));
 
@@ -740,13 +772,33 @@ module.exports.mount = function (app, ctx) {
       `UPDATE gift_cards
           SET status = 'active', payment_id = COALESCE($3, payment_id)
         WHERE business_id = $1 AND code = $2 AND status = 'pending'
-        RETURNING code, initial_cents, balance_cents, status`,
+        RETURNING code, initial_cents, balance_cents, status,
+                  purchaser_email, recipient_email, purchaser_name, recipient_name, message, expires_at`,
       [req.business.id, req.params.code.toUpperCase(), payment_id != null ? payment_id : null]);
     if (!rows[0]) return bad(res, 'Gift card no encontrada o ya confirmada', 404);
+    const g = rows[0];
     await audit(req, 'giftcard.confirm', 'gift_card', null, { code: req.params.code, payment_id: payment_id || null });
     await notify(req.business.id, 'giftcard', 'Gift card activada',
-      `La gift card ${rows[0].code} ya está activa.`, { code: rows[0].code });
-    res.json({ ok: true, gift_card: rows[0] });
+      `La gift card ${g.code} ya está activa.`, { code: g.code });
+
+    // Email del código ACTIVO al destinatario (si lo hay) y al comprador. Falla suave.
+    try {
+      if (sendEmail && emailGiftCard) {
+        const eg = emailGiftCard({
+          status: 'active', bizName: (req.business && req.business.name) || '', code: g.code,
+          amount_cents: g.initial_cents, balance_cents: g.balance_cents,
+          purchaser_name: g.purchaser_name, recipient_name: g.recipient_name,
+          message: g.message, expires_at: g.expires_at,
+        });
+        const to = [];
+        if (g.recipient_email) to.push(g.recipient_email);
+        if (g.purchaser_email && g.purchaser_email !== g.recipient_email) to.push(g.purchaser_email);
+        to.forEach(addr => sendEmail(addr, eg.subject, eg.text, eg.html)
+          .catch(e => console.error('giftcard email(active):', e.message)));
+      }
+    } catch (e) { console.error('giftcard email(active):', e.message); }
+
+    res.json({ ok: true, gift_card: { code: g.code, initial_cents: g.initial_cents, balance_cents: g.balance_cents, status: g.status } });
   }));
 
   // negocio: anular una gift card (fraude, error, o 'pending' que nunca se pagó)

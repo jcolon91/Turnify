@@ -178,6 +178,8 @@ app.post('/api/payments/stripe/webhook',
                 : `${a.service_name} · ${extRef || code}`,
               { appointment_id: a.id });
           } catch (e) { console.error('stripe webhook notify:', e.message); }
+          // Avisa al CLIENTE que su cita quedó confirmada (antes la rama tarjeta no lo hacía).
+          if (conf.rowCount > 0) await enqueueApptConfirm(a.business_id, a.id);
         }
       }
 
@@ -350,6 +352,15 @@ async function notify(businessId, type, title, body, data = {}) {
   await db.query(
     `INSERT INTO notifications (business_id, type, title, body, data)
      VALUES ($1,$2,$3,$4,$5)`, [businessId, type, title, body, data]);
+}
+// In-app dirigida a un USUARIO (p.ej. un empleado). La tabla notifications admite user_id;
+// el empleado las ve vía GET /api/me/notifications. Falla suave (no rompe el flujo).
+async function notifyUser(userId, type, title, body, data = {}) {
+  if (!userId) return;
+  try {
+    await db.query(`INSERT INTO notifications (user_id, type, title, body, data) VALUES ($1,$2,$3,$4,$5)`,
+      [userId, type, title, body, data]);
+  } catch (e) { console.error('notifyUser:', e.message); }
 }
 
 // ----------------------------------------------------------------------------
@@ -553,7 +564,13 @@ app.post('/api/auth/verify-email', authLimiter, asyncH(async (req, res) => {
   const ev = rows[0];
   if (!ev) return bad(res, 'El enlace expiró o ya fue usado. Pide uno nuevo desde tu panel.', 400);
   await db.query(`UPDATE email_verifications SET used_at = now() WHERE id = $1`, [ev.id]);
-  await db.query(`UPDATE users SET email_verified_at = COALESCE(email_verified_at, now()) WHERE id = $1`, [ev.user_id]);
+  const vu = await db.query(
+    `UPDATE users SET email_verified_at = now() WHERE id = $1 AND email_verified_at IS NULL
+     RETURNING full_name, email`, [ev.user_id]);
+  // Bienvenida SOLO en la primera verificación (si ya estaba verificado, no hay fila → no reenvía).
+  if (vu.rows[0] && vu.rows[0].email) {
+    try { const ew = emailWelcome(vu.rows[0].full_name); sendEmail(vu.rows[0].email, ew.subject, ew.text, ew.html).catch(err => console.error('welcome email:', err.message)); } catch (e) {}
+  }
   // Activa el trial Pro pendiente: negocio con referido, en free y sin trial usado aún.
   const up = await db.query(
     `UPDATE subscriptions s
@@ -801,7 +818,7 @@ app.get('/api/businesses/me', authRequired, businessScope, asyncH(async (req, re
 const BIZ_EDITABLE = ['name','bio','phone','whatsapp','email','address_line','municipality_id',
   'lat','lng','logo_url','cover_url','theme','social','ath_phone','deposit_default_cents',
   'cancellation_hours','no_show_policy','booking_lead_min','booking_horizon_days',
-  'slot_granularity_min','is_published'];
+  'slot_granularity_min','is_published','notify_wa','notify_email'];
 
 // Rangos válidos para los campos numéricos editables → se rechaza fuera de rango.
 const BIZ_NUM_RANGES = {
@@ -820,6 +837,7 @@ app.patch('/api/businesses/me', authRequired, businessScope, asyncH(async (req, 
       if (!isPhone(v)) return bad(res, `${k} inválido`); v = normPhone(v);
     }
     if (k === 'email' && v && !isEmail(v)) return bad(res, 'Email inválido');
+    if (k === 'notify_wa' || k === 'notify_email') v = !!v;   // prefs de canal: booleano
     // lat/lng: solo null (limpiar) o número en rango geográfico. Si no es número válido lo ignoramos.
     if (k === 'lat' || k === 'lng') {
       if (v == null) { v = null; }
@@ -2198,10 +2216,9 @@ app.post('/api/public/:slug/appointments', bookingLimiter, asyncH(async (req, re
 
     await client.query('COMMIT');
 
-    const st = await db.query(`SELECT display_name FROM staff WHERE id = $1`, [appt.staff_id]);
-    await notify(biz.id, 'new_appointment', deposit > 0 ? '📅 Nueva cita — pendiente de depósito' : '📅 Nueva cita',
+    await alertNewAppointment(biz.id, appt.id,
       `${full_name.trim()} · ${service.name} · ${starts.toLocaleString('es-PR', { timeZone: 'America/Puerto_Rico', dateStyle: 'short', timeStyle: 'short' })}`,
-      { appointment_id: appt.id });
+      deposit > 0);
 
     // Conversión de campaña patrocinada (módulo ads). Resiliente: NUNCA rompe la reserva.
     if (adsMod && isUuid(ad_campaign_id)) {
@@ -2682,6 +2699,11 @@ app.post('/api/payroll', authRequired, businessScope, asyncH(async (req, res) =>
     [req.business.id, b.staff_id, st.rows[0].display_name, b.period_start, b.period_end,
      hours, gross, pct, withhold, net, isStr(b.notes, 300) ? b.notes.trim() : null]);
   await audit(req, 'payroll.submit', 'staff', b.staff_id, { net_cents: net, reauth: !!hash });
+  // Aviso in-app al EMPLEADO (si tiene cuenta): su nómina quedó registrada, pendiente de pago.
+  if (st.rows[0].user_id)
+    await notifyUser(st.rows[0].user_id, 'payroll', 'Nómina registrada',
+      `${(req.business && req.business.name) || 'Tu negocio'} registró tu nómina del ${b.period_start} al ${b.period_end} por $${(net / 100).toFixed(2)} (pendiente de pago).`,
+      { payroll_entry_id: rows[0].id });
   res.status(201).json({ entry: rows[0] });
 }));
 
@@ -2705,7 +2727,8 @@ app.post('/api/payroll/:id/pay', authRequired, businessScope, asyncH(async (req,
   const { rows } = await db.query(
     `UPDATE payroll_entries SET status = 'paid', paid_at = now()
       WHERE id = $1 AND business_id = $2 AND status = 'pending'
-      RETURNING id, staff_id, staff_name, net_cents, period_start, period_end`,
+      RETURNING id, staff_id, staff_name, net_cents, period_start, period_end,
+                gross_cents, withhold_pct, withhold_cents, hours_worked`,
     [req.params.id, req.business.id]);
   if (!rows[0]) return bad(res, 'Nómina no encontrada o ya pagada', 404);
   const e = rows[0];
@@ -2719,6 +2742,27 @@ app.post('/api/payroll/:id/pay', authRequired, businessScope, asyncH(async (req,
        `Período ${e.period_start} a ${e.period_end}`]).catch(err => console.error('payroll expense insert:', err.message));
   }
   await audit(req, 'payroll.pay', 'staff', e.staff_id, { net_cents: e.net_cents });
+  // Aviso al EMPLEADO de que le pagaron: in-app (si tiene cuenta) + recibo por email. Falla suave.
+  try {
+    const stf = await db.query(
+      `SELECT s.user_id, u.email FROM staff s LEFT JOIN users u ON u.id = s.user_id
+        WHERE s.id = $1 AND s.business_id = $2`, [e.staff_id, req.business.id]);
+    const uid = stf.rows[0] && stf.rows[0].user_id;
+    const email = stf.rows[0] && stf.rows[0].email;
+    if (uid)
+      await notifyUser(uid, 'payroll', 'Nómina pagada',
+        `${(req.business && req.business.name) || 'Tu negocio'} te pagó la nómina del ${e.period_start} al ${e.period_end}: $${(e.net_cents / 100).toFixed(2)}.`,
+        { payroll_entry_id: e.id });
+    if (email && isEmail(email)) {
+      const ep = emailPayroll({
+        bizName: (req.business && req.business.name) || '', staffName: e.staff_name,
+        period_start: e.period_start, period_end: e.period_end,
+        gross_cents: e.gross_cents, withhold_pct: e.withhold_pct, withhold_cents: e.withhold_cents,
+        net_cents: e.net_cents, hours_worked: e.hours_worked,
+      });
+      sendEmail(email, ep.subject, ep.text, ep.html).catch(err => console.error('payroll email:', err.message));
+    }
+  } catch (err) { console.error('payroll notify:', err.message); }
   res.json({ ok: true });
 }));
 
@@ -2917,9 +2961,12 @@ app.patch('/api/payments/:id/confirm', authRequired, businessScope, asyncH(async
       WHERE id = $1 AND business_id = $2 AND status = 'pending'
       RETURNING appointment_id`, [req.params.id, req.business.id]);
   if (!rows[0]) return bad(res, 'Pago no encontrado', 404);
-  if (rows[0].appointment_id)
-    await db.query(`UPDATE appointments SET status = 'confirmed'
+  if (rows[0].appointment_id) {
+    const upd = await db.query(`UPDATE appointments SET status = 'confirmed'
       WHERE id = $1 AND status = 'pending_deposit'`, [rows[0].appointment_id]);
+    // Si la cita realmente pasó a confirmada, avisa al CLIENTE (antes no se enteraba).
+    if (upd.rowCount > 0) await enqueueApptConfirm(req.business.id, rows[0].appointment_id);
+  }
   await audit(req, 'payment.confirm', 'payment', req.params.id);
   res.json({ ok: true });
 }));
@@ -3042,6 +3089,18 @@ app.patch('/api/notifications/:id/read', authRequired, businessScope, asyncH(asy
   if (!isUuid(req.params.id)) return bad(res, 'ID inválido');
   await db.query(`UPDATE notifications SET read_at = now() WHERE id = $1 AND business_id = $2`,
     [req.params.id, req.business.id]);
+  res.json({ ok: true });
+}));
+
+// Avisos in-app del USUARIO (empleado): sus notificaciones personales (user_id = él).
+app.get('/api/me/notifications', authRequired, asyncH(async (req, res) => {
+  const { rows } = await db.query(
+    `SELECT id, type, title, body, data, read_at, created_at FROM notifications
+      WHERE user_id = $1 ORDER BY created_at DESC LIMIT 40`, [req.user.id]);
+  res.json({ unread: rows.filter(r => !r.read_at).length, notifications: rows });
+}));
+app.patch('/api/me/notifications/read-all', authRequired, asyncH(async (req, res) => {
+  await db.query(`UPDATE notifications SET read_at = now() WHERE user_id = $1 AND read_at IS NULL`, [req.user.id]);
   res.json({ ok: true });
 }));
 
@@ -3216,6 +3275,69 @@ function emailReceipt(ctx){
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F1EFE5;padding:32px 16px"><tr><td align="center">${inner}</td></tr></table></body></html>`;
   const text = `${inv.legal_name||biz.name||'Tu negocio'} — Recibo de pago\n`+(ctx.lines||[]).map(kv=>`${kv[0]}: ${kv[1]}`).join('\n')+`\nTotal pagado: ${dollars}`;
   return { subject: `Recibo de pago — ${inv.legal_name||biz.name||'tu compra'}`, text, html };
+}
+
+function emailGiftCard(ctx){
+  const active = ctx.status === 'active';
+  const brand  = emailEsc(ctx.bizName || 'el negocio');
+  const code   = emailEsc(ctx.code || '');
+  const amount = '$' + ((ctx.amount_cents||0)/100).toFixed(2);
+  const bal    = '$' + ((ctx.balance_cents != null ? ctx.balance_cents : (ctx.amount_cents||0))/100).toFixed(2);
+  const accent = '#0E8074';
+  const from   = ctx.purchaser_name ? emailEsc(ctx.purchaser_name) : '';
+  const msg    = ctx.message ? emailEsc(ctx.message) : '';
+  let exp = '';
+  try { if (ctx.expires_at) exp = new Date(ctx.expires_at).toLocaleDateString('es-PR',{year:'numeric',month:'long',day:'numeric'}); } catch(e){}
+  const title = active ? `Tu gift card de ${brand} está activa` : `Recibimos tu solicitud de gift card`;
+  const lead  = active
+    ? `Ya puedes usarla en ${brand}: presenta el código en el negocio o aplícalo al pagar en línea.`
+    : `Gracias por tu compra. ${brand} la activará al confirmar tu pago; te enviaremos otro correo cuando esté lista para usar.`;
+  const codeNote = active ? (`Saldo disponible: ${bal}` + (exp ? ` · Vence: ${exp}` : '')) : 'Se activa cuando el negocio confirme tu pago.';
+  const giftLine = (active && from) ? `<p style="margin:0 0 14px;font-size:14px;color:#17150F">${from} te regaló una gift card.</p>` : '';
+  const msgLine  = msg ? `<p style="margin:14px 0 0;font-size:13px;color:#7A7464;font-style:italic">"${msg}"</p>` : '';
+  const inner = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;background:#fff;border:1px solid #E1DCCD;border-radius:18px;overflow:hidden">`+
+    `<tr><td style="height:5px;background:${accent};line-height:5px;font-size:5px">&nbsp;</td></tr>`+
+    `<tr><td style="padding:24px 30px 6px 30px"><div style="font-size:20px;font-weight:800;color:#17150F">Buk<span style="color:${accent}">é</span>ame · Gift card</div><div style="font-size:13px;color:#7A7464;margin-top:2px">${brand}</div></td></tr>`+
+    `<tr><td style="padding:6px 30px 0 30px"><h1 style="margin:0 0 6px;font-size:18px;font-weight:800;color:#17150F">${title}</h1><p style="margin:0 0 14px;font-size:14px;color:#5E594B;line-height:1.6">${lead}</p>${giftLine}</td></tr>`+
+    `<tr><td style="padding:0 30px 4px 30px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FBFAF5;border:1px dashed ${accent};border-radius:14px"><tr><td style="padding:18px;text-align:center">`+
+      `<div style="font-size:12px;color:#7A7464;letter-spacing:.06em;text-transform:uppercase">Código</div>`+
+      `<div style="font-size:30px;font-weight:800;letter-spacing:2px;color:${accent};font-family:Consolas,monospace;margin:6px 0">${code}</div>`+
+      `<div style="font-size:13px;color:#17150F;font-weight:700">Valor: ${amount}</div>`+
+      `<div style="font-size:12px;color:#7A7464;margin-top:4px">${codeNote}</div>`+
+    `</td></tr></table>${msgLine}</td></tr>`+
+    `<tr><td style="padding:16px 30px 24px 30px"><p style="margin:0;font-size:11px;color:#A39C88">Emitida vía Bukéame · bukeame.com</p></td></tr></table>`;
+  const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"></head>`+
+    `<body style="margin:0;padding:0;background:#F1EFE5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">`+
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F1EFE5;padding:32px 16px"><tr><td align="center">${inner}</td></tr></table></body></html>`;
+  const text = `${title} — ${ctx.bizName||''}\nCódigo: ${ctx.code}\nValor: ${amount}\n`+
+    (active ? `Saldo: ${bal}${exp?` · Vence: ${exp}`:''}\nPresenta el código en el negocio o aplícalo al pagar en línea.` : 'Se activa cuando el negocio confirme tu pago.')+
+    (msg ? `\n\nMensaje: ${ctx.message}` : '')+`\n\nEmitida vía Bukeame · bukeame.com`;
+  const subject = active ? `Tu gift card de ${ctx.bizName||'tu negocio'} (${ctx.code})` : `Solicitud de gift card recibida — ${ctx.bizName||'tu negocio'}`;
+  return { subject, text, html };
+}
+
+function emailPayroll(ctx){
+  const brand  = emailEsc(ctx.bizName || 'tu negocio');
+  const accent = '#0E8074';
+  const money  = c => '$' + ((c||0)/100).toFixed(2);
+  const pairs = [['Empleado', ctx.staffName || ''], ['Período', `${ctx.period_start} — ${ctx.period_end}`]];
+  if (ctx.hours_worked != null && ctx.hours_worked !== '') pairs.push(['Horas trabajadas', String(ctx.hours_worked)]);
+  pairs.push(['Paga bruta', money(ctx.gross_cents)]);
+  if (ctx.withhold_cents > 0) pairs.push([`Retención (${Number(ctx.withhold_pct || 0)}%)`, '-' + money(ctx.withhold_cents)]);
+  const rows = emailRows(pairs);
+  const net = money(ctx.net_cents);
+  const inner = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;background:#fff;border:1px solid #E1DCCD;border-radius:18px;overflow:hidden">`+
+    `<tr><td style="height:5px;background:${accent};line-height:5px;font-size:5px">&nbsp;</td></tr>`+
+    `<tr><td style="padding:24px 30px 6px 30px"><div style="font-size:20px;font-weight:800;color:#17150F">${brand}</div><div style="font-size:13px;color:#7A7464;margin-top:2px">Recibo de nómina</div></td></tr>`+
+    `<tr><td style="padding:8px 30px 24px 30px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FBFAF5;border:1px solid #E1DCCD;border-radius:14px"><tr><td style="padding:6px 18px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}`+
+    `<tr><td style="padding:11px 0 4px 0;border-top:2px solid ${accent};font-size:13px;font-weight:700;color:#17150F">Neto pagado</td><td style="padding:11px 0 4px 0;border-top:2px solid ${accent};font-size:16px;font-weight:800;color:${accent};text-align:right">${net}</td></tr>`+
+    `</table></td></tr></table>`+
+    `<p style="margin:14px 0 0;font-size:11px;color:#A39C88">Emitido vía Bukéame · bukeame.com</p></td></tr></table>`;
+  const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"></head>`+
+    `<body style="margin:0;padding:0;background:#F1EFE5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">`+
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F1EFE5;padding:32px 16px"><tr><td align="center">${inner}</td></tr></table></body></html>`;
+  const text = `Recibo de nómina — ${ctx.bizName||''}\n`+pairs.map(kv=>`${kv[0]}: ${kv[1]}`).join('\n')+`\nNeto pagado: ${net}\n\nEmitido vía Bukeame · bukeame.com`;
+  return { subject: `Recibo de nómina — ${ctx.bizName||'tu negocio'}`, text, html };
 }
 
 function emailWelcome(name) {
@@ -3420,6 +3542,24 @@ async function expireBilling() {
 }
 setInterval(() => { expireBilling().catch(e => console.error('expireBilling:', e.message)); }, 3600_000);
 
+// ── Re-encola la confirmación al CLIENTE cuando la cita pasa a 'confirmed' tras validar
+// el depósito (manual efectivo/ATH o tarjeta). Espeja el encolado de la reserva; el worker
+// dispatchMessages lo despacha por WhatsApp (+ email si hay). Falla suave.
+async function enqueueApptConfirm(businessId, appointmentId) {
+  try {
+    const c = await db.query(
+      `SELECT cl.phone, cl.email FROM appointments a JOIN clients cl ON cl.id = a.client_id WHERE a.id = $1`,
+      [appointmentId]);
+    const row = c.rows[0]; if (!row) return;
+    if (row.phone)
+      await db.query(`INSERT INTO message_log (business_id, appointment_id, channel, recipient, template)
+         VALUES ($1,$2,'whatsapp',$3,'confirm')`, [businessId, appointmentId, row.phone]);
+    if (row.email && isEmail(row.email))
+      await db.query(`INSERT INTO message_log (business_id, appointment_id, channel, recipient, template)
+         VALUES ($1,$2,'email',$3,'confirm')`, [businessId, appointmentId, row.email.toLowerCase()]);
+  } catch (e) { console.error('enqueueApptConfirm:', e.message); }
+}
+
 // ── Aviso al NEGOCIO: tiene un depósito por validar (in-app + WhatsApp + email) ──
 // El WhatsApp dice que se valida EN LA PLATAFORMA (panel), NUNCA "aquí" por el chat.
 async function alertDepositToValidate(businessId, appointmentId, detail) {
@@ -3427,13 +3567,29 @@ async function alertDepositToValidate(businessId, appointmentId, detail) {
   try { await notify(businessId, 'payment', 'Depósito por validar', body, { appointment_id: appointmentId }); } catch (e) {}
   try {
     const b = await db.query(
-      `SELECT b.whatsapp, u.email FROM businesses b JOIN users u ON u.id = b.owner_user_id WHERE b.id = $1`, [businessId]);
+      `SELECT b.whatsapp, b.notify_wa, b.notify_email, u.email FROM businesses b JOIN users u ON u.id = b.owner_user_id WHERE b.id = $1`, [businessId]);
     const row = b.rows[0]; if (!row) return;
-    if (row.whatsapp) {
+    if (row.whatsapp && row.notify_wa) {
       const wa = `*Bukéame* — Depósito por validar\n\n${detail}\n\nValídalo en tu panel de Bukéame: Agenda → la cita → "Validar depósito y aceptar". (No se valida por este chat.)`;
       try { await sendWhatsApp(row.whatsapp, wa); } catch (e) {}
     }
-    if (row.email) { try { await sendEmail(row.email, 'Depósito por validar — Bukéame', body); } catch (e) {} }
+    if (row.email && row.notify_email) { try { await sendEmail(row.email, 'Depósito por validar — Bukéame', body); } catch (e) {} }
+  } catch (e) {}
+}
+
+// ── Aviso al NEGOCIO de una nueva cita (in-app + email + WhatsApp al dueño) ──
+async function alertNewAppointment(businessId, appointmentId, detail, pendingDeposit) {
+  const title = pendingDeposit ? 'Nueva cita — pendiente de depósito' : 'Nueva cita';
+  try { await notify(businessId, 'new_appointment', title, detail, { appointment_id: appointmentId }); } catch (e) {}
+  try {
+    const b = await db.query(
+      `SELECT b.whatsapp, b.notify_wa, b.notify_email, u.email FROM businesses b JOIN users u ON u.id = b.owner_user_id WHERE b.id = $1`, [businessId]);
+    const row = b.rows[0]; if (!row) return;
+    if (row.whatsapp && row.notify_wa) {
+      const wa = `*Bukéame* — ${title}\n\n${detail}\n\nMírala en tu panel de Bukéame: Agenda.`;
+      try { await sendWhatsApp(row.whatsapp, wa); } catch (e) {}
+    }
+    if (row.email && row.notify_email) { try { await sendEmail(row.email, `${title} — Bukéame`, detail); } catch (e) {} }
   } catch (e) {}
 }
 
@@ -3548,7 +3704,7 @@ setInterval(() => { expireUnpaidOrders().catch(e => console.error('expireUnpaidO
 const sharedHelpers = {
   asyncH, bad, isStr, isUuid, isEmail, isPhone, normPhone, isDate, audit, notify,
   confirmCode, bookingLimiter, codeLimiter, publicLimiter,
-  sendEmail, emailPlatformReceipt, emailReceipt,
+  sendEmail, emailPlatformReceipt, emailReceipt, emailGiftCard,
 };
 // Referencia al módulo de ads (se asigna al montarlo más abajo). Los endpoints
 // públicos la usan en tiempo de request; queda null si el módulo falla al cargar.

@@ -153,6 +153,13 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
     </div>
     <div id="joinMsg" style="font-size:12.5px;margin-top:8px"></div>
   </div>
+  <div id="myNotifCard" style="display:none;margin-top:14px;background:var(--card-soft);border:1px solid var(--border);border-radius:16px;padding:16px 18px">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px">
+      <b style="font-family:var(--display);font-size:15px;color:var(--text)">Avisos</b>
+      <button type="button" id="myNotifRead" style="font-size:12px;color:var(--green);background:none;border:0;cursor:pointer;padding:0">Marcar leídos</button>
+    </div>
+    <div id="myNotifList"></div>
+  </div>
   <div id="myPayrollCard" style="display:none;margin-top:14px;background:var(--card-soft);border:1px solid var(--border);border-radius:16px;padding:16px 18px">
     <b style="font-family:var(--display);font-size:15px;color:var(--text);display:block;margin-bottom:2px">Mi nómina</b>
     <span style="font-size:12.5px;color:var(--muted);line-height:1.5;display:block;margin-bottom:10px">Tus pagos sometidos por los negocios donde trabajas. Cuando el negocio los marca pagados quedan en tu contabilidad.</span>
@@ -487,6 +494,26 @@ async function loadMyPayroll(){
 }
 loadMyPayroll();
 
+// Avisos in-app del empleado (nómina registrada/pagada, etc.).
+async function loadMyNotifs(){
+  var r; try{ r=await api('GET','/me/notifications'); }catch(e){ return; }
+  var ns=(r&&r.ok&&r.data&&r.data.notifications)?r.data.notifications:[];
+  if(!ns.length) return;
+  var card=document.getElementById('myNotifCard'), list=document.getElementById('myNotifList');
+  if(!card||!list) return;
+  list.innerHTML=ns.slice(0,15).map(function(n){
+    var unread=!n.read_at;
+    return '<div style="border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:8px;'+(unread?'background:var(--green-soft)':'')+'">'+
+      '<div style="font-size:13px;font-weight:700;color:var(--text)">'+esc(n.title||'')+'</div>'+
+      (n.body?'<div style="font-size:12px;color:var(--muted);margin-top:3px">'+esc(n.body)+'</div>':'')+
+    '</div>';
+  }).join('');
+  card.style.display='block';
+  var rb=document.getElementById('myNotifRead');
+  if(rb) rb.onclick=async function(){ try{ await api('PATCH','/me/notifications/read-all'); }catch(e){} loadMyNotifs(); };
+}
+loadMyNotifs();
+
 // saludo con el nombre del usuario
 (async function greet(){
   try{
@@ -502,5 +529,6 @@ loadMyPayroll();
 load();
 loadOrders();
 </script>
+  <script src="i18n.js" defer></script>
 </body>
 </html>

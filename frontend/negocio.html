@@ -587,14 +587,9 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
     <!-- MÁS OPCIONES (gift card / lista de espera) -->
     <section class="sec" id="sec-more" style="display:none">
       <div class="sec-title">Más opciones</div>
-      <button class="action-card" id="openGift">
-        <span class="ic"><svg viewBox="0 0 24 24"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg></span>
-        <span class="grow"><h4>Regala una gift card</h4><p>Sorprende a alguien con saldo para usar en el negocio.</p></span>
-        <span class="arr">→</span>
-      </button>
       <button class="action-card" id="checkGift">
-        <span class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
-        <span class="grow"><h4>Consultar saldo de gift card</h4><p>Revisa cuánto saldo te queda en tu tarjeta de regalo.</p></span>
+        <span class="ic"><svg viewBox="0 0 24 24"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C12 7 12 7 12 7z"/></svg></span>
+        <span class="grow"><h4>Gift card</h4><p>Cómprala de regalo o consulta el saldo de tu tarjeta.</p></span>
         <span class="arr">→</span>
       </button>
       <button class="action-card" id="openWait">
@@ -2265,8 +2260,8 @@ function pollAthOrder(orderId, ecommerceId, msg, btnEl){
 }
 
 // ═══════════ GIFT CARD ═══════════
-document.getElementById('openGift').onclick = function(){ clearAlert('giftAlert'); document.getElementById('giftForm').style.display='block'; document.getElementById('giftOk').style.display='none'; openSheet('giftSheet'); };
-document.getElementById('closeGift').onclick = function(){ closeSheet('giftSheet'); };
+// La compra/consulta de gift card vive en gift-card.html (pestañas Comprar / Consultar saldo);
+// se retiró el sheet de compra en página para evitar el duplicado. La tarjeta única va allí:
 document.getElementById('checkGift').onclick = function(){ location.href = 'gift-card.html?slug='+encodeURIComponent(SLUG); };
 document.getElementById('giftBtn').onclick = async function(){
   clearAlert('giftAlert');
@@ -2346,5 +2341,6 @@ document.getElementById('waitOkClose').onclick = function(){ closeSheet('waitShe
 
 boot();
 </script>
+  <script src="i18n.js" defer></script>
 </body>
 </html>

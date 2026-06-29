@@ -364,7 +364,7 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
       <a data-v="pagos" class="navlink">Pagos</a>
       <a data-v="promos" class="navlink">Promociones</a>
       <a href="referidos.html" class="navlink">Referidos</a>
-      <a href="kit-marca.html" class="navlink" id="kitLink">Kit de marca</a>
+      <a data-v="marketing" class="navlink">Marketing</a>
       <a data-v="cuenta" class="navlink">Mi cuenta</a>
       <div class="planbox">
         <small>Tu plan</small>
@@ -644,6 +644,29 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
         <div id="promoList"></div>
       </section>
 
+      <section class="view" id="view-marketing">
+        <div class="tophead">
+          <div><h1>Marketing</h1><p>Herramientas para promover tu negocio y propagar tu marca.</p></div>
+        </div>
+        <div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">
+          <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px 20px">
+            <div style="font-size:17px;font-weight:700;color:var(--ink);margin:0 0 6px">Kit de marca</div>
+            <p style="font-size:13px;color:var(--ink2);margin:0 0 14px">Genera con tu información: posts para Instagram/Facebook, story, flyer/POS, recibo, firma de email y marca de agua para fotos — todos con el <strong>código QR</strong> a tu página de reservas.</p>
+            <a id="kitLink" class="btn btn-teal btn-sm" href="kit-marca.html" target="_blank" rel="noopener">Abrir kit</a>
+          </div>
+          <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px 20px">
+            <div style="font-size:17px;font-weight:700;color:var(--ink);margin:0 0 6px">Conecta tu web</div>
+            <p style="font-size:13px;color:var(--ink2);margin:0 0 14px">Pon el botón de reservas de Bukéame en tu propia página. Personaliza color, texto y posición. Incluye enlace directo, gift cards y API.</p>
+            <a id="embedLink" class="btn btn-sm" style="background:transparent;border:1.5px solid var(--green);color:var(--green)" href="developers.html" target="_blank" rel="noopener">Ver código e instrucciones</a>
+          </div>
+          <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px 20px">
+            <div style="font-size:17px;font-weight:700;color:var(--ink);margin:0 0 6px">Promociones y destacar</div>
+            <p style="font-size:13px;color:var(--ink2);margin:0 0 14px">Sal arriba en el buscador y el inicio con anuncios pagados por vista/clic, con tu presupuesto.</p>
+            <button class="btn btn-sm" style="background:transparent;border:1.5px solid var(--green);color:var(--green)" type="button" onclick="switchView('promos')">Ir a Promociones</button>
+          </div>
+        </div>
+      </section>
+
       <section class="view" id="view-negocio">
         <div class="tophead"><div><h1>Mi negocio</h1><p>Información que ven tus clientes.</p></div></div>
         <div class="alert" id="bizAlert"></div>
@@ -693,6 +716,18 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
           </div>
           <div class="field"><label>Dirección</label><input id="bizAddr" placeholder="Calle, pueblo"></div>
           <div class="field"><label>ATH Móvil (para depósitos)</label><input id="bizAth" placeholder="787-555-1234"></div>
+          <div style="border-top:1px solid var(--border);margin:6px 0 14px;padding-top:14px">
+            <div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:3px">Avisos de citas y depósitos</div>
+            <div style="font-size:12px;color:var(--ink2);margin-bottom:12px">La campana del panel siempre te avisa. Elige si además quieres recibirlos por WhatsApp y/o email.</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px">
+              <span style="font-size:13.5px;color:var(--ink)">Avisos por WhatsApp</span>
+              <label class="switch"><input type="checkbox" id="bizNotifyWa"><span class="slider"></span></label>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+              <span style="font-size:13.5px;color:var(--ink)">Avisos por email</span>
+              <label class="switch"><input type="checkbox" id="bizNotifyEmail"><span class="slider"></span></label>
+            </div>
+          </div>
           <button class="btn btn-teal" id="saveBizBtn">Guardar cambios</button>
         </div>
         <div class="card">
@@ -1899,8 +1934,12 @@ function fillBusiness(data){
   document.getElementById('bizName').value = b.name || '';
   document.getElementById('bizPhone').value = b.phone || '';
   document.getElementById('bizWa').value = b.whatsapp || '';
+  document.getElementById('bizNotifyWa').checked = (b.notify_wa !== false);      // default activado
+  document.getElementById('bizNotifyEmail').checked = (b.notify_email !== false);
   var kitLink = document.getElementById('kitLink');
   if (kitLink) kitLink.href = 'kit-marca.html?nombre=' + encodeURIComponent(b.name || '') + '&slug=' + encodeURIComponent(b.slug || '') + '&url=' + encodeURIComponent('bukeame.com/' + (b.slug || '')) + '&tel=' + encodeURIComponent(b.whatsapp || b.phone || '');
+  var embedLink = document.getElementById('embedLink');
+  if (embedLink) embedLink.href = 'developers.html?slug=' + encodeURIComponent(b.slug || '');
   document.getElementById('bizAddr').value = b.address_line || '';
   document.getElementById('bizAth').value = b.ath_phone || '';
   // Factura/recibo personalizado del negocio (lo que le llega al cliente).
@@ -2696,7 +2735,9 @@ document.getElementById('saveBizBtn').onclick = async function(){
     phone: document.getElementById('bizPhone').value.trim() || null,
     whatsapp: document.getElementById('bizWa').value.trim() || null,
     address_line: document.getElementById('bizAddr').value.trim() || null,
-    ath_phone: document.getElementById('bizAth').value.trim() || null
+    ath_phone: document.getElementById('bizAth').value.trim() || null,
+    notify_wa: document.getElementById('bizNotifyWa').checked,
+    notify_email: document.getElementById('bizNotifyEmail').checked
   };
   const btn = document.getElementById('saveBizBtn'); btn.disabled=true; btn.textContent='Guardando…';
   const r = await api('PATCH','/businesses/me', body);
@@ -2895,7 +2936,7 @@ function openMenu(){ var d=document.getElementById('mobDrawer'),b=document.getEl
 function closeMenu(){ var d=document.getElementById('mobDrawer'),b=document.getElementById('mobBackdrop'),h=document.getElementById('hambBtn'); d.classList.remove('open'); b.classList.remove('open'); if(h) h.setAttribute('aria-expanded','false'); }
 function buildMobnav(){
   const nav = document.getElementById('mobDrawer');
-  const items = [['agenda','Agenda'],['servicios','Servicios'],['equipo','Equipo'],['clientes','Clientes'],['lealtad','Lealtad'],['#productos.html','Tienda'],['#espera.html','Lista de espera'],['ordenes','Órdenes'],['horario','Horario'],['contabilidad','Contabilidad'],['negocio','Mi negocio'],['pagos','Pagos'],['promos','Promociones'],['#referidos.html','Referidos'],['cuenta','Mi cuenta']];
+  const items = [['agenda','Agenda'],['servicios','Servicios'],['equipo','Equipo'],['clientes','Clientes'],['lealtad','Lealtad'],['#productos.html','Tienda'],['#espera.html','Lista de espera'],['ordenes','Órdenes'],['horario','Horario'],['contabilidad','Contabilidad'],['negocio','Mi negocio'],['pagos','Pagos'],['promos','Promociones'],['marketing','Marketing'],['#referidos.html','Referidos'],['cuenta','Mi cuenta']];
   // Móvil: drawer off-canvas (hamburguesa) en vez de una barra de pestañas.
   nav.innerHTML = items.map(function(it){
     return '<a data-v="'+it[0]+'">'+it[1]+'</a>';
@@ -4053,5 +4094,6 @@ document.getElementById('athCancel').onclick = closeAthCheckout;
 loadAthConfig();
 boot();
 </script>
+  <script src="i18n.js" defer></script>
 </body>
 </html>
