@@ -80,6 +80,13 @@ function mount(app, ctx) {
   // Crea el pago en ATH (manda push al teléfono). Devuelve { ecommerceId, authToken } o null.
   async function athCreate(cents, phone, metadata1, metadata2, itemName) {
     const dollars = (cents / 100).toFixed(2);
+    // ATH Móvil rechaza ciertos caracteres en name/description/metadata (p.ej. paréntesis,
+    // comas, acentos). Saneamos a un set seguro — por esto los add-ons ("Add-ons (2)",
+    // "addons:store_10,payroll") fallaban al crear el pago mientras los planes ("Plan Pro") pasaban.
+    const athSafe = (s) => String(s == null ? '' : s)
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')              // quita acentos (é→e)
+      .replace(/[^A-Za-z0-9 :._-]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 40);
+    const item = athSafe(itemName) || 'Compra Bukeame';
     const body = {
       env: ATHM_ENV,
       publicToken: PUBLIC_TOKEN,
@@ -87,12 +94,12 @@ function mount(app, ctx) {
       total: dollars,
       subtotal: dollars,
       tax: '0.00',
-      metadata1: String(metadata1 || '').slice(0, 40),
-      metadata2: String(metadata2 || '').slice(0, 40),
+      metadata1: athSafe(metadata1),
+      metadata2: athSafe(metadata2),
       phoneNumber: phone,
       items: [{
-        name: String(itemName || 'Compra Bukeame').slice(0, 40),
-        description: String(itemName || 'Compra Bukeame').slice(0, 40),
+        name: item,
+        description: item,
         quantity: '1', price: dollars, tax: '0.00', metadata: '',
       }],
     };
@@ -130,8 +137,9 @@ function mount(app, ctx) {
       const a = await db.query(`SELECT code, price_cents FROM addon_catalog WHERE code = ANY($1::text[])`, [codesArr]);
       if (a.rows.length !== codesArr.length) fail('Algún add-on no existe', 404);
       montoEsperadoCents = a.rows.reduce((s, r) => s + r.price_cents, 0);
+      if (!Number.isInteger(montoEsperadoCents) || montoEsperadoCents <= 0) fail('Estos add-ons no son cobrables');
       refCode = codesArr.join(',');
-      title = 'Add-ons (' + codesArr.length + ')';
+      title = 'Add-ons ' + codesArr.length;
     } else if (kind === 'ad_budget') {
       if (!isUuid(campaign_id)) fail('Campaña inválida');
       if (!Number.isInteger(amount) || amount <= 0 || amount > 100000000) fail('Monto de presupuesto inválido');
