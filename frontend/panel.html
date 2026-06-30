@@ -1963,7 +1963,7 @@ function fillBusiness(data){
   document.getElementById('bizNotifyWa').checked = (b.notify_wa !== false);      // default activado
   document.getElementById('bizNotifyEmail').checked = (b.notify_email !== false);
   var kitLink = document.getElementById('kitLink');
-  if (kitLink) kitLink.href = 'kit-marca.html?nombre=' + encodeURIComponent(b.name || '') + '&slug=' + encodeURIComponent(b.slug || '') + '&url=' + encodeURIComponent('bukeame.com/' + (b.slug || '')) + '&tel=' + encodeURIComponent(b.whatsapp || b.phone || '');
+  if (kitLink) kitLink.href = 'kit-marca.html?nombre=' + encodeURIComponent(b.name || '') + '&slug=' + encodeURIComponent(b.slug || '') + '&url=' + encodeURIComponent('bukeame.com/' + (b.slug || '')) + '&tel=' + encodeURIComponent(b.whatsapp || b.phone || '') + (b.logo_url ? '&logo=' + encodeURIComponent(b.logo_url) : '');
   var embedLink = document.getElementById('embedLink');
   if (embedLink) embedLink.href = 'developers.html?slug=' + encodeURIComponent(b.slug || '');
   document.getElementById('bizAddr').value = b.address_line || '';
