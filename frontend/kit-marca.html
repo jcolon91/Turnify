@@ -97,6 +97,40 @@
   /* Receipt preview */
   .receipt-preview{background:#fff;color:#16110a;border-radius:12px;padding:18px;font-family:var(--body)}
 
+  /* Logo preview thumb in form */
+  .logo-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .logo-thumb{width:54px;height:54px;border-radius:12px;border:1px solid var(--border);background:#0c1d15 center/cover no-repeat;flex:0 0 auto;display:flex;align-items:center;justify-content:center}
+  .logo-thumb span{color:#5d736a;font-size:11px;font-family:var(--mono);text-align:center;padding:4px}
+  .warn{color:var(--mango);font-size:12px;font-family:var(--mono);margin-top:6px}
+
+  /* Editable receipt */
+  .rcpt{background:#fff;color:#16110a;border-radius:12px;padding:18px;font-family:Arial,Helvetica,sans-serif;max-width:480px}
+  .rcpt-head{display:flex;align-items:center;gap:12px;border-bottom:2px solid #0E8074;padding-bottom:12px;margin-bottom:12px}
+  .rcpt-logo{width:48px;height:48px;flex:0 0 auto}
+  .rcpt input.ed{border:none;border-bottom:1px dashed transparent;background:transparent;font-family:Arial,Helvetica,sans-serif;color:#16110a;padding:2px 2px;outline:none;width:100%}
+  .rcpt input.ed:focus{border-bottom-color:#0E8074}
+  .rcpt .biz-name{font:700 20px Arial;color:#0B1A13}
+  .rcpt-meta{font:400 12px Arial;color:#55665e}
+  .rcpt-lines{width:100%;border-collapse:collapse;margin-top:6px}
+  .rcpt-lines td{padding:5px 0;border-bottom:1px dashed #d8d2c4;vertical-align:middle}
+  .rcpt-lines .amt{width:96px}
+  .rcpt-lines .amt input{text-align:right}
+  .rcpt-lines .rm{width:26px;text-align:center}
+  .rcpt-lines .rm button{border:none;background:#f2ece0;color:#a23;width:22px;height:22px;border-radius:6px;cursor:pointer;font-size:14px;line-height:1;font-family:Arial}
+  .rcpt-total{display:flex;justify-content:space-between;font:700 16px Arial;color:#0B1A13;margin-top:10px}
+  .rcpt-total .v{color:#0E8074}
+  .rcpt-foot{text-align:center;margin-top:18px;padding-top:12px;border-top:1px solid #e3ddce;font:400 12px Arial;color:#55665e}
+  .rcpt-foot .e{color:#36E27B}
+  .rcpt-addline{margin-top:8px}
+  .rcpt-addline button{border:1px dashed #0E8074;background:#fff;color:#0E8074;border-radius:8px;padding:6px 12px;cursor:pointer;font:600 12px Arial}
+
+  /* preset chips for posters */
+  .chips{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{border:1px solid var(--border);background:#0c1d15;color:var(--cream);border-radius:999px;padding:7px 13px;font-size:13px;cursor:pointer;font-family:var(--body)}
+  .chip.active{background:var(--green);color:#06150d;border-color:var(--green);font-weight:600}
+  .size-toggle{display:flex;gap:8px}
+  .size-toggle .chip.active{background:var(--deep);color:#fff;border-color:var(--deep)}
+
   footer.foot{margin-top:40px;text-align:center;color:var(--muted);font-size:13px}
   footer.foot .e{color:var(--green)}
 
@@ -151,6 +185,19 @@
       <div class="field">
         <label for="f_fb">Facebook</label>
         <input id="f_fb" type="text" placeholder="Barbería La Nueva" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label for="f_logo">Sube tu logo (opcional)</label>
+        <div class="logo-row">
+          <div class="logo-thumb" id="logo_thumb"><span>Sin logo</span></div>
+          <label class="btn ghost" for="f_logo" style="white-space:nowrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Subir logo
+          </label>
+          <button class="btn ghost" id="logo_clear" type="button" style="display:none">Quitar</button>
+          <input class="file-input" id="f_logo" type="file" accept="image/*" />
+        </div>
+        <div class="warn" id="logo_warn" style="display:none"></div>
       </div>
     </div>
   </section>
@@ -244,11 +291,11 @@
       <div class="piece-head">
         <span class="piece-num">05</span>
         <div>
-          <h3>Recibo imprimible</h3>
-          <p class="desc">Plantilla simple lista para imprimir</p>
+          <h3>Recibo editable</h3>
+          <p class="desc">Edita líneas y montos · el total se calcula solo</p>
         </div>
       </div>
-      <div class="preview"><div class="receipt-preview" id="receipt_preview" style="width:100%"></div></div>
+      <div class="preview" style="display:block"><div id="receipt_edit" style="width:100%"></div></div>
       <div class="actions">
         <button class="btn" id="print_receipt">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
@@ -276,6 +323,40 @@
       </div>
     </article>
 
+  </section>
+
+  <!-- ===== POSTER / STICKER (CO-BRAND) ===== -->
+  <section class="panel">
+    <div class="piece-head" style="margin-bottom:14px">
+      <span class="piece-num">07</span>
+      <div>
+        <h3 style="font-family:var(--display);font-weight:800;font-size:18px;margin:0;letter-spacing:-.01em">Cartel / sticker co-marca</h3>
+        <p class="desc" style="color:var(--muted);font-size:13px;margin:2px 0 0">Para pegar en tu local · texto editable + QR a tu página</p>
+      </div>
+    </div>
+
+    <div class="field" style="margin-bottom:14px">
+      <label>Texto del cartel</label>
+      <div class="chips" id="poster_presets" style="margin-bottom:10px"></div>
+      <input id="poster_text" type="text" value="Aquí se agenda con Bukéame" autocomplete="off" />
+    </div>
+
+    <div class="field" style="margin-bottom:16px">
+      <label>Tamaño</label>
+      <div class="size-toggle chips" id="poster_sizes">
+        <button type="button" class="chip active" data-w="1080" data-h="1350">Vertical 1080×1350</button>
+        <button type="button" class="chip" data-w="1080" data-h="1080">Cuadrado 1080×1080</button>
+      </div>
+    </div>
+
+    <div class="preview" style="max-width:360px;margin:0 auto"><canvas id="cv_poster" width="1080" height="1350"></canvas></div>
+    <div class="actions" style="justify-content:center;margin-top:14px">
+      <button class="btn" id="dl_poster">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Descargar PNG
+      </button>
+      <span class="ok-flash" id="ok_poster">Listo</span>
+    </div>
   </section>
 
   <footer class="foot">
@@ -436,6 +517,12 @@ var QRCode=(function(){
   var $ = function(id){ return document.getElementById(id); };
   var f_nombre=$('f_nombre'), f_url=$('f_url'), f_tel=$('f_tel'), f_ig=$('f_ig'), f_fb=$('f_fb');
 
+  // ---- business logo state ----
+  // logoImage: a loaded HTMLImageElement (or null). logoTainted: true if drawn from a
+  // cross-origin URL that may taint the canvas (toDataURL would throw).
+  var logoImage = null;
+  var logoTainted = false;
+
   // ---- prefill from query params ----
   function prefill(){
     var p = new URLSearchParams(location.search);
@@ -446,6 +533,52 @@ var QRCode=(function(){
     if(p.get('fb')) f_fb.value = p.get('fb');
     // slug convenience: if url empty but slug present -> bukeame.com/slug
     if(!f_url.value && p.get('slug')) f_url.value = 'bukeame.com/' + p.get('slug');
+    // logo passed by the panel as a URL
+    if(p.get('logo')) loadLogoFromUrl(p.get('logo'));
+  }
+
+  // Load the business logo from a (possibly cross-origin) URL. Tries crossOrigin
+  // first so the canvas stays clean; if that fails, falls back to a plain load
+  // (which may taint the canvas — we then warn the user to upload the file).
+  function loadLogoFromUrl(url){
+    if(!url) return;
+    var triedAnon = false;
+    function attempt(useCors){
+      var img = new Image();
+      if(useCors) img.crossOrigin = 'anonymous';
+      img.onload = function(){
+        logoImage = img;
+        logoTainted = !useCors; // a non-CORS external image taints the canvas
+        updateLogoThumb();
+        regenAll();
+      };
+      img.onerror = function(){
+        if(useCors && !triedAnon){ triedAnon = true; attempt(false); }
+        else { /* degrade elegantly: just keep going without a logo */ }
+      };
+      img.src = url;
+    }
+    attempt(true);
+  }
+
+  function updateLogoThumb(){
+    var thumb = $('logo_thumb'), clearBtn = $('logo_clear'), warn = $('logo_warn');
+    if(logoImage){
+      try{ thumb.style.backgroundImage = 'url('+logoImage.src+')'; }catch(e){}
+      thumb.innerHTML = '';
+      clearBtn.style.display = '';
+      if(logoTainted){
+        warn.style.display = '';
+        warn.textContent = 'El logo viene por URL externa y no se puede incrustar en las descargas (CORS). Súbelo como archivo para que salga en las piezas.';
+      } else {
+        warn.style.display = 'none';
+      }
+    } else {
+      thumb.style.backgroundImage = '';
+      thumb.innerHTML = '<span>Sin logo</span>';
+      clearBtn.style.display = 'none';
+      warn.style.display = 'none';
+    }
   }
 
   // ---- model getters (with sensible defaults so previews never look empty) ----
@@ -484,6 +617,28 @@ var QRCode=(function(){
     ctx.lineTo(x+472*k, y+668*k);
     ctx.lineTo(x+652*k, y+496*k);
     ctx.stroke();
+  }
+
+  // Draw the business logo inside a rounded box centered at cx, top at y, max size box.
+  // Preserves aspect ratio (contain) and clips to rounded corners. Returns the actual
+  // bottom Y used so callers can lay out below it. If no logo, returns y unchanged.
+  function drawLogo(ctx, cx, y, box){
+    if(!logoImage) return y;
+    var iw=logoImage.naturalWidth||logoImage.width, ih=logoImage.naturalHeight||logoImage.height;
+    if(!iw||!ih) return y;
+    var scale = Math.min(box/iw, box/ih);
+    var dw = iw*scale, dh = ih*scale;
+    var dx = cx - dw/2, dy = y;
+    var r = Math.min(dw,dh)*0.16;
+    ctx.save();
+    // subtle cream plate behind logo so any transparency reads on dark bg
+    roundRect(ctx, dx-14, dy-14, dw+28, dh+28, r+10);
+    ctx.fillStyle = C.cream2; ctx.fill();
+    roundRect(ctx, dx, dy, dw, dh, r);
+    ctx.clip();
+    try{ ctx.drawImage(logoImage, dx, dy, dw, dh); }catch(e){}
+    ctx.restore();
+    return dy + dh; // bottom edge
   }
 
   function roundRect(ctx,x,y,w,h,r){
@@ -577,26 +732,39 @@ var QRCode=(function(){
     // "Reserva en línea" eyebrow
     ctx.fillStyle=C.green;
     ctx.font='600 34px '+FONT_MONO;
-    ctx.fillText('RESERVA EN LÍNEA', W/2, 138);
+    ctx.fillText('RESERVA EN LÍNEA', W/2, 120);
 
-    // Business name (wrap up to 2 lines, fit)
-    ctx.fillStyle=C.cream2;
-    var maxW = W-140;
-    ctx.font='800 96px '+FONT_DISPLAY;
-    var lines = wrapText(ctx, b.nombre, maxW, 2);
-    if(lines.length===1){
-      var fp = fitFont(ctx, b.nombre, '800', FONT_DISPLAY, 112, maxW, 40);
-      ctx.font='800 '+fp+'px '+FONT_DISPLAY;
-      ctx.fillText(b.nombre, W/2, 232);
+    // Business logo (primary brand) on top, then name; if no logo, larger name.
+    var nameY;
+    if(logoImage){
+      drawLogo(ctx, W/2, 150, 188);
+      ctx.fillStyle=C.cream2;
+      var maxWL=W-160;
+      var lp=fitFont(ctx, b.nombre, '800', FONT_DISPLAY, 64, maxWL, 34);
+      ctx.font='800 '+lp+'px '+FONT_DISPLAY;
+      var ln1=wrapText(ctx,b.nombre,maxWL,1)[0];
+      ctx.fillText(ln1, W/2, 408);
+      nameY=408;
     } else {
-      ctx.font='800 84px '+FONT_DISPLAY;
-      lines.forEach(function(ln,i){
-        ctx.fillText(ln, W/2, 208 + i*88);
-      });
+      ctx.fillStyle=C.cream2;
+      var maxW = W-140;
+      ctx.font='800 96px '+FONT_DISPLAY;
+      var lines = wrapText(ctx, b.nombre, maxW, 2);
+      if(lines.length===1){
+        var fp = fitFont(ctx, b.nombre, '800', FONT_DISPLAY, 112, maxW, 40);
+        ctx.font='800 '+fp+'px '+FONT_DISPLAY;
+        ctx.fillText(b.nombre, W/2, 232);
+      } else {
+        ctx.font='800 84px '+FONT_DISPLAY;
+        lines.forEach(function(ln,i){
+          ctx.fillText(ln, W/2, 208 + i*88);
+        });
+      }
     }
 
-    // QR card
-    var qrSize=420, qx=(W-qrSize)/2, qy=312;
+    // QR card (smaller + lower when a logo takes the top spot)
+    var qrSize = logoImage ? 360 : 420;
+    var qx=(W-qrSize)/2, qy = logoImage ? 462 : 312;
     ctx.fillStyle=C.cream2;
     roundRect(ctx, qx-28, qy-28, qrSize+56, qrSize+56, 34); ctx.fill();
     try{
@@ -608,7 +776,7 @@ var QRCode=(function(){
     ctx.fillStyle=C.cream;
     var up=fitFont(ctx, b.url, '500', FONT_MONO, 34, W-180, 18);
     ctx.font='500 '+up+'px '+FONT_MONO;
-    ctx.fillText(b.url, W/2, qy+qrSize+74);
+    ctx.fillText(b.url, W/2, qy+qrSize+64);
 
     // bottom: horizontal lockup (mark + "Reserva en Bukéame") + tagline, above the awning
     var markS=72, lockY=910;
@@ -643,21 +811,31 @@ var QRCode=(function(){
 
     ctx.fillStyle=C.green;
     ctx.font='600 40px '+FONT_MONO;
-    ctx.fillText('RESERVA EN LÍNEA', W/2, 280);
+    ctx.fillText('RESERVA EN LÍNEA', W/2, 250);
 
-    // name
-    ctx.fillStyle=C.cream2;
-    var maxW=W-150;
-    ctx.font='800 110px '+FONT_DISPLAY;
-    var lines=wrapText(ctx, b.nombre, maxW, 3);
-    var fp = (lines.length<=1)? fitFont(ctx,b.nombre,'800',FONT_DISPLAY,140,maxW,52) : (lines.length===2?110:84);
-    ctx.font='800 '+fp+'px '+FONT_DISPLAY;
-    lines = wrapText(ctx, b.nombre, maxW, 3);
-    var ly = 430;
-    lines.forEach(function(ln,i){ ctx.fillText(ln, W/2, ly + i*(fp*1.02)); });
+    // logo (primary brand) + name, or large name if no logo
+    if(logoImage){
+      drawLogo(ctx, W/2, 300, 300);
+      ctx.fillStyle=C.cream2;
+      var maxWL=W-160;
+      var lp=fitFont(ctx,b.nombre,'800',FONT_DISPLAY,86,maxWL,44);
+      ctx.font='800 '+lp+'px '+FONT_DISPLAY;
+      var ln1=wrapText(ctx,b.nombre,maxWL,1)[0];
+      ctx.fillText(ln1, W/2, 700);
+    } else {
+      ctx.fillStyle=C.cream2;
+      var maxW=W-150;
+      ctx.font='800 110px '+FONT_DISPLAY;
+      var lines=wrapText(ctx, b.nombre, maxW, 3);
+      var fp = (lines.length<=1)? fitFont(ctx,b.nombre,'800',FONT_DISPLAY,140,maxW,52) : (lines.length===2?110:84);
+      ctx.font='800 '+fp+'px '+FONT_DISPLAY;
+      lines = wrapText(ctx, b.nombre, maxW, 3);
+      var ly = 430;
+      lines.forEach(function(ln,i){ ctx.fillText(ln, W/2, ly + i*(fp*1.02)); });
+    }
 
     // QR card centered
-    var qrSize=520, qx=(W-qrSize)/2, qy=720;
+    var qrSize=520, qx=(W-qrSize)/2, qy = logoImage ? 760 : 720;
     ctx.fillStyle=C.cream2;
     roundRect(ctx, qx-34, qy-34, qrSize+68, qrSize+68, 40); ctx.fill();
     try{
@@ -712,20 +890,31 @@ var QRCode=(function(){
 
     ctx.fillStyle=C.green;
     ctx.font='600 36px '+FONT_MONO;
-    ctx.fillText('RESERVA EN LÍNEA', W/2, 158);
+    ctx.fillText('RESERVA EN LÍNEA', W/2, 140);
 
-    // name
-    ctx.fillStyle=C.cream2;
-    var maxW=W-150;
-    ctx.font='800 92px '+FONT_DISPLAY;
-    var lines=wrapText(ctx,b.nombre,maxW,2);
-    var fp=(lines.length<=1)?fitFont(ctx,b.nombre,'800',FONT_DISPLAY,108,maxW,44):78;
-    ctx.font='800 '+fp+'px '+FONT_DISPLAY;
-    lines=wrapText(ctx,b.nombre,maxW,2);
-    lines.forEach(function(ln,i){ ctx.fillText(ln, W/2, 260 + i*(fp*1.0)); });
+    // logo (primary brand) + name, or large name if no logo
+    if(logoImage){
+      drawLogo(ctx, W/2, 168, 196);
+      ctx.fillStyle=C.cream2;
+      var maxWL=W-160;
+      var lp=fitFont(ctx,b.nombre,'800',FONT_DISPLAY,70,maxWL,38);
+      ctx.font='800 '+lp+'px '+FONT_DISPLAY;
+      var ln1=wrapText(ctx,b.nombre,maxWL,1)[0];
+      ctx.fillText(ln1, W/2, 446);
+    } else {
+      ctx.fillStyle=C.cream2;
+      var maxW=W-150;
+      ctx.font='800 92px '+FONT_DISPLAY;
+      var lines=wrapText(ctx,b.nombre,maxW,2);
+      var fp=(lines.length<=1)?fitFont(ctx,b.nombre,'800',FONT_DISPLAY,108,maxW,44):78;
+      ctx.font='800 '+fp+'px '+FONT_DISPLAY;
+      lines=wrapText(ctx,b.nombre,maxW,2);
+      lines.forEach(function(ln,i){ ctx.fillText(ln, W/2, 260 + i*(fp*1.0)); });
+    }
 
     // big QR
-    var qrSize=480, qx=(W-qrSize)/2, qy=360;
+    var qrSize = logoImage ? 380 : 480;
+    var qx=(W-qrSize)/2, qy = logoImage ? 496 : 360;
     ctx.fillStyle=C.cream2;
     roundRect(ctx, qx-32, qy-32, qrSize+64, qrSize+64, 38); ctx.fill();
     try{
@@ -777,6 +966,91 @@ var QRCode=(function(){
     ctx.fillStyle=C.muted;
     ctx.font='400 24px '+FONT_MONO;
     ctx.fillText('Tu turno, sin llamadas', W/2, lockY+40);
+  }
+
+  // ================= 7) POSTER / STICKER (CO-BRAND) =================
+  var posterSize = {w:1080, h:1350};
+  function posterTextValue(){
+    var el=$('poster_text');
+    return (el && el.value.trim()) ? el.value.trim() : 'Aquí se agenda con Bukéame';
+  }
+  function drawPoster(){
+    var cv=$('cv_poster'); if(!cv) return;
+    var W=posterSize.w, H=posterSize.h;
+    if(cv.width!==W || cv.height!==H){ cv.width=W; cv.height=H; }
+    var ctx=cv.getContext('2d'), b=biz();
+    paintBg(ctx,W,H);
+    var stripe=28;
+    toldo(ctx,0,W,stripe*2,stripe);
+    toldo(ctx,H-stripe*2,W,stripe*2,stripe);
+    ctx.textAlign='center';
+
+    var square = (H===W);
+    var topPad = square ? 96 : 130;
+
+    // logo (or name) as the business brand at top
+    var headY;
+    if(logoImage){
+      var box = square ? 150 : 180;
+      var bottom = drawLogo(ctx, W/2, topPad, box);
+      ctx.fillStyle=C.cream2;
+      var lp=fitFont(ctx,b.nombre,'800',FONT_DISPLAY, square?52:60, W-180, 30);
+      ctx.font='800 '+lp+'px '+FONT_DISPLAY;
+      ctx.fillText(wrapText(ctx,b.nombre,W-180,1)[0], W/2, bottom+78);
+      headY = bottom+78;
+    } else {
+      ctx.fillStyle=C.cream2;
+      var fp=fitFont(ctx,b.nombre,'800',FONT_DISPLAY, square?74:88, W-160, 40);
+      ctx.font='800 '+fp+'px '+FONT_DISPLAY;
+      ctx.fillText(wrapText(ctx,b.nombre,W-160,1)[0], W/2, topPad+fp);
+      headY = topPad+fp;
+    }
+
+    // editable headline text (up to 3 lines, fit)
+    ctx.fillStyle=C.green;
+    var hlMaxW=W-150;
+    var hlPx=fitFont(ctx, posterTextValue(), '800', FONT_DISPLAY, square?70:84, hlMaxW, 40);
+    ctx.font='800 '+hlPx+'px '+FONT_DISPLAY;
+    var hlLines=wrapText(ctx, posterTextValue(), hlMaxW, 3);
+    var hlY = headY + (square?70:96);
+    hlLines.forEach(function(ln,i){ ctx.fillText(ln, W/2, hlY + i*(hlPx*1.06)); });
+
+    // QR card
+    var qrSize = square ? 360 : 440;
+    var qy = hlY + hlLines.length*(hlPx*1.06) + (square?30:60);
+    var qx=(W-qrSize)/2;
+    ctx.fillStyle=C.cream2;
+    roundRect(ctx, qx-30, qy-30, qrSize+60, qrSize+60, 36); ctx.fill();
+    try{
+      var qr=QRCode.create(reserveUrl(b),'M');
+      QRCode.renderToCanvas(qr, ctx, qx, qy, qrSize, 2, '#0B1A13', C.cream2);
+    }catch(e){}
+
+    // URL under QR
+    ctx.fillStyle=C.cream;
+    var up=fitFont(ctx,b.url,'500',FONT_MONO, square?30:34, W-180, 18);
+    ctx.font='500 '+up+'px '+FONT_MONO;
+    ctx.fillText(b.url, W/2, qy+qrSize+(square?58:66));
+
+    // Bukéame seal (mark + wordmark) above the bottom awning
+    var markS = square ? 60 : 66;
+    var lockY = H - (square?96:128);
+    ctx.font='600 '+(square?32:36)+'px '+FONT_BODY;
+    var pre='Reserva en  ';
+    var wPre=ctx.measureText(pre).width;
+    ctx.font='800 '+(square?44:48)+'px '+FONT_DISPLAY;
+    var wWord=ctx.measureText('Bukéame').width;
+    var lockW=markS+20+wPre+wWord;
+    var lx=W/2-lockW/2;
+    drawMark(ctx, lx, lockY-markS+6, markS);
+    ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+    ctx.fillStyle=C.cream2; ctx.font='600 '+(square?32:36)+'px '+FONT_BODY;
+    ctx.fillText(pre, lx+markS+20, lockY-12);
+    drawWordmark(ctx, lx+markS+20+wPre+wWord/2, lockY-8, square?44:48);
+    ctx.textAlign='center';
+    ctx.fillStyle=C.muted;
+    ctx.font='400 '+(square?22:24)+'px '+FONT_MONO;
+    ctx.fillText('Tu turno, sin llamadas', W/2, lockY+38);
   }
 
   // ================= 3) WATERMARK =================
@@ -868,6 +1142,15 @@ var QRCode=(function(){
     );
     var markUri = 'data:image/svg+xml,'+markSvg;
 
+    // Business logo for the left cell: use the uploaded/loaded logo if available,
+    // otherwise fall back to the Bukéame mark.
+    var leftImg, leftAlt;
+    if(logoImage && logoSrcForEmail()){
+      leftImg = logoSrcForEmail(); leftAlt = b.nombre;
+    } else {
+      leftImg = markUri; leftAlt = 'Bukéame';
+    }
+
     var rows = '';
     rows += '<tr><td style="padding:2px 0;font:600 16px Arial,Helvetica,sans-serif;color:#0B1A13;">'+esc(b.nombre)+'</td></tr>';
     rows += '<tr><td style="padding:2px 0;font:400 13px Arial,Helvetica,sans-serif;color:#0E8074;"><a href="'+esc(url)+'" style="color:#0E8074;text-decoration:none;">'+esc(b.url)+'</a></td></tr>';
@@ -884,7 +1167,7 @@ var QRCode=(function(){
 '<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-family:Arial,Helvetica,sans-serif;">'+
   '<tr>'+
     '<td style="vertical-align:top;padding-right:16px;border-right:2px solid #36E27B;">'+
-      '<img src="'+markUri+'" width="56" height="56" alt="Bukéame" style="display:block;border:0;" />'+
+      '<img src="'+leftImg+'" width="56" height="56" alt="'+esc(leftAlt)+'" style="display:block;border:0;border-radius:10px;object-fit:contain;" />'+
     '</td>'+
     '<td style="vertical-align:top;padding-left:16px;">'+
       '<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">'+rows+'</table>'+
@@ -897,47 +1180,161 @@ var QRCode=(function(){
     $('sig_preview').innerHTML = buildSignatureHTML();
   }
 
-  // ================= 5) RECEIPT =================
-  function buildReceiptHTML(forPrint){
-    var b=biz();
-    var today = new Date();
-    var fecha = today.toLocaleDateString('es-PR', {year:'numeric', month:'long', day:'numeric'});
-    var markSvg =
-      '<svg width="40" height="40" viewBox="0 0 1024 1024" style="vertical-align:middle">'+
+  // ================= 5) RECEIPT (editable) =================
+  // Editable receipt state. Business name + date are seeded from the form/today but
+  // can be overridden right on the receipt. Lines can be added/removed; total auto-sums.
+  var receipt = {
+    nombre: null,            // null = follow the business form; string = user override
+    fecha: null,             // null = today (es-PR); string = user override
+    lines: [
+      {desc:'Corte de cabello', amt:'20.00'},
+      {desc:'Arreglo de barba', amt:'10.00'}
+    ]
+  };
+  var receiptInit = false;
+
+  function receiptMarkSvg(){
+    return '<svg width="40" height="40" viewBox="0 0 1024 1024" style="vertical-align:middle">'+
       '<rect x="286" y="336" width="452" height="398" rx="56" fill="#0E8074"/>'+
       '<rect x="386" y="298" width="36" height="96" rx="18" fill="#36E27B"/>'+
       '<rect x="602" y="298" width="36" height="96" rx="18" fill="#36E27B"/>'+
       '<rect x="286" y="450" width="452" height="14" fill="#F3F1E7"/>'+
       '<path d="M 392 588 L 472 668 L 652 496" fill="none" stroke="#F3F1E7" stroke-width="58" stroke-linecap="round" stroke-linejoin="round"/>'+
       '</svg>';
-    var pad = forPrint ? '32px' : '0';
-    var html =
-'<div style="font-family:Arial,Helvetica,sans-serif;color:#16110a;max-width:480px;margin:0 auto;padding:'+pad+';background:#fff;">'+
-  '<div style="text-align:center;border-bottom:2px solid #0E8074;padding-bottom:14px;margin-bottom:16px;">'+
-    '<div style="font:700 22px Arial,Helvetica,sans-serif;color:#0B1A13;">'+esc(b.nombre)+'</div>'+
-    '<div style="font:400 12px Arial,Helvetica,sans-serif;color:#0E8074;margin-top:3px;">'+esc(b.url)+'</div>'+
-    (b.tel?'<div style="font:400 12px Arial,Helvetica,sans-serif;color:#55665e;margin-top:2px;">'+esc(b.tel)+'</div>':'')+
+  }
+  function todayStr(){
+    return new Date().toLocaleDateString('es-PR', {year:'numeric', month:'long', day:'numeric'});
+  }
+  function receiptTotal(){
+    var t=0;
+    for(var i=0;i<receipt.lines.length;i++){
+      var v=parseFloat(String(receipt.lines[i].amt).replace(/[^0-9.\-]/g,''));
+      if(!isNaN(v)) t+=v;
+    }
+    return t;
+  }
+  function money(n){ return '$'+(Math.round(n*100)/100).toFixed(2); }
+
+  function curBizName(){ return (receipt.nombre!=null) ? receipt.nombre : biz().nombre; }
+  function curFecha(){ return (receipt.fecha!=null) ? receipt.fecha : todayStr(); }
+
+  // Render the interactive (in-page) editable receipt.
+  function renderReceipt(){
+    var host=$('receipt_edit'); if(!host) return;
+    var b=biz();
+    var logoHtml;
+    if(logoImage && logoSrcForEmail()){
+      logoHtml = '<img class="rcpt-logo" src="'+logoSrcForEmail()+'" alt="'+esc(b.nombre)+'" style="border-radius:9px;object-fit:contain" />';
+    } else {
+      logoHtml = receiptMarkSvg();
+    }
+    var linesHtml='';
+    for(var i=0;i<receipt.lines.length;i++){
+      var ln=receipt.lines[i];
+      linesHtml +=
+        '<tr>'+
+          '<td><input class="ed" type="text" data-i="'+i+'" data-k="desc" value="'+esc(ln.desc)+'" placeholder="Descripción" /></td>'+
+          '<td class="amt"><input class="ed" type="text" inputmode="decimal" data-i="'+i+'" data-k="amt" value="'+esc(ln.amt)+'" placeholder="0.00" /></td>'+
+          '<td class="rm"><button type="button" data-rm="'+i+'" title="Quitar">&times;</button></td>'+
+        '</tr>';
+    }
+    host.innerHTML =
+      '<div class="rcpt">'+
+        '<div class="rcpt-head">'+logoHtml+
+          '<div style="flex:1;min-width:0">'+
+            '<input class="ed biz-name" id="rc_nombre" type="text" value="'+esc(curBizName())+'" placeholder="Nombre del negocio" />'+
+            '<div class="rcpt-meta">'+esc(b.url)+(b.tel?' · '+esc(b.tel):'')+'</div>'+
+          '</div>'+
+        '</div>'+
+        '<table class="rcpt-lines">'+linesHtml+'</table>'+
+        '<div class="rcpt-addline"><button type="button" id="rc_add">+ Añadir línea</button></div>'+
+        '<div class="rcpt-total"><span>Total</span><span class="v">'+money(receiptTotal())+'</span></div>'+
+        '<div class="rcpt-meta" style="margin-top:14px">Fecha: <input class="ed" id="rc_fecha" type="text" style="display:inline-block;width:auto;min-width:140px" value="'+esc(curFecha())+'" /></div>'+
+        '<div class="rcpt-foot">'+receiptMarkSvg()+
+          '<div style="margin-top:6px">Reservado vía <span style="color:#0E8074;font-weight:600">Buk<span class="e">é</span>ame</span> · bukeame.com</div>'+
+        '</div>'+
+      '</div>';
+
+    // wire inputs
+    var inputs = host.querySelectorAll('input.ed[data-i]');
+    for(var j=0;j<inputs.length;j++){
+      inputs[j].addEventListener('input', onLineInput);
+    }
+    $('rc_nombre').addEventListener('input', function(){ receipt.nombre=this.value; });
+    $('rc_fecha').addEventListener('input', function(){ receipt.fecha=this.value; });
+    $('rc_add').addEventListener('click', function(){
+      receipt.lines.push({desc:'', amt:''}); renderReceipt();
+      var ins=host.querySelectorAll('input.ed[data-i]');
+      // focus the new line's description input (2 inputs per row: desc, amt)
+      if(ins.length>=2) ins[ins.length-2].focus();
+    });
+    var rms = host.querySelectorAll('button[data-rm]');
+    for(var k=0;k<rms.length;k++){
+      rms[k].addEventListener('click', function(){
+        var idx=parseInt(this.getAttribute('data-rm'),10);
+        receipt.lines.splice(idx,1);
+        if(receipt.lines.length===0) receipt.lines.push({desc:'',amt:''});
+        renderReceipt();
+      });
+    }
+    receiptInit = true;
+  }
+  // Update only the affected line + total without a full re-render (keeps focus/caret).
+  function onLineInput(){
+    var i=parseInt(this.getAttribute('data-i'),10), k=this.getAttribute('data-k');
+    if(receipt.lines[i]){ receipt.lines[i][k]=this.value; }
+    var tot=$('receipt_edit').querySelector('.rcpt-total .v');
+    if(tot) tot.textContent = money(receiptTotal());
+  }
+
+  // Build print-only HTML (static snapshot of current values).
+  function buildReceiptHTML(){
+    var b=biz();
+    var logoHtml;
+    if(logoImage && logoSrcForEmail()){
+      logoHtml = '<img src="'+logoSrcForEmail()+'" width="48" height="48" alt="'+esc(b.nombre)+'" style="display:block;border:0;border-radius:9px;object-fit:contain;" />';
+    } else {
+      logoHtml = receiptMarkSvg();
+    }
+    var rows='';
+    for(var i=0;i<receipt.lines.length;i++){
+      var ln=receipt.lines[i];
+      if(!ln.desc && !ln.amt) continue;
+      var v=parseFloat(String(ln.amt).replace(/[^0-9.\-]/g,''));
+      var amtTxt = isNaN(v) ? '' : money(v);
+      rows += '<tr><td style="padding:8px 0;font:400 14px Arial;color:#16110a;border-bottom:1px dashed #d8d2c4;">'+esc(ln.desc)+'</td>'+
+              '<td style="padding:8px 0;text-align:right;font:600 14px Arial;color:#16110a;border-bottom:1px dashed #d8d2c4;">'+amtTxt+'</td></tr>';
+    }
+    return ''+
+'<div style="font-family:Arial,Helvetica,sans-serif;color:#16110a;max-width:480px;margin:0 auto;padding:32px;background:#fff;">'+
+  '<div style="display:flex;align-items:center;gap:12px;border-bottom:2px solid #0E8074;padding-bottom:14px;margin-bottom:16px;">'+
+    logoHtml+
+    '<div style="flex:1;min-width:0">'+
+      '<div style="font:700 22px Arial,Helvetica,sans-serif;color:#0B1A13;">'+esc(curBizName())+'</div>'+
+      '<div style="font:400 12px Arial,Helvetica,sans-serif;color:#0E8074;margin-top:3px;">'+esc(b.url)+(b.tel?' · '+esc(b.tel):'')+'</div>'+
+    '</div>'+
   '</div>'+
   '<div style="font:600 13px Arial,Helvetica,sans-serif;color:#55665e;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Recibo</div>'+
-  '<table cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;font-family:Arial,Helvetica,sans-serif;">'+
-    '<tr><td style="padding:8px 0;font:400 14px Arial;color:#16110a;border-bottom:1px dashed #d8d2c4;">Corte de cabello</td><td style="padding:8px 0;text-align:right;font:600 14px Arial;color:#16110a;border-bottom:1px dashed #d8d2c4;">$20.00</td></tr>'+
-    '<tr><td style="padding:8px 0;font:400 14px Arial;color:#16110a;border-bottom:1px dashed #d8d2c4;">Arreglo de barba</td><td style="padding:8px 0;text-align:right;font:600 14px Arial;color:#16110a;border-bottom:1px dashed #d8d2c4;">$10.00</td></tr>'+
-    '<tr><td style="padding:12px 0 0;font:700 16px Arial;color:#0B1A13;">Total</td><td style="padding:12px 0 0;text-align:right;font:700 16px Arial;color:#0E8074;">$30.00</td></tr>'+
+  '<table cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;font-family:Arial,Helvetica,sans-serif;">'+rows+
+    '<tr><td style="padding:12px 0 0;font:700 16px Arial;color:#0B1A13;">Total</td><td style="padding:12px 0 0;text-align:right;font:700 16px Arial;color:#0E8074;">'+money(receiptTotal())+'</td></tr>'+
   '</table>'+
-  '<div style="font:400 12px Arial,Helvetica,sans-serif;color:#55665e;margin-top:18px;">Fecha: '+esc(fecha)+'</div>'+
+  '<div style="font:400 12px Arial,Helvetica,sans-serif;color:#55665e;margin-top:18px;">Fecha: '+esc(curFecha())+'</div>'+
   '<div style="text-align:center;margin-top:26px;padding-top:16px;border-top:1px solid #e3ddce;">'+
-    markSvg+
+    receiptMarkSvg()+
     '<div style="font:400 12px Arial,Helvetica,sans-serif;color:#55665e;margin-top:6px;">Reservado vía <span style="color:#0E8074;font-weight:600;">Buk<span style="color:#36E27B;">é</span>ame</span> · bukeame.com</div>'+
   '</div>'+
 '</div>';
-    return html;
-  }
-  function renderReceipt(){
-    $('receipt_preview').innerHTML = buildReceiptHTML(false);
   }
 
   // ---- utils ----
   function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  // Logo source usable inside HTML (signature/receipt): the image's src works for
+  // both an uploaded dataURL and an external URL (email/HTML fetches it directly).
+  function logoSrcForEmail(){
+    if(!logoImage) return '';
+    try{ return logoImage.src || ''; }catch(e){ return ''; }
+  }
 
   function downloadCanvas(canvas, filename){
     try{
@@ -945,7 +1342,15 @@ var QRCode=(function(){
       var a = document.createElement('a');
       a.href = url; a.download = filename;
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    }catch(e){ alert('No se pudo descargar: ' + e.message); }
+    }catch(e){
+      // SecurityError = canvas tainted by a cross-origin logo loaded via ?logo=
+      if(logoImage && logoTainted){
+        alert('No se pudo descargar porque el logo viene de una URL externa (CORS). '+
+              'Súbelo como archivo con "Subir logo" y vuelve a descargar.');
+      } else {
+        alert('No se pudo descargar: ' + e.message);
+      }
+    }
   }
   function slug(b){
     return (b.nombre||'negocio').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'') || 'negocio';
@@ -955,14 +1360,30 @@ var QRCode=(function(){
     setTimeout(function(){ el.classList.remove('show'); }, 1600);
   }
 
+  // Light refresh of the receipt that does NOT rebuild the DOM (so it won't steal
+  // focus while the user types in form fields). Updates the read-only meta line and,
+  // if the user hasn't overridden them, the seeded business name.
+  function refreshReceiptMeta(){
+    var host=$('receipt_edit'); if(!host) return;
+    var b=biz();
+    var meta=host.querySelector('.rcpt-head .rcpt-meta');
+    if(meta) meta.textContent = b.url + (b.tel?' · '+b.tel:'');
+    if(receipt.nombre==null){
+      var nm=$('rc_nombre'); if(nm && document.activeElement!==nm) nm.value=b.nombre;
+    }
+    // logo may have appeared/changed -> full rebuild only when needed handled elsewhere
+  }
+
   // ---- regenerate everything ----
   function regenAll(){
     drawPost();
     drawStory();
     drawFlyer();
     drawWatermark();
+    drawPoster();
     renderSignature();
-    renderReceipt();
+    if(!receiptInit) renderReceipt();
+    else refreshReceiptMeta();
   }
 
   // ---- wiring ----
@@ -991,6 +1412,68 @@ var QRCode=(function(){
         img.src = ev.target.result;
       };
       reader.readAsDataURL(file);
+    });
+
+    // ---- business logo upload (file -> dataURL, never taints the canvas) ----
+    $('f_logo').addEventListener('change', function(e){
+      var file = e.target.files && e.target.files[0];
+      if(!file) return;
+      var reader = new FileReader();
+      reader.onload = function(ev){
+        var img = new Image();
+        img.onload = function(){
+          logoImage = img; logoTainted = false;
+          updateLogoThumb();
+          renderReceipt();   // logo position in receipt header needs full rebuild
+          regenAll();
+        };
+        img.onerror = function(){ alert('No se pudo cargar el logo.'); };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+    $('logo_clear').addEventListener('click', function(){
+      logoImage=null; logoTainted=false; $('f_logo').value='';
+      updateLogoThumb(); renderReceipt(); regenAll();
+    });
+
+    // ---- poster / sticker controls ----
+    var presets = [
+      'Aquí se agenda con Bukéame',
+      'Este negocio es parte de Bukéame',
+      'Reserva tu cita en línea'
+    ];
+    var pc=$('poster_presets');
+    presets.forEach(function(txt){
+      var chip=document.createElement('button');
+      chip.type='button'; chip.className='chip'; chip.textContent=txt;
+      if(txt===$('poster_text').value) chip.classList.add('active');
+      chip.addEventListener('click', function(){
+        $('poster_text').value=txt;
+        syncPresetActive();
+        drawPoster();
+      });
+      pc.appendChild(chip);
+    });
+    function syncPresetActive(){
+      var chips=pc.querySelectorAll('.chip'), val=$('poster_text').value;
+      for(var i=0;i<chips.length;i++){
+        chips[i].classList.toggle('active', chips[i].textContent===val);
+      }
+    }
+    $('poster_text').addEventListener('input', function(){ syncPresetActive(); drawPoster(); });
+
+    var ps=$('poster_sizes');
+    ps.addEventListener('click', function(e){
+      var btn=e.target.closest('.chip'); if(!btn) return;
+      var chips=ps.querySelectorAll('.chip');
+      for(var i=0;i<chips.length;i++) chips[i].classList.remove('active');
+      btn.classList.add('active');
+      posterSize={ w:parseInt(btn.getAttribute('data-w'),10), h:parseInt(btn.getAttribute('data-h'),10) };
+      drawPoster();
+    });
+    $('dl_poster').addEventListener('click', function(){
+      var b=biz(); downloadCanvas($('cv_poster'), 'bukeame-cartel-'+slug(b)+'.png'); flash('ok_poster');
     });
 
     // copy signature
