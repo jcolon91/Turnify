@@ -737,14 +737,14 @@ var QRCode=(function(){
     // Business logo (primary brand) on top, then name; if no logo, larger name.
     var nameY;
     if(logoImage){
-      drawLogo(ctx, W/2, 150, 188);
+      drawLogo(ctx, W/2, 144, 180);
       ctx.fillStyle=C.cream2;
       var maxWL=W-160;
       var lp=fitFont(ctx, b.nombre, '800', FONT_DISPLAY, 64, maxWL, 34);
       ctx.font='800 '+lp+'px '+FONT_DISPLAY;
       var ln1=wrapText(ctx,b.nombre,maxWL,1)[0];
-      ctx.fillText(ln1, W/2, 408);
-      nameY=408;
+      ctx.fillText(ln1, W/2, 400);
+      nameY=400;
     } else {
       ctx.fillStyle=C.cream2;
       var maxW = W-140;
@@ -763,8 +763,8 @@ var QRCode=(function(){
     }
 
     // QR card (smaller + lower when a logo takes the top spot)
-    var qrSize = logoImage ? 360 : 420;
-    var qx=(W-qrSize)/2, qy = logoImage ? 462 : 312;
+    var qrSize = logoImage ? 320 : 420;
+    var qx=(W-qrSize)/2, qy = logoImage ? 446 : 312;
     ctx.fillStyle=C.cream2;
     roundRect(ctx, qx-28, qy-28, qrSize+56, qrSize+56, 34); ctx.fill();
     try{
