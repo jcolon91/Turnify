@@ -139,7 +139,7 @@ function mount(app, ctx) {
       if (!Array.isArray(codes) || codes.length < 1 || codes.length > 10) fail('Selecciona entre 1 y 10 add-ons');
       codesArr = [...new Set(codes.map(c => String(c == null ? '' : c).trim()).filter(c => c && c.length <= 60))];
       if (!codesArr.length) fail('Códigos de add-ons inválidos');
-      const a = await db.query(`SELECT code, price_cents FROM addon_catalog WHERE code = ANY($1::text[])`, [codesArr]);
+      const a = await db.query(`SELECT code, price_cents FROM addon_catalog WHERE code::text = ANY($1::text[])`, [codesArr]);
       if (a.rows.length !== codesArr.length) fail('Algún add-on no existe', 404);
       montoEsperadoCents = a.rows.reduce((s, r) => s + r.price_cents, 0);
       if (!Number.isInteger(montoEsperadoCents) || montoEsperadoCents <= 0) fail('Estos add-ons no son cobrables');
