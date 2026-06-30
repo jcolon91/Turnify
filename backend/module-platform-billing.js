@@ -106,6 +106,11 @@ function mount(app, ctx) {
     const r = await athPost(ATH_PAYMENT_URL, body);
     if (r.ok && r.data && r.data.ecommerceId && r.data.auth_token)
       return { ecommerceId: r.data.ecommerceId, authToken: r.data.auth_token };
+    // Diagnóstico: ATH rechazó la creación → logueamos QUÉ enviamos y QUÉ respondió ATH.
+    console.error('ath.create rechazado:', JSON.stringify({
+      sent: { total: body.total, name: item, metadata1: body.metadata1, metadata2: body.metadata2, phoneLen: String(phone || '').length },
+      resp: r.raw,
+    }));
     return null;
   }
 
