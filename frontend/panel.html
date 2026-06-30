@@ -67,7 +67,7 @@ input,select,textarea{font:inherit}
 .side .planbox b{display:block;font-family:var(--display);font-size:15px;margin-top:3px}
 .side .planbox span{font-family:var(--mono);font-size:11px;color:var(--plan-accent)}
 .side .logout{color:var(--muted);font-size:12.5px;padding:11px 12px;margin-top:6px}
-main{padding:22px 20px 90px;max-width:760px}
+main{padding:22px 20px 90px;max-width:760px;min-width:0}
 .tophead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:20px}
 .tophead h1{font-family:var(--display);font-weight:800;font-size:clamp(20px,3.4vw,26px);letter-spacing:-.02em}
 .tophead p{font-size:13px;color:var(--muted);margin-top:3px}
@@ -169,7 +169,7 @@ html[data-theme="dark"] .alert.err{background:rgba(225,75,60,.14);color:#FF9A8E;
 .agnav .todaybtn:hover{border-color:var(--green)}
 .agperiod{font-weight:700;font-size:13.5px;color:var(--text);min-width:120px;text-align:center;text-transform:capitalize}
 /* Semana */
-.wk-grid{display:grid;grid-template-columns:repeat(7,minmax(118px,1fr));gap:8px}
+.wk-grid{display:grid;grid-template-columns:repeat(7,minmax(118px,1fr));gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch}
 .wk-col{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:8px 8px 10px;min-height:120px;display:flex;flex-direction:column;gap:6px}
 .wk-col.is-today{border-color:var(--green);box-shadow:0 0 0 1px var(--green) inset}
 .wk-head{display:flex;align-items:baseline;justify-content:space-between;gap:4px;padding:2px 2px 4px;border-bottom:1px solid var(--border)}
