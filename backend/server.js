@@ -3163,12 +3163,19 @@ function buildMessage(template, ctx) {
   }
 }
 
+// Normaliza el número al formato que WhatsApp/Evolution espera (con código de país).
+// PR/US guardamos 10 dígitos → hay que anteponer el 1; si no, el JID no existe (exists:false).
+function waNumber(phone) {
+  let d = String(phone == null ? '' : phone).replace(/[^0-9]/g, '');
+  if (d.length === 10) d = '1' + d;            // 7875551234 → 17875551234 (PR/US)
+  return d;
+}
 async function sendWhatsApp(phone, text) {
   if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) return { skipped: true };
   const r = await fetch(`${EVOLUTION_API_URL}/message/sendText/${EVOLUTION_INSTANCE}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', apikey: EVOLUTION_API_KEY },
-    body: JSON.stringify({ number: phone.replace('+', ''), text }),
+    body: JSON.stringify({ number: waNumber(phone), text }),
   });
   if (!r.ok) throw new Error(`Evolution ${r.status}`);
   const j = await r.json().catch(() => ({}));
