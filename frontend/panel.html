@@ -1090,6 +1090,11 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
     </div>
     <div class="field"><label>Depósito ($, opcional)</label><input id="svcDep" type="number" value="0" min="0" step="0.01"></div>
     <div class="field"><label>Descripción (opcional)</label><textarea id="svcDesc" rows="2" placeholder="Incluye lavado y peinado"></textarea></div>
+    <div class="field" id="svcStaffField" style="display:none">
+      <label>¿Quién ofrece este servicio?</label>
+      <div id="svcStaffList" style="display:flex;flex-direction:column;gap:9px;margin-top:4px"></div>
+      <p style="font-size:12px;color:var(--ink2);margin-top:6px">Si no marcas a nadie, lo ofrecen todos.</p>
+    </div>
     <div style="display:flex;gap:10px;margin-top:6px">
       <button class="btn btn-ghost btn-sm" id="svcCancel" style="flex:1">Cancelar</button>
       <button class="btn btn-teal btn-sm" id="svcSave" style="flex:1">Guardar</button>
@@ -2691,6 +2696,23 @@ function setSvcForm(s){
   document.getElementById('svcDep').value   = s ? ((s.deposit_cents||0)/100) : 0;
   document.getElementById('svcDesc').value  = s ? (s.description||'') : '';
 }
+// Selector "¿Quién ofrece este servicio?" — solo con 2+ profesionales.
+async function svcLoadStaff(selectedIds){
+  var field = document.getElementById('svcStaffField');
+  var list = document.getElementById('svcStaffList');
+  var r = await api('GET','/staff');
+  var staff = (r.ok && r.data.staff) ? r.data.staff : [];
+  if(staff.length < 2){ field.style.display='none'; list.innerHTML=''; return; }
+  var sel = new Set((selectedIds||[]).map(String));
+  var checkAll = !selectedIds || selectedIds.length===0;   // nuevo o "todos" → marca todos
+  list.innerHTML = staff.map(function(s){
+    var on = checkAll || sel.has(String(s.id));
+    return '<label style="display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer">'+
+      '<input type="checkbox" class="svcstaff" value="'+esc(s.id)+'"'+(on?' checked':'')+'> '+
+      esc(s.display_name||'Profesional')+'</label>';
+  }).join('');
+  field.style.display='block';
+}
 function openSvcModal(id){
   editingSvcId = id || null;
   document.getElementById('svcModalTitle').textContent = id ? 'Editar servicio' : 'Nuevo servicio';
@@ -2703,8 +2725,9 @@ function editSvc(id){
   if(!s) return;
   setSvcForm(s);
   openSvcModal(id);
+  svcLoadStaff(s.staff_ids || []);
 }
-document.getElementById('addSvcBtn').onclick = function(){ setSvcForm(null); openSvcModal(null); };
+document.getElementById('addSvcBtn').onclick = function(){ setSvcForm(null); openSvcModal(null); svcLoadStaff(null); };
 document.getElementById('svcCancel').onclick = function(){ svcModal.classList.remove('on'); editingSvcId=null; };
 document.getElementById('svcSave').onclick = async function(){
   clearAlert('svcAlert');
@@ -2717,6 +2740,10 @@ document.getElementById('svcSave').onclick = async function(){
   if(!(dur>=5 && dur<=480)){ showAlert('svcAlert','Duración entre 5 y 480 minutos.',false); return; }
   if(!(price>=0)){ showAlert('svcAlert','Precio inválido.',false); return; }
   const body = { name:name, duration_min:dur, price_cents:price, deposit_cents:dep, description:desc||undefined };
+  var staffField = document.getElementById('svcStaffField');
+  if(staffField && staffField.style.display !== 'none'){
+    body.staff_ids = [].slice.call(document.querySelectorAll('#svcStaffList .svcstaff:checked')).map(function(c){ return c.value; });
+  }
   const btn = document.getElementById('svcSave'); btn.disabled=true; btn.textContent='…';
   const r = editingSvcId
     ? await api('PATCH','/services/'+editingSvcId, body)

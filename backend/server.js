@@ -1240,6 +1240,12 @@ app.delete('/api/staff/:id', authRequired, businessScope, asyncH(async (req, res
   await db.query(
     `UPDATE staff SET deleted_at = now(), is_active = false WHERE id = $1 AND business_id = $2`,
     [req.params.id, req.business.id]);
+  // Quitar sus enlaces servicio↔staff (scoped al negocio, evita IDOR cross-tenant).
+  // Un servicio que quede sin ningún profesional pasa a "cualquiera" → no queda huérfano.
+  await db.query(
+    `DELETE FROM service_staff ss USING staff s
+      WHERE ss.staff_id = s.id AND s.id = $1 AND s.business_id = $2`,
+    [req.params.id, req.business.id]);
   await audit(req, 'staff.delete', 'staff', req.params.id);
   res.json({ ok: true });
 }));
@@ -1649,7 +1655,8 @@ async function eligibleStaff(bizId, serviceId, dateStr) {
       WHERE st.business_id = $5 AND st.is_active AND st.deleted_at IS NULL
         AND (
           EXISTS (SELECT 1 FROM service_staff ss WHERE ss.service_id = $1 AND ss.staff_id = st.id)
-          OR NOT EXISTS (SELECT 1 FROM service_staff ss WHERE ss.service_id = $1)
+          OR NOT EXISTS (SELECT 1 FROM service_staff ss JOIN staff s2 ON s2.id = ss.staff_id
+                          WHERE ss.service_id = $1 AND s2.is_active AND s2.deleted_at IS NULL)
         )
       GROUP BY st.id ORDER BY count(a.id) ASC`,
     [serviceId, start, end, ALIVE, bizId]);
@@ -2123,13 +2130,25 @@ app.post('/api/public/:slug/appointments', bookingLimiter, asyncH(async (req, re
   const ends = new Date(starts.getTime() + service.duration_min * 60_000);
   const dateStr = starts.toLocaleDateString('en-CA', { timeZone: 'America/Puerto_Rico' });
 
-  // candidatos de staff (deben ofrecer el primer servicio como referencia)
+  // candidatos de staff
   let candidates;
   if (isUuid(staff_id)) {
+    // El profesional debe pertenecer al negocio, estar activo y ofrecer TODOS los
+    // servicios elegidos. Un servicio SIN asignaciones activas lo puede dar cualquiera
+    // (mismo criterio que la disponibilidad → evita "no ofrece" en cupos que sí se ven).
+    const svcIds = services.map(s => s.id);
     const ok = await db.query(
-      `SELECT 1 FROM service_staff ss JOIN staff st ON st.id = ss.staff_id
-        WHERE ss.service_id = $1 AND ss.staff_id = $2 AND st.is_active`, [service.id, staff_id]);
-    if (!ok.rows[0]) return bad(res, 'Ese profesional no ofrece este servicio', 400);
+      `SELECT (SELECT count(*) FROM unnest($3::uuid[]) AS svc(id)
+                 WHERE EXISTS (SELECT 1 FROM service_staff ss JOIN staff s2 ON s2.id = ss.staff_id
+                                 WHERE ss.service_id = svc.id AND s2.is_active AND s2.deleted_at IS NULL)
+                   AND NOT EXISTS (SELECT 1 FROM service_staff ss
+                                     WHERE ss.service_id = svc.id AND ss.staff_id = st.id)
+              )::int AS missing
+         FROM staff st
+        WHERE st.id = $2 AND st.business_id = $1 AND st.is_active AND st.deleted_at IS NULL`,
+      [biz.id, staff_id, svcIds]);
+    if (!ok.rows[0]) return bad(res, 'Profesional no encontrado', 404);
+    if (ok.rows[0].missing > 0) return bad(res, 'Ese profesional no ofrece uno de los servicios seleccionados', 400);
     candidates = [staff_id];
   } else {
     candidates = await eligibleStaff(biz.id, service.id, dateStr);
