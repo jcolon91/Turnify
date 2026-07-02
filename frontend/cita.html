@@ -123,7 +123,8 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
     <!-- Depósito pendiente: cobro con los métodos del negocio (dinero directo al negocio) -->
     <div class="card" id="depCard" style="display:none">
       <div style="font-family:var(--display);font-weight:800;font-size:18px;text-align:center;margin-bottom:4px">Asegura tu cita</div>
-      <p class="sub" style="margin-bottom:14px">Falta el depósito de <b id="depAmt"></b>. Va directo al negocio.</p>
+      <p class="sub" style="margin-bottom:10px">Falta el depósito de <b id="depAmt"></b>. Va directo al negocio.</p>
+      <div style="background:var(--green-soft);border:1px solid var(--border);border-radius:12px;padding:11px 14px;font-size:12.5px;color:var(--text);line-height:1.5;margin-bottom:14px"><b>⏳ Tu turno queda reservado por 30 minutos.</b> Envía el depósito ahora; el negocio lo validará y confirmará tu cita. Si no se valida a tiempo, el turno se libera.</div>
       <div class="alert" id="payAlert"></div>
       <div id="payMethods"></div>
     </div>

@@ -1621,7 +1621,7 @@ function showOkStep(appt){
   var pending = (a.status === 'pending_deposit');
   document.getElementById('okTitle').textContent = pending ? 'Reserva pendiente de depósito' : '¡Reserva confirmada!';
   document.getElementById('okDetail').textContent = pending
-    ? state.selectedServices.map(function(s){ return s.name; }).join(' + ')+' · '+when.toLocaleDateString('es-PR',{weekday:'long',day:'numeric',month:'long'})+' a las '+when.toLocaleTimeString('es-PR',{hour:'numeric',minute:'2-digit'})+'. El negocio confirmará tu cita al validar el depósito.'
+    ? state.selectedServices.map(function(s){ return s.name; }).join(' + ')+' · '+when.toLocaleDateString('es-PR',{weekday:'long',day:'numeric',month:'long'})+' a las '+when.toLocaleTimeString('es-PR',{hour:'numeric',minute:'2-digit'})+'. El negocio confirmará tu cita al validar el depósito. Tu turno queda reservado por 30 minutos: si el depósito no se valida a tiempo, se libera.'
     : state.selectedServices.map(function(s){ return s.name; }).join(' + ')+' · '+when.toLocaleDateString('es-PR',{weekday:'long',day:'numeric',month:'long'})+' a las '+when.toLocaleTimeString('es-PR',{hour:'numeric',minute:'2-digit'});
   document.getElementById('okCode').textContent = (appt&&appt.confirmation_code) || (state.appt&&state.appt.confirmation_code) || '—';
   document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('on'); });
@@ -1650,6 +1650,12 @@ function renderPayStep(appt, depCents){
   var host = document.getElementById('payMethods');
   host.innerHTML = '';
   var hasAny = false;
+
+  // Aviso del standby: el turno se aguanta 30 min mientras el negocio valida el depósito.
+  var holdNote = document.createElement('div');
+  holdNote.style.cssText = 'background:var(--green-soft);border:1px solid var(--border);border-radius:12px;padding:11px 14px;font-size:12.5px;color:var(--text);line-height:1.5;margin-bottom:12px';
+  holdNote.innerHTML = '<b>⏳ Tu turno queda reservado por 30 minutos.</b> Envía el depósito ahora; el negocio lo validará y confirmará tu cita. Si no se valida a tiempo, el turno se libera.';
+  host.appendChild(holdNote);
 
   // ── ATH Móvil AUTO (API REST): el depósito va DIRECTO a la cuenta del negocio.
   //    El cliente recibe una push a su app para confirmar (NO escribe número). ──

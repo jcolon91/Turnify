@@ -2497,14 +2497,13 @@ function tlOpenPopover(ev){
   const id = ev.dataset.id, svc = ev.dataset.svc, price = parseInt(ev.dataset.price,10)||0;
   const st = ev.dataset.st;
   const isPending = (st==='pending_deposit');
-  // Validación manual del depósito: SOLO cuando es efectivo o ATH Móvil al número
-  // (el negocio recibe el pago y lo valida). El ATH automático y la tarjeta se
-  // confirman solos, así que ahí no aparece el botón.
-  const depId = ev.dataset.depId||'', depStatus = ev.dataset.depStatus||'', depManual = ev.dataset.depManual==='1';
-  // Solo los depósitos MANUALES (el cliente eligió efectivo o ATH al número) requieren
-  // validación del negocio. Los AUTOMÁTICOS (ATH auto / tarjeta) se confirman solos y
-  // las reservas AUTO abandonadas las expira el worker — por eso NO se muestra aquí.
-  const needsValidation = isPending && depId && depStatus==='pending' && depManual;
+  // Validación manual del depósito: aparece con CUALQUIER depósito pendiente.
+  // Antes exigía que el cliente hubiera reportado su referencia (manual_validate)
+  // — pero si el cliente envía el ATH/PayPal directo al negocio SIN escribir la
+  // referencia en la app, el botón nunca salía y el negocio no podía aceptar la
+  // cita. El diálogo de confirmación ("¿RECIBISTE el depósito?") protege el resto.
+  const depId = ev.dataset.depId||'', depStatus = ev.dataset.depStatus||'';
+  const needsValidation = isPending && depId && depStatus==='pending';
   const phone = String(ev.dataset.phone||'').replace(/\D/g,'');
   const arrived = TL_ARRIVED.has(String(id));
 

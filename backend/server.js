@@ -3162,7 +3162,9 @@ function buildMessage(template, ctx) {
     + (biz.lat != null && biz.lng != null ? `🗺 Cómo llegar: https://www.google.com/maps/search/?api=1&query=${biz.lat},${biz.lng}\n` : '');
   switch (template) {
     case 'confirm':
-      return `✅ *${biz.name}*\nTu cita quedó ${appt.status === 'pending_deposit' ? 'reservada (pendiente de depósito)' : 'confirmada'}:\n\n💈 ${appt.service_name}\n🗓 ${when}\n🎟 Código: ${appt.confirmation_code}\n${appt.status === 'pending_deposit' && biz.ath_phone ? `\nPara confirmar, envía el depósito de $${(appt.deposit_cents / 100).toFixed(2)} por ATH Móvil a ${biz.ath_phone} y responde con tu referencia.` : ''}`;
+      return `✅ *${biz.name}*\nTu cita quedó ${appt.status === 'pending_deposit' ? 'reservada (pendiente de depósito)' : 'confirmada'}:\n\n💈 ${appt.service_name}\n🗓 ${when}\n🎟 Código: ${appt.confirmation_code}\n${appt.status === 'pending_deposit' && biz.ath_phone ? `\nPara confirmar, envía el depósito de $${(appt.deposit_cents / 100).toFixed(2)} por ATH Móvil a ${biz.ath_phone} y responde con tu referencia.` : ''}${appt.status === 'pending_deposit' ? `\n\n⏳ *Importante:* tu turno queda reservado por *30 minutos* mientras el negocio valida el depósito. Si no se valida a tiempo, el turno se libera.` : ''}`;
+    case 'hold_expired':
+      return `⌛ *${biz.name}*\nTu reserva de *${appt.service_name}* (${when}) no quedó registrada: el depósito no se validó dentro de los 30 minutos y el turno se liberó.\n\nSi YA enviaste el depósito, contacta al negocio para que valide tu pago y te reubique. Si no, puedes reservar de nuevo cuando quieras. 🙏`;
     case 'reminder_48h':
       return `📅 *${biz.name}*\nTu cita es en 2 días:\n\n💈 ${appt.service_name}\n🗓 ${when}\n\nSi necesitas mover la fecha, este es buen momento para avisarnos. Responde aquí.`;
     case 'reminder_24h':
@@ -3430,10 +3432,15 @@ function emailAppt(template, ctx) {
     case 'confirm':
       title = appt.status === 'pending_deposit' ? 'Tu cita está reservada' : 'Tu cita está confirmada';
       intro = appt.status === 'pending_deposit'
-        ? 'Tu cita quedó reservada, pendiente de depósito.'
+        ? 'Tu cita quedó reservada, pendiente de depósito. Importante: el turno queda reservado por 30 minutos mientras el negocio valida el depósito; si no se valida a tiempo, se libera.'
         : 'Tu cita quedó confirmada. Te esperamos.';
       if (appt.status === 'pending_deposit' && biz.ath_phone)
         extra = `Para confirmar, envía el depósito de $${(appt.deposit_cents / 100).toFixed(2)} por ATH Móvil a ${emailEsc(biz.ath_phone)} y responde con tu referencia.`;
+      break;
+    case 'hold_expired':
+      title = 'Tu reserva expiró';
+      intro = 'Tu reserva no quedó registrada: el depósito no se validó dentro de los 30 minutos y el turno se liberó.';
+      extra = 'Si ya enviaste el depósito, contacta al negocio para que valide tu pago y te reubique. Si no, puedes reservar de nuevo cuando quieras.';
       break;
     case 'reminder_48h':
       title = 'Tu cita es en 2 días';
@@ -3663,25 +3670,28 @@ setInterval(() => { remindRenewals().catch(e => console.error('remindRenewals:',
 remindRenewals().catch(e => console.error('remindRenewals(boot):', e.message));
 expireBilling().catch(e => console.error('expireBilling(boot):', e.message));
 
-// ── Worker: expirar reservas AUTOMÁTICAS sin pagar (libera el turno) ─────────
+// ── Worker: expirar reservas con depósito sin validar (libera el turno) ──────
 // Una cita 'pending_deposit' OCUPA el turno (constraint anti-doble-reserva, pues
-// pending_deposit está en ALIVE). Si el depósito es AUTOMÁTICO (ATH Móvil auto:
-// method='ath_movil' y manual_validate=false) y el cliente NO lo paga en 30 min,
-// se cancela para liberar el turno. NUNCA se tocan: los MANUALES (efectivo / ATH
-// al número → manual_validate=true, el negocio los valida cuando quiera) ni los de
-// TARJETA (method='card', Stripe confirma async). Cancelar a 'cancelled_business'
-// (fuera de ALIVE) libera el turno de inmediato. Idempotente; corre cada 5 min.
+// pending_deposit está en ALIVE). El standby dura MÁXIMO 30 minutos para todo
+// depósito ELECTRÓNICO directo (method='ath_movil': ATH auto, ATH al número con o
+// sin referencia reportada, y PayPal — que queda con el method por defecto). Si el
+// negocio no lo valida (o el pago auto no entra) en 30 min, se cancela y se avisa
+// al CLIENTE (WhatsApp/email 'hold_expired') además del negocio. NUNCA se tocan:
+// EFECTIVO (method='cash' → pago en persona, el negocio valida cuando quiera) ni
+// TARJETA (method='card', Stripe confirma async y su webhook maneja pagos tardíos).
+// Cancelar a 'cancelled_business' (fuera de ALIVE) libera el turno de inmediato.
+// Idempotente; corre cada 5 min.
 async function expireAutoHolds() {
   const { rows } = await db.query(
     `UPDATE appointments a SET status = 'cancelled_business', cancelled_at = now(),
-            cancel_reason = 'Depósito no recibido a tiempo'
+            cancel_reason = 'Depósito no validado a tiempo'
       WHERE a.status = 'pending_deposit'
         AND a.created_at < now() - interval '30 minutes'
         AND EXISTS (SELECT 1 FROM payments p
                      WHERE p.appointment_id = a.id AND p.business_id = a.business_id
                        AND p.kind = 'deposit' AND p.status = 'pending'
-                       AND p.manual_validate = false AND p.method = 'ath_movil')
-      RETURNING a.id, a.business_id, a.service_name`);
+                       AND p.method = 'ath_movil')
+      RETURNING a.id, a.business_id, a.service_name, a.client_id`);
   for (const r of rows) {
     // marca el depósito pendiente como fallido (reporte); la cita ya quedó cancelada
     await db.query(
@@ -3689,8 +3699,19 @@ async function expireAutoHolds() {
         WHERE appointment_id = $1 AND kind = 'deposit' AND status = 'pending'`, [r.id]);
     try {
       await notify(r.business_id, 'cancellation', '⌛ Reserva expirada',
-        `${r.service_name} · depósito no recibido a tiempo`, { appointment_id: r.id });
+        `${r.service_name} · depósito no validado en 30 min`, { appointment_id: r.id });
     } catch (e) { console.error('expireAutoHolds notify:', e.message); }
+    // Avisar al CLIENTE que su reserva no quedó registrada (WhatsApp + email).
+    try {
+      const c = await db.query(`SELECT phone, email FROM clients WHERE id = $1`, [r.client_id]);
+      const cl = c.rows[0];
+      if (cl?.phone)
+        await db.query(`INSERT INTO message_log (business_id, appointment_id, channel, recipient, template)
+           VALUES ($1,$2,'whatsapp',$3,'hold_expired')`, [r.business_id, r.id, cl.phone]);
+      if (cl?.email && isEmail(cl.email))
+        await db.query(`INSERT INTO message_log (business_id, appointment_id, channel, recipient, template)
+           VALUES ($1,$2,'email',$3,'hold_expired')`, [r.business_id, r.id, cl.email.toLowerCase()]);
+    } catch (e) { console.error('expireAutoHolds client msg:', e.message); }
   }
 }
 setInterval(() => { expireAutoHolds().catch(e => console.error('expireAutoHolds:', e.message)); }, 300_000);
